@@ -24,9 +24,12 @@ var _current := {}
 var _active := false
 var loaded_count := 0
 var failed_count := 0
+## 累计入队数（含已完成），用于加载界面的「N / M」
+var enqueued_count := 0
 
 
 func enqueue(path: String, parent: Node, meta: Variant = null) -> void:
+	enqueued_count += 1
 	_queue.append({"path": path, "parent": parent, "meta": meta, "state": "pending"})
 
 
@@ -41,6 +44,31 @@ func pending() -> int:
 
 func is_idle() -> bool:
 	return _current.is_empty() and _queue.is_empty()
+
+
+## 已完成数（成功 + 失败）
+func finished_count() -> int:
+	return loaded_count + failed_count
+
+
+## 整体进度 0–1：已完成项 + 当前项的线程加载进度。
+## 只给 0–0.99，避免"队列跑完了但步骤还没推进"时进度条提前顶到 100%。
+func progress() -> float:
+	if is_idle():
+		return 1.0
+	var total := maxi(enqueued_count, 1)
+	var cur := 0.0
+	if not _current.is_empty():
+		var out: Array = []
+		var st := ResourceLoader.load_threaded_get_status(str(_current["path"]), out)
+		if st == ResourceLoader.THREAD_LOAD_IN_PROGRESS and out.size() > 0:
+			cur = clampf(float(out[0]), 0.0, 0.95)
+	return clampf((float(finished_count()) + cur) / float(total), 0.0, 0.99)
+
+
+## 界面用的计数 [已完成, 总数]
+func counters() -> Vector2i:
+	return Vector2i(finished_count(), enqueued_count)
 
 
 ## 推进一个加载项。返回"这一帧是否有进展"。

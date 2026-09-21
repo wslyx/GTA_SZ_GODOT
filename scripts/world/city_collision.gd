@@ -23,6 +23,14 @@ var _land_rings: Array = []
 var _water: Array = []
 var _water_outer: Array = []
 
+## blocked() 是每帧被调若干次的热路径（车子步碰撞、自动驾驶、飞行判定…），
+## 原来每次都把上千条地标 / 312 个水域外环全量走一遍射线法。
+## 这里预打包成扁平数组 + 包围盒，先做 O(1) 的盒子剔除再决定是否进射线法。
+var _block_r := PackedFloat32Array()   ## 每 3 个一组：x, z, radius
+var _land_box := PackedFloat32Array()  ## 每 4 个一组：minx, maxx, minz, maxz
+var _water_box := PackedFloat32Array()
+var _hole_box := PackedFloat32Array()
+
 var _seg_cache: Dictionary = {}
 var _ring_cache: Dictionary = {}
 
@@ -75,22 +83,41 @@ func build(data_hint: Node = null) -> void:
 				_bcells[k].append(ring)
 
 	_landmarks = CityData.all_landmarks()
+	# 预打包地标阻挡圈：原实现是每帧在 blocked() 里重复做 dict.get / bool 判断
+	_block_r.clear()
 	for lm in _landmarks:
 		if bool(lm.get("detailCollision", false)):
 			continue
+		var h := float(lm.get("height", 0.0))
+		if h <= 0.0:
+			continue
+		var id := str(lm.get("id", ""))
+		var radius := 24.0
+		if id == "civic":
+			radius = 65.0
+		elif id == "tencent":
+			radius = 46.0
+		_block_r.append(float(lm.get("x", 0.0)))
+		_block_r.append(float(lm.get("z", 0.0)))
+		_block_r.append(radius)
 
 	for r in CityData.land_rings:
 		if r.size() >= 3:
-			_land_rings.append(_pack(r))
+			var ring := _pack(r)
+			_land_box.append_array(_ring_box(ring))
+			_land_rings.append(ring)
 
 	for w in CityData.water:
 		var rings: Array = w.get("rings", [])
 		if rings.is_empty():
 			continue
 		var outer := _pack(rings[0])
+		_water_box.append_array(_ring_box(outer))
 		_water_outer.append(outer)
 		for i in range(1, rings.size()):
-			_water.append(_pack(rings[i]))
+			var hole := _pack(rings[i])
+			_hole_box.append_array(_ring_box(hole))
+			_water.append(hole)
 
 	# 注意：water 的洞（内环）在原版里是**排除**水面的，见 blocked() 的最后一行
 	print("[CityCollision] 构建完成 %d ms：路段格 %d / 建筑格 %d / 陆地环 %d / 水域 %d"
@@ -111,6 +138,26 @@ static func _pack(ring: Array) -> PackedVector2Array:
 
 static func _key(cx: int, cz: int) -> int:
 	return (cx + 32768) * 65536 + (cz + 32768)
+
+
+## 求一个环的包围盒，返回 [minx, maxx, minz, maxz]
+static func _ring_box(ring: PackedVector2Array) -> PackedFloat32Array:
+	var minx := INF
+	var minz := INF
+	var maxx := -INF
+	var maxz := -INF
+	for p in ring:
+		minx = minf(minx, p.x)
+		maxx = maxf(maxx, p.x)
+		minz = minf(minz, p.y)
+		maxz = maxf(maxz, p.y)
+	return PackedFloat32Array([minx, maxx, minz, maxz])
+
+
+## 包围盒命中测试（i 为环序号）
+static func _box_hit(box: PackedFloat32Array, i: int, x: float, z: float) -> bool:
+	var o := i * 4
+	return x >= box[o] and x <= box[o + 1] and z >= box[o + 2] and z <= box[o + 3]
 
 
 ## 最近路段：返回 {point:Vector2, d:float, yaw:float, road:Dictionary} 或空字典
@@ -173,40 +220,37 @@ func blocked(x: float, z: float) -> bool:
 			if closest_point(x, z, r[i - 1], r[i])["d"] < WALL_MARGIN:
 				return true
 
-	for m in _landmarks:
-		if bool(m.get("detailCollision", false)):
-			continue
-		var h := float(m.get("height", 0.0))
-		if h <= 0.0:
-			continue
-		var id := str(m.get("id", ""))
-		var radius := 24.0
-		if id == "civic":
-			radius = 65.0
-		elif id == "tencent":
-			radius = 46.0
-		var mx := float(m.get("x", 0.0))
-		var mz := float(m.get("z", 0.0))
-		if sqrt((x - mx) * (x - mx) + (z - mz) * (z - mz)) < radius:
+	# 地标阻挡圈：扁平数组 + 距离平方比较，不再逐条做 dict.get
+	for i in range(0, _block_r.size(), 3):
+		var mx := _block_r[i]
+		var mz := _block_r[i + 1]
+		var radius := _block_r[i + 2]
+		var dx := x - mx
+		var dz := z - mz
+		if dx * dx + dz * dz < radius * radius:
 			return true
 
+	# 陆地 / 水域：先过包围盒，命中才走 O(n) 的射线法
 	var on_land := false
-	for ring in _land_rings:
-		if in_ring(x, z, ring):
+	for i in _land_rings.size():
+		if _box_hit(_land_box, i, x, z) and in_ring(x, z, _land_rings[i]):
 			on_land = true
 			break
 	if not on_land:
 		return true
 
-	for ring in _water_outer:
-		if in_ring(x, z, ring):
-			var in_hole := false
-			for hole in _water:
-				if in_ring(x, z, hole):
-					in_hole = true
-					break
-			if not in_hole:
-				return true
+	for i in _water_outer.size():
+		if not _box_hit(_water_box, i, x, z):
+			continue
+		if not in_ring(x, z, _water_outer[i]):
+			continue
+		var in_hole := false
+		for j in _water.size():
+			if _box_hit(_hole_box, j, x, z) and in_ring(x, z, _water[j]):
+				in_hole = true
+				break
+		if not in_hole:
+			return true
 
 	return false
 

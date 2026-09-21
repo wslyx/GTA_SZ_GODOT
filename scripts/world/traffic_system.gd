@@ -22,6 +22,8 @@ const HOLD_BLOCK_DIST := 8.0
 const HOLD_SIGNAL_DIST := 6.0
 const KERB_OFFSET := 1.15
 const CAR_HEIGHT := 0.14
+## 布点时「最近节点池」的大小（原版 pool_size = 45，只用于前 10 辆车）
+const NEAR_POOL := 45
 
 const CAR_COLORS := [
 	Color(0.52, 0.56, 0.53),
@@ -44,6 +46,11 @@ var _rng := RandomNumberGenerator.new()
 ## 实例变换重写节流：69 个 MultiMesh 节点，每帧重写太重
 const SYNC_INTERVAL := 0.1
 var _sync_timer := 0.0
+## 路网节点空间索引。
+## place() 原本每 450m 就把 42829 个节点全量扫一遍，再对上千个候选跑
+## sort_custom（GDScript 的 lambda 比较器，单次几十毫秒）—— 开车时表现为
+## 每隔十几秒一次明显卡顿。改成网格索引后一次只取半径内那一小撮。
+var _node_grid: PointGrid
 
 
 func setup(p_world: CityWorld) -> void:
@@ -51,9 +58,19 @@ func setup(p_world: CityWorld) -> void:
 	graph = p_world.graph
 	signals = p_world.signals
 	_rng.seed = 77  # 原版 seed=77
+	_build_node_index()
 	_load_car_asset()
 	if not world.blocks.is_empty():
 		place(CityData.spawn_pos.x, CityData.spawn_pos.y)
+
+
+func _build_node_index() -> void:
+	if graph == null or graph.nodes.is_empty():
+		return
+	var t0 := Time.get_ticks_msec()
+	_node_grid = PointGrid.new(256.0)
+	_node_grid.build(graph.nodes)
+	print("[TrafficSystem] 路网节点索引 %d 个，%.0f ms" % [graph.nodes.size(), float(Time.get_ticks_msec() - t0)])
 
 
 func _load_car_asset() -> void:
@@ -119,21 +136,46 @@ func place(px: float, pz: float) -> void:
 	if graph == null or graph.nodes.is_empty():
 		return
 	var p := Vector2(px, pz)
-	var candidates: Array = []
-	for i in graph.nodes.size():
+	# 索引可用时只扫半径内的节点；索引还没建好（极端情况）才退回全量扫描。
+	var scan: Array = []
+	if _node_grid != null:
+		scan = _node_grid.query_radius(p, MAX_SPAWN_DIST)
+	else:
+		scan = range(graph.nodes.size())
+	var all_ids: Array = []
+	for i in scan:
 		var d := graph.nodes[i].distance_to(p)
 		if d > MIN_SPAWN_DIST and d < MAX_SPAWN_DIST and graph.degree(i) > 1:
-			candidates.append(i)
-	if candidates.is_empty():
+			all_ids.append(i)
+	if all_ids.is_empty():
 		return
-	candidates.sort_custom(func(a, b):
-		return graph.nodes[a].distance_to(p) < graph.nodes[b].distance_to(p))
+
+	# 原版要的是「按距离升序、前 45 个里随机」+「其余里随机」两个池。
+	# 全量 sort_custom（上千次 GDScript lambda 调用）只为拿到前 45 个太亏，
+	# 这里改成一次线性选出最近的 45 个。
+	var near_ids: Array = []
+	var near_d := PackedFloat32Array()
+	for idx in all_ids:
+		var d := graph.nodes[idx].distance_to(p)
+		if near_ids.size() < NEAR_POOL:
+			near_ids.append(idx)
+			near_d.append(d)
+			continue
+		# 比当前最远的近就替换掉它（插入排序，NEAR_POOL 只有 45，开销可忽略）
+		var worst := 0
+		for k in range(1, near_d.size()):
+			if near_d[k] > near_d[worst]:
+				worst = k
+		if d < near_d[worst]:
+			near_ids[worst] = idx
+			near_d[worst] = d
 
 	for i in CAR_COUNT:
-		if candidates.is_empty():
+		# 前 10 辆从最近的 45 个节点里挑（原版 pool_size = 45），其余从全部候选里挑
+		var pool_ids: Array = near_ids if i < 10 else all_ids
+		if pool_ids.is_empty():
 			break
-		var pool_size := mini(candidates.size(), 45 if i < 10 else candidates.size())
-		var from: int = candidates[_rng.randi_range(0, pool_size - 1)]
+		var from: int = pool_ids[_rng.randi_range(0, pool_ids.size() - 1)]
 		var next: Array = []
 		for to in graph.neighbor_ids(from):
 			next.append(to)

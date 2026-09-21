@@ -24,7 +24,23 @@ var _dialog_kind := ""
 
 var _loading_label: Label
 var _loading_bar: Control
-var _loading_progress := 0.0
+var _loading_pct: Label
+var _loading_detail: Label
+var _loading_progress := 0.0      ## 目标进度
+var _loading_shown := 0.0         ## 显示进度（向目标平滑逼近）
+var _loading_built := false
+
+const BAR_WIDTH := 520.0
+
+
+## 加载界面必须在**城市构建之前**就建好。
+## 之前的写法把 _build() 整个放进 setup()，而 setup() 是 _on_built()（城市构建完成）
+## 之后才调的 —— 于是整个加载阶段 `loading` 都是 null，show_loading() /
+## set_loading_progress() 全部空转，玩家看到的是一片黑屏。
+func _ready() -> void:
+	layer = 12
+	_build_loading()
+	show_loading()
 
 
 func setup(p_world: CityWorld, p_player, p_career: CareerSystem, p_story: StorySystem) -> void:
@@ -78,42 +94,13 @@ func _panel(title: String, size: Vector2, pos: Vector2) -> Dictionary:
 
 
 func _build() -> void:
+	if not _loading_built:
+		_build_loading()
 	journal = _panel("城市手账 · J 关闭", Vector2(720, 620), Vector2(600, 180))["root"]
 	journal_body = journal.get_child(3)
 
 	graphics_panel = _panel("画质设置 · G+Shift 关闭", Vector2(560, 320), Vector2(680, 820))["root"]
 	graphics_body = graphics_panel.get_child(3)
-
-	# 加载画面
-	loading = Control.new()
-	loading.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(loading)
-	var lbg := ColorRect.new()
-	lbg.color = Color(0.02, 0.03, 0.05, 1.0)
-	lbg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	loading.add_child(lbg)
-	_loading_label = Label.new()
-	_loading_label.add_theme_font_override("font", _font(30))
-	_loading_label.add_theme_color_override("font_color", Color(0.92, 0.94, 0.96))
-	_loading_label.set_anchors_preset(Control.PRESET_CENTER)
-	_loading_label.position = Vector2(-300, -30)
-	_loading_label.size = Vector2(600, 40)
-	_loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_loading_label.text = "深城纪 · 正在加载"
-	loading.add_child(_loading_label)
-
-	var bar_bg := ColorRect.new()
-	bar_bg.color = Color(0.12, 0.14, 0.18)
-	bar_bg.set_anchors_preset(Control.PRESET_CENTER)
-	bar_bg.position = Vector2(-260, 30)
-	bar_bg.size = Vector2(520, 8)
-	loading.add_child(bar_bg)
-	_loading_bar = ColorRect.new()
-	_loading_bar.color = Color(0.85, 0.72, 0.40)
-	_loading_bar.set_anchors_preset(Control.PRESET_CENTER)
-	_loading_bar.position = Vector2(-260, 30)
-	_loading_bar.size = Vector2(0, 8)
-	loading.add_child(_loading_bar)
 
 	# 对话
 	dialog = Control.new()
@@ -149,26 +136,131 @@ var dialog_options: Label
 
 
 # ---------------------------------------------------------------------------
-# 加载
+# 加载画面
 # ---------------------------------------------------------------------------
 
+func _build_loading() -> void:
+	if _loading_built:
+		return
+	_loading_built = true
+
+	loading = Control.new()
+	loading.name = "LoadingScreen"
+	loading.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(loading)
+
+	var lbg := ColorRect.new()
+	lbg.color = Color(0.02, 0.03, 0.05, 1.0)
+	lbg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading.add_child(lbg)
+
+	# 顶部标题
+	var title := Label.new()
+	title.add_theme_font_override("font", _font(22))
+	title.add_theme_color_override("font_color", Color(0.85, 0.72, 0.40))
+	title.set_anchors_preset(Control.PRESET_CENTER)
+	title.position = Vector2(-300, -110)
+	title.size = Vector2(600, 32)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.text = "深 城 纪 · SHENCHENGJI"
+	loading.add_child(title)
+
+	# 阶段文案
+	_loading_label = Label.new()
+	_loading_label.add_theme_font_override("font", _font(30))
+	_loading_label.add_theme_color_override("font_color", Color(0.92, 0.94, 0.96))
+	_loading_label.set_anchors_preset(Control.PRESET_CENTER)
+	_loading_label.position = Vector2(-300, -50)
+	_loading_label.size = Vector2(600, 42)
+	_loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_label.text = "深城纪 · 正在加载"
+	loading.add_child(_loading_label)
+
+	# 进度条底槽
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color(0.12, 0.14, 0.18)
+	bar_bg.set_anchors_preset(Control.PRESET_CENTER)
+	bar_bg.position = Vector2(-BAR_WIDTH * 0.5, 10)
+	bar_bg.size = Vector2(BAR_WIDTH, 10)
+	loading.add_child(bar_bg)
+
+	# 进度条（从左侧生长：锚点已居中，左边缘固定）
+	_loading_bar = ColorRect.new()
+	_loading_bar.color = Color(0.85, 0.72, 0.40)
+	_loading_bar.set_anchors_preset(Control.PRESET_CENTER)
+	_loading_bar.position = Vector2(-BAR_WIDTH * 0.5, 10)
+	_loading_bar.size = Vector2(0, 10)
+	loading.add_child(_loading_bar)
+
+	# 百分比
+	_loading_pct = Label.new()
+	_loading_pct.add_theme_font_override("font", _font(20))
+	_loading_pct.add_theme_color_override("font_color", Color(0.85, 0.72, 0.40))
+	_loading_pct.set_anchors_preset(Control.PRESET_CENTER)
+	_loading_pct.position = Vector2(-300, 30)
+	_loading_pct.size = Vector2(600, 28)
+	_loading_pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_pct.text = "0%"
+	loading.add_child(_loading_pct)
+
+	# 明细（资源计数等）
+	_loading_detail = Label.new()
+	_loading_detail.add_theme_font_override("font", _font(16))
+	_loading_detail.add_theme_color_override("font_color", Color(0.55, 0.60, 0.66))
+	_loading_detail.set_anchors_preset(Control.PRESET_CENTER)
+	_loading_detail.position = Vector2(-300, 62)
+	_loading_detail.size = Vector2(600, 24)
+	_loading_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_detail.text = ""
+	loading.add_child(_loading_detail)
+
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	# 进度条平滑逼近：单块 266MB 的 buildings.glb 会长时间停在同一百分比，
+	# 直接跳变到目标值会让界面看起来"卡住了"。
+	if loading == null or not loading.visible:
+		return
+	if is_zero_approx(_loading_shown - _loading_progress):
+		return
+	_loading_shown = move_toward(_loading_shown, _loading_progress, delta * 0.65)
+	_apply_bar()
+
+
+func _apply_bar() -> void:
+	if _loading_bar != null:
+		_loading_bar.size = Vector2(BAR_WIDTH * _loading_shown, 10)
+	if _loading_pct != null:
+		_loading_pct.text = "%d%%" % int(round(_loading_shown * 100.0))
+
+
 func set_loading_text(text: String) -> void:
-	if _loading_label != null:
+	if _loading_label != null and _loading_label.text != text:
 		_loading_label.text = text
+
+
+func set_loading_detail(text: String) -> void:
+	if _loading_detail != null and _loading_detail.text != text:
+		_loading_detail.text = text
 
 
 func set_loading_progress(p: float) -> void:
 	_loading_progress = clampf(p, 0.0, 1.0)
-	if _loading_bar != null:
-		_loading_bar.size = Vector2(520.0 * _loading_progress, 8)
 
 
 func finish_loading() -> void:
+	_loading_progress = 1.0
+	_loading_shown = 1.0
+	_apply_bar()
 	if loading != null:
 		loading.visible = false
 
 
 func show_loading() -> void:
+	_loading_progress = 0.0
+	_loading_shown = 0.0
+	_apply_bar()
 	if loading != null:
 		loading.visible = true
 

@@ -41,11 +41,86 @@ var stats_loaded := 0
 var stats_unloaded := 0
 var stats_failed := 0
 
+# --- 启动期预加载 -----------------------------------------------------------
+## 出生点附近的瓦片在加载界面里一次性载完，避免行驶途中单块 6MB GLB 造成掉帧。
+var _preload_ids: Array = []
+var _preload_total := 0
+var _preload_done_n := 0
+var _setup_done := false
+
 
 func setup(p_world: CityWorld) -> void:
+	# 幂等：CityWorld 的步骤与 main_game 都可能调到这里，重复 connect 会让
+	# 同一块瓦片被处理两次（_by_id 里 state 被覆写）。
+	if _setup_done:
+		return
+	_setup_done = true
 	world = p_world
 	_loader.entry_loaded.connect(_on_loaded)
 	_loader.entry_failed.connect(_on_failed)
+
+
+# ---------------------------------------------------------------------------
+# 启动期预加载
+# ---------------------------------------------------------------------------
+
+## 把 focus_data 半径内的瓦片全部入队（仍是一次一个地串行走完）
+func begin_preload(focus_data: Vector2) -> int:
+	_preload_ids.clear()
+	_preload_total = 0
+	_preload_done_n = 0
+	var fx := focus_data.x
+	var fz := focus_data.y
+	for t in tiles:
+		var d := Vector2(float(t["x"]) - fx, float(t["z"]) - fz).length()
+		if d <= SHOW_RADIUS:
+			_preload_ids.append(str(t["id"]))
+	if _preload_ids.is_empty():
+		return 0
+	_preload_total = _preload_ids.size()
+	for id in _preload_ids:
+		var e: Dictionary = _by_id[id]
+		e["state"] = "loading"
+		_loader.enqueue(_tile_path(id), self, id)
+	print("[FacadeStreamer] 预加载出生点 %.0fm 内立面瓦片 %d 块" % [SHOW_RADIUS, _preload_total])
+	return _preload_total
+
+
+func poll_preload() -> void:
+	if _preload_ids.is_empty():
+		return
+	_loader.poll()
+
+
+func preload_done() -> bool:
+	if _preload_ids.is_empty():
+		return true
+	return _loader.is_idle()
+
+
+func preload_progress() -> float:
+	if _preload_ids.is_empty():
+		return 1.0
+	if _loader.is_idle():
+		return 1.0
+	# 用「已就位的瓦片数 / 总数」，比单块的线程进度更贴合观感
+	var done := 0
+	for id in _preload_ids:
+		var e: Dictionary = _by_id.get(id, {})
+		if str(e.get("state", "")) == "loaded":
+			done += 1
+	return clampf(float(done) / float(_preload_total), 0.0, 0.99)
+
+
+func preload_detail() -> String:
+	if _preload_ids.is_empty():
+		return ""
+	var done := 0
+	for id in _preload_ids:
+		var e: Dictionary = _by_id.get(id, {})
+		if str(e.get("state", "")) == "loaded":
+			done += 1
+	return "近景立面 %d / %d" % [done, _preload_total]
 
 
 ## 由 CityWorld 的步骤调用
@@ -156,8 +231,11 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant) -> void:
 	stats_loaded += 1
 
 
-func _on_failed(_path: String, _reason: String) -> void:
+func _on_failed(path: String, _reason: String) -> void:
+	# 预加载阶段是批量入队的，_current_id 一直是空串，只能从路径反推 id
 	var id := _current_id
+	if id == "":
+		id = path.get_file().get_basename()
 	_current_id = ""
 	stats_failed += 1
 	if id == "":

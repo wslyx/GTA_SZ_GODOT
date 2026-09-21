@@ -38,6 +38,11 @@ var _furniture_nodes: Array = []
 var _detail_nodes: Array = []
 var _timer := 0.0
 var _built := false
+## 林冠分帧重建状态：phase 0=空闲，1=筛选候选，2=写入 MultiMesh
+var _canopy_job: Dictionary = {"phase": 0}
+var _canopy_last_focus := Vector2.ZERO
+## 林冠每帧最多处理的候选树数（计算 + 写入都计入），把上万次 set_instance_transform 摊到多帧
+const CANOPY_CHUNK := 2600
 
 
 func setup(p_world: CityWorld) -> void:
@@ -147,57 +152,89 @@ func _canopy_tier(d: float, aerial: bool) -> String:
 	return "mid" if d <= mid_limit else "far"
 
 
-func _update_canopy(focus: Vector3, aerial: bool) -> void:
+## 启动一次林冠重建任务：只筛选候选树（网格索引 + 距离升序），
+## 真正的实例写入在 _canopy_step 里分帧进行，避免单帧重写上万实例造成卡顿。
+func _canopy_start(focus: Vector3, aerial: bool) -> void:
 	if _canopy_instances.is_empty() or _canopy_nodes.is_empty():
 		return
 	var fx := focus.x
 	var fz := -focus.z
-	var buckets := {}
-	# Dictionary.get() 返回 Variant，必须显式标类型
 	var budget: int = TREE_BUDGET.get(GameState.graphics_tier, 9000)
-	var used := 0
-
-	# 网格索引取半径内的树（按距离升序），不再全量扫 40927 棵 + 排序
 	var near: Array = []
 	if _canopy_grid != null:
 		near = _canopy_grid.query_radius_sorted(Vector2(fx, fz), STREET_RADIUS, _canopy_points)
+	_canopy_job = {
+		"phase": 1, "buckets": {}, "node_list": [], "node_idx": 0, "write_i": 0,
+		"cand": near, "ci": 0, "used": 0, "budget": budget, "aerial": aerial,
+	}
 
-	for it in near:
-		if used >= budget:
-			break
-		var idx: int = it["idx"]
-		var d: float = it["dist"]
-		var t: Dictionary = _canopy_instances[idx]
-		var sid := _species_id(int(t["species"]))
-		if sid.is_empty():
-			continue
-		var tier := _canopy_tier(d, aerial)
-		var key := "%s|%s" % [sid, tier]
-		if not buckets.has(key):
-			buckets[key] = []
-		var tx := float(t["x"])
-		var tz := float(t["z"])
-		var g := world.ground_height(tx, -tz)
-		buckets[key].append(Transform3D(
-			Basis(Vector3.UP, CoordinateUtil.node_yaw(float(t["yaw"]))).scaled(
-				Vector3(float(t["scale"]), float(t["scale"]), float(t["scale"]))),
-			CoordinateUtil.to_world(tx, tz, g)))
-		used += 1
 
-	for node_key in _canopy_nodes:
-		# _canopy_nodes 里存的是 MultiMeshInstance3D（不是 MeshInstance3D），
-		# 类型标错了会在运行时报 Trying to assign MultiMeshInstance3D to MeshInstance3D
-		var node: MultiMeshInstance3D = _canopy_nodes[node_key]
-		# 遍历 Dictionary 拿到的 key 是 Variant，先取成 String 再用
-		var key_str: String = node_key
-		var parts := key_str.split("|")
-		var bucket_key := "%s|%s" % [parts[0], parts[1]]
-		var list: Array = buckets.get(bucket_key, [])
-		var mm: MultiMesh = node.multimesh
-		mm.instance_count = list.size()
-		mm.visible_instance_count = list.size()
-		for i in list.size():
-			mm.set_instance_transform(i, list[i])
+## 分帧推进林冠重建：
+##   phase 1 —— 把候选树分到各 LOD 桶（算变换矩阵 + 查地面高度）
+##   phase 2 —— 把桶写入各 MultiMesh
+## 每帧只处理 CANOPY_CHUNK 个候选树，把「上万次 set_instance_transform」摊到多帧，
+## 消除原来每 2 秒一次的主线程尖峰（1.6 万实例单帧重写）。
+func _canopy_step(focus: Vector3) -> void:
+	var job: Dictionary = _canopy_job
+	if int(job["phase"]) == 0:
+		return
+
+	if int(job["phase"]) == 1:
+		var near: Array = job["cand"]
+		var processed := 0
+		while int(job["ci"]) < near.size() and int(job["used"]) < int(job["budget"]) and processed < CANOPY_CHUNK:
+			var it: Dictionary = near[int(job["ci"])]
+			job["ci"] = int(job["ci"]) + 1
+			processed += 1
+			var idx: int = int(it["idx"])
+			var d: float = float(it["dist"])
+			var t: Dictionary = _canopy_instances[idx]
+			var sid := _species_id(int(t["species"]))
+			if sid.is_empty():
+				continue
+			var tier := _canopy_tier(d, bool(job["aerial"]))
+			var key := "%s|%s" % [sid, tier]
+			if not job["buckets"].has(key):
+				job["buckets"][key] = []
+			var tx := float(t["x"])
+			var tz := float(t["z"])
+			var g := world.ground_height(tx, -tz)
+			job["buckets"][key].append(Transform3D(
+				Basis(Vector3.UP, CoordinateUtil.node_yaw(float(t["yaw"]))).scaled(
+					Vector3(float(t["scale"]), float(t["scale"]), float(t["scale"]))),
+				CoordinateUtil.to_world(tx, tz, g)))
+			job["used"] = int(job["used"]) + 1
+		if int(job["ci"]) >= near.size() or int(job["used"]) >= int(job["budget"]):
+			job["node_list"] = []
+			for nk in _canopy_nodes:
+				job["node_list"].append(nk)
+			job["phase"] = 2
+			job["node_idx"] = 0
+			job["write_i"] = 0
+		return
+
+	if int(job["phase"]) == 2:
+		var written := 0
+		while int(job["node_idx"]) < job["node_list"].size() and written < CANOPY_CHUNK:
+			var nk: String = job["node_list"][int(job["node_idx"])]
+			var node: MultiMeshInstance3D = _canopy_nodes[nk]
+			var parts: Array = nk.split("|")
+			var bucket_key := "%s|%s" % [parts[0], parts[1]]
+			var list: Array = job["buckets"].get(bucket_key, [])
+			var mm: MultiMesh = node.multimesh
+			if int(job["write_i"]) == 0:
+				mm.instance_count = list.size()
+			while int(job["write_i"]) < list.size() and written < CANOPY_CHUNK:
+				mm.set_instance_transform(int(job["write_i"]), list[int(job["write_i"])])
+				job["write_i"] = int(job["write_i"]) + 1
+				written += 1
+			# 只显示已写入的有效实例（未写入的暂留在原点不能显示），随写入平滑增长
+			mm.visible_instance_count = int(job["write_i"])
+			if int(job["write_i"]) >= list.size():
+				job["node_idx"] = int(job["node_idx"]) + 1
+				job["write_i"] = 0
+		if int(job["node_idx"]) >= job["node_list"].size():
+			_canopy_job = {"phase": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -340,11 +377,23 @@ func _load_furniture() -> void:
 func update_system(delta: float, focus: Vector3) -> void:
 	if not enabled or not _built:
 		return
-	_timer -= delta
-	if _timer > 0.0:
+	# 林冠分帧重建：进行中的任务每帧只做一小块，避免一次重写上万实例导致卡顿
+	if int(_canopy_job["phase"]) != 0:
+		_canopy_step(focus)
 		return
+	_timer -= delta
+	var f2 := Vector2(focus.x, -focus.z)
+	var moved := INF
+	if not _canopy_last_focus.is_zero_approx():
+		moved = f2.distance_to(_canopy_last_focus)
+	# 静止或慢速移动（<120m）时跳过重建：树是静态的，LOD 不会因此变化，
+	# 这样原地不动时不再每 2 秒卡一下。
+	if _timer > 0.0 and moved < 120.0:
+		return
+	_canopy_start(focus, world.aerial)
 	_timer = 2.0
-	_update_canopy(focus, world.aerial)
+	_canopy_last_focus = f2
+	_canopy_step(focus)
 	_update_details(focus)
 	_load_furniture()
 

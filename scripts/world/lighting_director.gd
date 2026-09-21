@@ -103,6 +103,9 @@ var _lamp_pool: Array = []
 var _scan_timer := 0.0
 var _built := false
 var lamp_lit := false
+## 实际参与分配的灯数（低画质档会调小）。Forward+ 下每盏 OmniLight 都是
+## 逐像素开销，24 盏铺满夜景城区并不便宜。
+var _active_lamps := LAMP_POOL
 
 
 func setup(p_world: CityWorld) -> void:
@@ -223,6 +226,8 @@ func cycle_mode() -> int:
 func set_quality(p: Dictionary) -> void:
 	if sun != null:
 		sun.shadow_enabled = true
+	# 低画质档把路灯池砍到 8 盏：省下的逐像素光照开销比少几盏灯更值钱
+	_active_lamps = 8 if float(p.get("detail_scale", 1.0)) <= 0.5 else LAMP_POOL
 	var env := env_node.environment
 	env.ssao_enabled = bool(p.get("ao", true))
 	env.glow_enabled = float(p.get("bloom_scale", 0.5)) > 0.0
@@ -270,7 +275,11 @@ func _create_lamp_pool() -> void:
 		l.omni_range = LAMP_RANGE
 		l.light_color = LAMP_COLOR
 		l.light_energy = LAMP_NIGHT_ENERGY / 100.0
-		l.shadow_enabled = i < 4
+		# ⚠️ 原来前 4 盏开了阴影。点光源阴影是立方体/双抛物面贴图，
+		# 一盏就要把半径 46m 内的所有几何重画一遍（双抛物面 2 个 pass），
+		# 4 盏 = 每帧 8 次额外的深度 pass，夜景下直接吃掉十几毫秒。
+		# 路灯离地 8m、照的是地面，有没有阴影在观感上几乎看不出来。
+		l.shadow_enabled = false
 		l.visible = false
 		add_child(l)
 		_lamp_pool.append(l)
@@ -285,7 +294,7 @@ func _assign_lamps(focus: Vector3) -> void:
 	if _lamp_grid != null:
 		scored = _lamp_grid.query_radius_sorted(Vector2(focus.x, focus.z),
 			LAMP_END_DISTANCE, _lamp_points)
-	var n := mini(_lamp_pool.size(), scored.size())
+	var n := mini(mini(_active_lamps, _lamp_pool.size()), scored.size())
 	for i in _lamp_pool.size():
 		var l: OmniLight3D = _lamp_pool[i]
 		if i < n:

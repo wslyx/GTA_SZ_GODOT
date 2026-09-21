@@ -82,6 +82,8 @@ var _focus_data := Vector2.ZERO
 var _steps: Array = []
 var _step := 0
 var _cull_timer := 0.0
+## 地标步骤内部有 3 段装载，用它算步骤内进度
+var _landmark_stage := 0
 var stats_loaded := 0
 var stats_failed := 0
 var last_failure := ""
@@ -141,7 +143,11 @@ func _process(delta: float) -> void:
 
 	if _step < _steps.size():
 		var fn: Callable = _steps[_step]
-		progress.emit(_step_label(_step))
+		# 只在阶段文案变化时广播：Label.text 每帧重写会触发 CJK 重排版，
+		# 加载期白白吃掉几毫秒。
+		if _step != _last_label_step:
+			_last_label_step = _step
+			progress.emit(_step_label(_step))
 		if fn.call():
 			_step += 1
 			_phase = ""
@@ -152,8 +158,6 @@ func _process(delta: float) -> void:
 	if _cull_timer <= 0.0:
 		_cull_timer = 0.25
 		_cull_chunks()
-		if signs != null and signs.has_method("update_signs"):
-			signs.update_signs(focus)
 	_update_subsystems(delta)
 
 
@@ -163,11 +167,46 @@ func _update_subsystems(delta: float) -> void:
 			sys.update_system(delta, focus)
 
 
-## 构建进度 0–1，供加载条使用
+## 构建进度 0–1，供加载条使用。
+## 粗粒度（只算第几步）会导致 buildings.glb 这种 266MB 的大件加载时进度条
+## 长时间一动不动，所以这里把「当前步骤内部」的进度也算进去。
 func progress_ratio() -> float:
 	if _steps.is_empty():
 		return 0.0
-	return clampf(float(_step) / float(_steps.size()), 0.0, 1.0)
+	var base := float(_step) / float(_steps.size())
+	var frac := 0.0
+	if _step < _steps.size():
+		frac = _step_fraction()
+	return clampf(base + frac / float(_steps.size()), 0.0, 1.0)
+
+
+## 当前步骤的内部进度 0–1
+func _step_fraction() -> float:
+	match _step:
+		5:  # 地标：landmarks → detail → candidates 三段
+			return clampf(float(_landmark_stage) / 3.0, 0.0, 1.0)
+		6:  # 立面瓦片预加载
+			if facades != null and facades.has_method("preload_progress"):
+				return float(facades.call("preload_progress"))
+			return 1.0
+		_:
+			if not loader.is_idle():
+				return loader.progress()
+			return 0.0
+
+
+## 加载界面下方的明细文案
+func progress_detail() -> String:
+	if _step == 6:
+		if facades != null and facades.has_method("preload_detail"):
+			return str(facades.call("preload_detail"))
+	var c := loader.counters()
+	if c.y > 0 and c.x < c.y:
+		return "资源 %d / %d" % [c.x, c.y]
+	return ""
+
+
+var _last_label_step := -1
 
 
 func _step_label(i: int) -> String:
@@ -245,6 +284,7 @@ func _plan_buildings() -> bool:
 func _plan_landmarks() -> bool:
 	if _phase == "":
 		_index_building_chunks()
+		_landmark_stage = 0
 		_phase = "landmarks"
 		loader.enqueue("res://data/city/landmarks.glb", landmarks_root, "landmarks")
 		return false
@@ -252,6 +292,7 @@ func _plan_landmarks() -> bool:
 		if not loader.is_idle():
 			return false
 		_dispose_replaced("detail")
+		_landmark_stage = 1
 		_phase = "detail"
 		loader.enqueue("res://data/city/landmark-detail.glb", landmarks_root, "landmark-detail")
 		return false
@@ -259,24 +300,44 @@ func _plan_landmarks() -> bool:
 		if not loader.is_idle():
 			return false
 		_dispose_replaced("candidates")
+		_landmark_stage = 2
 		_phase = "candidates"
 		loader.enqueue("res://data/city/landmark-candidates.glb", landmarks_root, "landmark-candidates")
 		return false
 	if _phase == "candidates":
-		return loader.is_idle()
+		if not loader.is_idle():
+			return false
+		_landmark_stage = 3
+		return true
 	return true
 
 
 # --- 步骤 6：立面 -----------------------------------------------------------
+## 出生点附近的立面瓦片在**加载阶段**一次性预载完。
+## 原实现只在 init_streaming 里建清单就返回 true，剩下的瓦片留给行驶途中
+## 逐个加载 —— 每块 5~7MB 的 GLB 在开车时入队会在那一帧砸出明显卡顿。
 func _plan_facades() -> bool:
-	if facades != null and facades.has_method("init_streaming"):
-		# _focus_data 要等 main_game 每帧调 set_focus() 才有值，这一步发生在
-		# 城市构建期间，此时它还是 (0,0)。直接用它初始化会让立面瓦片围着
-		# 地图原点加载、而不是围着出生点，玩家一落地周围全是空立面。
-		var f := _focus_data
-		if f == Vector2.ZERO:
-			f = CityData.spawn_pos
-		return facades.init_streaming(f)
+	if facades == null:
+		return true
+	if facades.has_method("setup"):
+		facades.call("setup", self)
+	if not facades.has_method("init_streaming"):
+		return true
+	# _focus_data 要等 main_game 每帧调 set_focus() 才有值，这一步发生在
+	# 城市构建期间，此时它还是 (0,0)。直接用它初始化会让立面瓦片围着
+	# 地图原点加载、而不是围着出生点，玩家一落地周围全是空立面。
+	var f := _focus_data
+	if f == Vector2.ZERO:
+		f = CityData.spawn_pos
+	match _phase:
+		"":
+			facades.call("init_streaming", f)
+			facades.call("begin_preload", f)
+			_phase = "wait"
+			return false
+		"wait":
+			facades.call("poll_preload")
+			return bool(facades.call("preload_done"))
 	return true
 
 

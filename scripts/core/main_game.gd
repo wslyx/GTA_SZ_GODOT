@@ -58,10 +58,21 @@ var _tank_model: Node3D
 var _plane_model: Node3D
 var _pending_level_up_dialogue := {}
 
-
 func _ready() -> void:
+	# ⚠️ 加载界面必须先于任何重活出现。
+	# PanelsUI._ready() 会在 add_child 的瞬间建好加载画面，但那一帧还没画到屏幕上；
+	# 如果紧接着就在同一帧里跑 CityData.load_core() / collision.build() 这类
+	# 秒级的同步活，玩家看到的仍然是白屏。所以这里先让出一到两帧，等加载画面
+	# 真正渲染出来再开工。
+	panels = PanelsUI.new()
+	panels.name = "PanelsUI"
+	add_child(panels)
+	panels.show_loading()
+	panels.set_loading_text("深城纪 · 正在展开深圳")
+	panels.set_loading_progress(0.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
 	_build_world()
-
 
 func _build_world() -> void:
 	# 先建世界（walk 的两个回调会在运行时读 world，但 GDScript 的 lambda 是
@@ -116,9 +127,6 @@ func _build_world() -> void:
 	maps = MapUI.new()
 	maps.name = "MapUI"
 	add_child(maps)
-	panels = PanelsUI.new()
-	panels.name = "PanelsUI"
-	add_child(panels)
 
 	# 车辆模型
 	_load_vehicle_models()
@@ -127,9 +135,6 @@ func _build_world() -> void:
 	world.progress.connect(_on_progress)
 	world.built.connect(_on_built)
 	world.build()
-	panels.show_loading()
-	panels.set_loading_text("深城纪 · 正在展开深圳")
-
 
 const SKY_SCRIPT := preload("res://scripts/world/sky_system.gd")
 const LIGHTING_SCRIPT := preload("res://scripts/world/lighting_director.gd")
@@ -144,13 +149,11 @@ const PED_SCRIPT := preload("res://scripts/world/pedestrian_system.gd")
 const EBIKE_SCRIPT := preload("res://scripts/world/ebike_system.gd")
 const FACADE_SCRIPT := preload("res://scripts/world/facade_streamer.gd")
 
-
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
 	n.name = node_name
 	add_child(n)
 	return n
-
 
 func _load_vehicle_models() -> void:
 	_car_model = _load_glb("res://data/city/car.glb", "PlayerCar")
@@ -160,7 +163,6 @@ func _load_vehicle_models() -> void:
 		_tank_model.visible = false
 	if _plane_model != null:
 		_plane_model.visible = false
-
 
 func _load_glb(path: String, node_name: String) -> Node3D:
 	if not ResourceLoader.exists(path):
@@ -175,17 +177,16 @@ func _load_glb(path: String, node_name: String) -> Node3D:
 	GlbLoader.configure_meshes(GlbLoader.meshes_of(inst), true, true)
 	return inst
 
-
 func _on_progress(text: String) -> void:
 	panels.set_loading_text(text)
 	panels.set_loading_progress(world.progress_ratio())
-
 
 ## 城市构建完成后的收尾。
 ## 注意：各子系统（sky / lighting / water / weather / distant / scenery / signs /
 ## signals / traffic / pedestrians / ebikes / facades）的 setup 已经由 CityWorld
 ## 的装配步骤按原版 init() 的顺序调用过了，这里**不能**重复 setup。
 func _on_built() -> void:
+	print("[MainGame] 城市构建完成，启动累计 %d ms" % Time.get_ticks_msec())
 	career.setup(world)
 	rides.setup(world)
 	story.setup(world, career)
@@ -204,7 +205,6 @@ func _on_built() -> void:
 	session_ready = true
 	panels.finish_loading()
 	hud.toast("深城纪 · 按 P 查看帧率，Esc 暂停", 5.0)
-
 
 # ---------------------------------------------------------------------------
 # 输入
@@ -249,7 +249,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_camera_yaw -= d.x * 0.004
 			_look_pitch = clampf(_look_pitch - d.y * 0.003, -0.2, 1.0)
-
 
 func _on_key(k: InputEventKey) -> void:
 	var code := k.keycode
@@ -319,13 +318,11 @@ func _on_key(k: InputEventKey) -> void:
 						hud.toast("已接下合约：%s" % career.status()["contract"], 3.0)
 						panels.refresh_journal()
 
-
 func _light_mode_name() -> String:
 	match GameState.light_mode:
 		GameContent.LightMode.DAY: return "晴日"
 		GameContent.LightMode.NIGHT: return "夜色"
 	return "日落"
-
 
 func _apply_light_mode() -> void:
 	if world.sky != null:
@@ -334,7 +331,6 @@ func _apply_light_mode() -> void:
 		world.water.on_light_mode(GameState.light_mode)
 	if lights != null:
 		lights.set_light_mode(GameState.light_mode)
-
 
 # ---------------------------------------------------------------------------
 # 模式切换
@@ -349,9 +345,7 @@ func _snap_to_road(x: float, z: float) -> Vector3:
 	_last_road_message = "已回到 %s" % road_name if road_name != "" else "已回到最近道路"
 	return Vector3(near["point"].x, near["point"].y, near["yaw"])
 
-
 var _last_road_message := ""
-
 
 func _reset_to_road() -> void:
 	if mode == Mode.TANK:
@@ -366,7 +360,6 @@ func _reset_to_road() -> void:
 	else:
 		return
 	hud.toast(_last_road_message)
-
 
 func _toggle_tank() -> void:
 	if mode == Mode.WALKING or mode == Mode.OBSERVER or mode == Mode.AIRCRAFT:
@@ -410,7 +403,6 @@ func _toggle_tank() -> void:
 		camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 		hud.toast("切换为轿车")
 
-
 ## 换车空间检测的采样偏移。
 ##
 ## 两点限制：
@@ -423,7 +415,6 @@ func _toggle_tank() -> void:
 const CAR_SWAP_SIDE := [-1.0, 0.0, 1.0]
 const CAR_SWAP_ALONG := [-3.0, 0.0, 3.0]
 
-
 func _tank_safe_for_car() -> bool:
 	var sides := PackedFloat32Array(CAR_SWAP_SIDE)
 	var alongs := PackedFloat32Array(CAR_SWAP_ALONG)
@@ -434,7 +425,6 @@ func _tank_safe_for_car() -> bool:
 			if world.collision.blocked(sx, sz):
 				return false
 	return true
-
 
 func _toggle_vehicle_entry() -> void:
 	if mode == Mode.CAR or mode == Mode.TANK:
@@ -477,12 +467,10 @@ func _toggle_vehicle_entry() -> void:
 		walk.active = false
 		hud.toast("上车")
 
-
 func _vehicle_state() -> Dictionary:
 	if mode == Mode.TANK:
 		return {"x": tank.x, "z": tank.z, "yaw": tank.yaw, "speed": tank.speed}
 	return {"x": car.x, "z": car.z, "yaw": car.yaw, "speed": car.speed}
-
 
 func _flush_speed() -> void:
 	car.speed = 0.0
@@ -490,7 +478,6 @@ func _flush_speed() -> void:
 	tank.speed = 0.0
 	tank.steer = 0.0
 	_keys.clear()
-
 
 func _enter_observer() -> void:
 	var p := _player_position_data()
@@ -504,7 +491,6 @@ func _enter_observer() -> void:
 	world.set_aerial(true)
 	hud.toast("观景模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向")
 
-
 func _exit_observer() -> void:
 	observer.end()
 	mode = Mode.CAR if _car_model == null or _car_model.visible else Mode.TANK
@@ -515,7 +501,6 @@ func _exit_observer() -> void:
 	world.set_aerial(false)
 	camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 	hud.toast("已退出观景")
-
 
 func _toggle_aircraft() -> void:
 	if flight.active():
@@ -531,14 +516,16 @@ func _toggle_aircraft() -> void:
 	camera.set_mode(ChaseCamera.Mode.AIRCRAFT, true)
 	hud.toast("飞行：W/S 俯仰，A/D 横滚，Q/E 方向舵，Shift 加速，Space 导弹，X 减速")
 
-
 # ---------------------------------------------------------------------------
 # 主循环
 # ---------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	if not session_ready:
-		panels.set_loading_progress(world.progress_ratio())
+		# _ready() 里有两帧的 await，这两帧 _process 会先于 world 创建跑进来
+		if world != null:
+			panels.set_loading_progress(world.progress_ratio())
+			panels.set_loading_detail(world.progress_detail())
 		return
 
 	var dt := clampf(delta, 0.0, 0.05)
@@ -581,7 +568,6 @@ func _process(delta: float) -> void:
 			slipping = Input.is_key_pressed(KEY_SPACE) and absf(car.speed) > 6.0
 		audio.set_drive_state(speed, 0.55 if mode in [Mode.CAR, Mode.TANK] else 0.0, slipping)
 
-
 func _update_modes(dt: float) -> void:
 	if paused:
 		return
@@ -597,7 +583,6 @@ func _update_modes(dt: float) -> void:
 		Mode.AIRCRAFT:
 			_step_aircraft(dt)
 
-
 func _axis_key(pos_keys: Array, neg_keys: Array) -> float:
 	var v := 0.0
 	for k in pos_keys:
@@ -608,8 +593,8 @@ func _axis_key(pos_keys: Array, neg_keys: Array) -> float:
 			v -= 1.0
 	return clampf(v, -1.0, 1.0)
 
-
 func _step_car(dt: float) -> void:
+
 	var throttle := _axis_key([KEY_W, KEY_UP], [KEY_S, KEY_DOWN])
 	var steer_in := _axis_key([KEY_D, KEY_RIGHT], [KEY_A, KEY_LEFT])
 	steer_in = CarDrive.manual_steering(steer_in, car.speed)
@@ -647,7 +632,6 @@ func _step_car(dt: float) -> void:
 	camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false)
 	lights.update_brake(throttle < 0.0 and car.speed > 0.5, car.speed < -0.5)
 	lights.place(_car_model.global_transform if _car_model != null else camera.global_transform)
-
 
 func _step_tank(dt: float) -> void:
 	var throttle := _axis_key([KEY_W, KEY_UP], [KEY_S, KEY_DOWN])
@@ -691,7 +675,6 @@ func _step_tank(dt: float) -> void:
 	lights.update_brake(handbrake, tank.speed < -0.5)
 	lights.place(_tank_model.global_transform if _tank_model != null else camera.global_transform)
 
-
 func _step_walk(dt: float) -> void:
 	walk.step({
 		"forward": Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP),
@@ -711,9 +694,7 @@ func _step_walk(dt: float) -> void:
 	camera.look_pitch = walk.pitch
 	camera.follow_walk(dt, walk.camera_distance, _walk_first_person)
 
-
 var walk_eye_world := Vector3.ZERO
-
 
 func _step_observer(dt: float) -> void:
 	observer.step({
@@ -729,7 +710,6 @@ func _step_observer(dt: float) -> void:
 	camera.observer_yaw = observer.yaw
 	camera.observer_pitch = observer.pitch
 	camera.follow_observer(dt)
-
 
 func _step_aircraft(dt: float) -> void:
 	var result: String = flight.step({
@@ -787,7 +767,6 @@ func _step_aircraft(dt: float) -> void:
 	camera.aircraft_basis = _plane_model.global_transform if _plane_model != null else Transform3D.IDENTITY
 	camera.follow_aircraft(dt)
 
-
 func _place_car_model() -> void:
 	if _car_model == null:
 		return
@@ -800,7 +779,6 @@ func _place_car_model() -> void:
 	_car_model.global_transform = Transform3D(
 		Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)),
 		CoordinateUtil.to_world(car.x, car.z, g + 0.02))
-
 
 # ---------------------------------------------------------------------------
 # 交互
@@ -817,7 +795,6 @@ func _player_position_data() -> Vector2:
 		Mode.AIRCRAFT:
 			return Vector2(flight.x, flight.z)
 	return Vector2(car.x, car.z)
-
 
 func _interact() -> void:
 	if panels.dialog_active:
@@ -850,7 +827,6 @@ func _interact() -> void:
 				panels.toggle_journal()
 			return
 
-
 func _resolve_dialogue(idx: int) -> void:
 	var kind := panels.dialog_kind()
 	panels.close_dialogue()
@@ -867,7 +843,6 @@ func _resolve_dialogue(idx: int) -> void:
 			hud.toast("关系 +%d" % int(_pending_level_up_dialogue["options"][idx].get("relationship", 0)), 3.0)
 			_pending_level_up_dialogue = {}
 
-
 # ---------------------------------------------------------------------------
 # 供 HUD / 地图查询的接口
 # ---------------------------------------------------------------------------
@@ -880,7 +855,6 @@ func speed() -> float:
 		Mode.AIRCRAFT: return flight.speed
 	return car.speed
 
-
 func gear_text() -> String:
 	if paused:
 		return "P"
@@ -890,17 +864,14 @@ func gear_text() -> String:
 		return "走"
 	return "D"
 
-
 func odometer() -> float:
 	match mode:
 		Mode.TANK: return tank.distance
 		Mode.WALKING: return walk.distance
 	return car.distance
 
-
 func data_position() -> Vector2:
 	return _player_position_data()
-
 
 func data_yaw() -> float:
 	match mode:
@@ -910,7 +881,6 @@ func data_yaw() -> float:
 		Mode.AIRCRAFT: return flight.yaw
 	return car.yaw
 
-
 func mode_text() -> String:
 	match mode:
 		Mode.CAR: return "驾驶 · 轿车"
@@ -919,7 +889,6 @@ func mode_text() -> String:
 		Mode.OBSERVER: return "无人机观景"
 		Mode.AIRCRAFT: return "飞行 · 观光水上飞机"
 	return "未知"
-
 
 func route_text() -> String:
 	if autopilot.active:
@@ -934,18 +903,14 @@ func route_text() -> String:
 	var hint3: Dictionary = rides.interaction_hint(_player_position_data(), speed())
 	return str(hint3.get("text", ""))
 
-
 func is_observer() -> bool:
 	return mode == Mode.OBSERVER
-
 
 func has_route() -> bool:
 	return autopilot.active
 
-
 func route_points() -> PackedVector2Array:
 	return autopilot.route_points()
-
 
 func start_autopilot(target: Vector2) -> void:
 	autopilot.setup(world)
@@ -955,7 +920,6 @@ func start_autopilot(target: Vector2) -> void:
 	autopilot.traffic_positions = func() -> Array:
 		return world.traffic.positions() if world.traffic != null else []
 	autopilot.start(target, Vector2(car.x, car.z))
-
 
 func diagnostics() -> Dictionary:
 	return {

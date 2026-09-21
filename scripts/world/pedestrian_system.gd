@@ -38,6 +38,10 @@ var enabled := true
 
 var _parts: Dictionary = {}     ## "body"/"leftLeg"/... → {mesh, mm}
 var _built := false
+## 人行道段中点索引。
+## place() 原本每 220m 全量扫 36969 条路径，是行驶中周期性卡顿的另一个来源。
+var _path_mids := PackedVector2Array()
+var _path_grid: PointGrid
 ## 实例变换重写节流：56 行人 × 12 部件 ≈ 670 次/帧太重
 const PUSH_INTERVAL := 0.1
 var _push_timer := 0.0
@@ -58,6 +62,12 @@ func _load_paths() -> void:
 		if e.size() < 4:
 			continue
 		paths.append(Vector4(float(e[0]), float(e[1]), float(e[2]), float(e[3])))
+	_path_mids.resize(paths.size())
+	for i in paths.size():
+		var s: Vector4 = paths[i]
+		_path_mids[i] = Vector2((s.x + s.z) * 0.5, (s.y + s.w) * 0.5)
+	_path_grid = PointGrid.new(256.0)
+	_path_grid.build(_path_mids)
 	print("[PedestrianSystem] 人行道段 %d 条" % paths.size())
 
 
@@ -106,10 +116,14 @@ func place(px: float, pz: float) -> void:
 	walkers.clear()
 	var p := Vector2(px, pz)
 	var near: Array = []
-	for seg in paths:
-		var mid := Vector2((seg.x + seg.z) * 0.5, (seg.y + seg.w) * 0.5)
-		if mid.distance_to(p) < PATH_RADIUS:
-			near.append(seg)
+	var scan: Array = []
+	if _path_grid != null:
+		scan = _path_grid.query_radius(p, PATH_RADIUS)
+	else:
+		scan = range(paths.size())
+	for idx in scan:
+		if _path_mids[idx].distance_to(p) < PATH_RADIUS:
+			near.append(paths[idx])
 	if near.is_empty():
 		return
 	var count := mini(MAX_COUNT, maxi(near.size(), walkers.size()))
