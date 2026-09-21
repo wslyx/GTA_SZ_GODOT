@@ -16,7 +16,11 @@ const HEAD_COLOR := Color(0.78, 0.87, 1.0)
 const HEAD_INTENSITY := 250.0
 const HEAD_RANGE := 65.0
 const HEAD_ANGLE := PI / 3.0
-const HEAD_OFFSET := Vector3(0.6, 0.82, 2.25)
+## 前灯在**车模局部**的偏移。车模（car.glb）的机头/车头在 -Z（前轮 Z=-1.43，
+## 后轮 Z=+1.78），所以前灯要装在 z = -2.25、尾灯装在 z = +2.2。
+## 之前两者是反的：前灯被放到车尾、尾灯被放到车头。
+const HEAD_OFFSET := Vector3(0.6, 0.82, -2.25)
+const TAIL_OFFSET := Vector3(0.72, 0.72, 2.2)
 const HEAD_DIR := Vector3(0.0, -0.055, 1.0)
 
 ## 尾灯
@@ -51,7 +55,8 @@ func build() -> void:
 		l.spot_angle_attenuation = 4.0
 		l.shadow_enabled = false
 		l.position = Vector3(HEAD_OFFSET.x * side, HEAD_OFFSET.y, HEAD_OFFSET.z)
-		# 灯朝 +Z（车头在 glTF 里为 +Z）
+		# SpotLight3D 默认沿自身 **-Z** 发光，车头也在 -Z，所以不需要旋转。
+		# 之前注释写"车头在 glTF 里为 +Z"是错的，已按实测纠正。
 		l.rotation = Vector3(0.0, 0.0, 0.0)
 		add_child(l)
 		headlights.append(l)
@@ -63,7 +68,7 @@ func build() -> void:
 		t.light_energy = 0.3
 		t.omni_range = 6.0
 		t.shadow_enabled = false
-		t.position = Vector3(0.72 * side, 0.72, -2.2)
+		t.position = Vector3(TAIL_OFFSET.x * side, TAIL_OFFSET.y, TAIL_OFFSET.z)
 		add_child(t)
 		if side < 0.0:
 			tail_left = t

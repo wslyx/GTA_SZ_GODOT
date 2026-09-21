@@ -246,7 +246,9 @@ func _sync_instances(px: float, pz: float) -> void:
 			continue
 		var g := world.ground_height(float(c["x"]), -float(c["z"]))
 		var xf := Transform3D(
-			Basis(Vector3.UP, CoordinateUtil.node_yaw(yaw)),
+			# 车流模型（traffic-car.glb）同样是 -Z 前向：
+			# car_led（前灯）Z = -2.24 ／ car_redled（尾灯）Z = +1.62。
+			Basis(Vector3.UP, CoordinateUtil.node_yaw(yaw, CoordinateUtil.ModelForward.MINUS_Z)),
 			CoordinateUtil.to_world(float(c["x"]), float(c["z"]), g + CAR_HEIGHT))
 		for entry in _multimeshes:
 			if int(entry["group"]) == int(c["group"]):

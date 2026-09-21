@@ -83,8 +83,21 @@ node tools/convert_glb.mjs ../GTA_SZ/public ./data
 
 | 模型在 glTF 里的前向 | 节点 `rotation.y` |
 |---|---|
-| `+Z`（本项目绝大多数资产：车 / 坦克 / 飞机 / 行人） | `PI − yaw` |
+| `+Z` | `PI − yaw` |
 | `−Z` | `−yaw` |
+
+> **注意：不要凭"多数资产是 +Z"去猜，逐个实测过才知道。** 下面这张表是按各个零件
+> 的几何包围盒中心量出来的（模型局部坐标），之前文档写反了，导致车倒着开：
+
+| 资产 | 判据 | 实际前向 |
+|---|---|---|
+| `city/car.glb` | 前轮 `wheel_lf/rf_rubber` Z=−1.43 ／ 后轮 `wheel_lr/rr_rubber` Z=+1.78 | **−Z** |
+| `city/traffic-car.glb` | 前灯 `car_led` Z=−2.24 ／ 尾灯 `car_redled` Z=+1.62 | **−Z** |
+| `city/floatplane.glb` | 螺旋桨 Z=−4.19，座舱玻璃 Z=−0.52（桨在座舱前 3.7m，拉进式） | **−Z** |
+| `city/tank/tank.glb` | 炮管 `tank_barrel_tube` Z=+3.54 ／ 炮塔座圈 Z=−0.90 | **+Z** |
+
+对应到代码：`_place_car_model()` 与 `TrafficSystem` 用 `ModelForward.MINUS_Z`，
+坦克仍用 `PLUS_Z`，飞机构基时 z 轴取 `−fwd`。
 
 `yaw` 的方向定义与原版一致：`方向 = (sin yaw, cos yaw)`，即 `yaw=0` 指向正北。
 另有 `yaw_to_direction()` / `direction_to_yaw()` 供需要在世界向量与数据朝向之间往返的地方使用。

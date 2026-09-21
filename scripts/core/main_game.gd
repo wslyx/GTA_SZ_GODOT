@@ -773,9 +773,13 @@ func _step_aircraft(dt: float) -> void:
 		var fwd: Vector3 = b["forward"]
 		var up: Vector3 = b["up"]
 		var world_pos := CoordinateUtil.to_world(flight.x, flight.z, flight.y)
-		# 机模的 glTF 前向为 +Z，因此基的 z 轴取 fwd、y 轴取 up。
-		# Godot 的 Basis(x, y, z) 要求右手系 x = y × z。
-		var z_axis := fwd.normalized()
+		# ⚠️ 水上飞机模型的机头在 **-Z**，不是 +Z。
+		# 实测：floatplane_propeller_mesh Z = -4.19（机身一端），
+		# floatplane_airframe_fp_glass（座舱玻璃）Z = -0.52 —— 螺旋桨在座舱前方 3.7 m，
+		# 是拉进式（tractor）布局，所以 -Z 才是机头。
+		# 因此基的 z 轴取 **-fwd**（等价于绕 up 转 180°），y 轴仍取 up；
+		# Godot 的 Basis(x, y, z) 要求右手系 x = y × z，cross 会自动把 x 一并翻过来。
+		var z_axis := -fwd.normalized()
 		var y_axis := (up - z_axis * up.dot(z_axis)).normalized()
 		var x_axis := y_axis.cross(z_axis)
 		_plane_model.global_transform = Transform3D(
@@ -788,8 +792,13 @@ func _place_car_model() -> void:
 	if _car_model == null:
 		return
 	var g := world.height_field.height_at(car.x, car.z)
+	# ⚠️ 轿车模型的前向轴是 **-Z**，不是 +Z。
+	# 实测（按各零件几何包围盒中心，模型局部坐标）：
+	#   前轮 wheel_lf_rubber / wheel_rf_rubber  Z = -1.43
+	#   后轮 wheel_lr_rubber / wheel_rr_rubber  Z = +1.78
+	# 之前统一按 PLUS_Z 处理（rotation.y = PI − yaw），结果是车头朝后、倒着开。
 	_car_model.global_transform = Transform3D(
-		Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw)),
+		Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)),
 		CoordinateUtil.to_world(car.x, car.z, g + 0.02))
 
 
