@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b2a44"/>
+      <stop offset="55%" stop-color="#7a4a52"/>
+      <stop offset="100%" stop-color="#e0a45c"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#sky)"/>
+  <!-- 平安金融中心 -->
+  <polygon points="58,18 68,26 68,96 58,96" fill="#101720" opacity="0.92"/>
+  <polygon points="62,12 68,26 58,26" fill="#2a3a4e"/>
+  <!-- 京基与地王 -->
+  <rect x="38" y="52" width="9" height="44" fill="#141d29"/>
+  <rect x="78" y="42" width="8" height="54" fill="#161f2c"/>
+  <rect x="90" y="62" width="7" height="34" fill="#131b26"/>
+  <rect x="24" y="70" width="10" height="26" fill="#121a25"/>
+  <!-- 海面 -->
+  <rect x="0" y="96" width="128" height="32" fill="#0b2a33" opacity="0.95"/>
+  <path d="M0 100 Q16 96 32 100 T64 100 T96 100 T128 100 L128 106 Q96 110 64 106 T0 106 Z"
+        fill="#1d5a68" opacity="0.8"/>
+  <!-- 灯火 -->
+  <circle cx="62" cy="34" r="1.6" fill="#ffd79a"/>
+  <circle cx="42" cy="66" r="1.2" fill="#ffd79a"/>
+  <circle cx="82" cy="56" r="1.2" fill="#ffd79a"/>
+</svg>

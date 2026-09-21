@@ -1,0 +1,67 @@
+# ============================================================
+# 深城纪 Godot 4.7 重制版 · .gitattributes
+#
+# 1) 大体积二进制资产交给 Git LFS（约 925 MB：GLB 790 / HDR 57 / 图 70 / 视频 6.5）
+#    新机器克隆前需安装 Git LFS：https://git-lfs.com  并执行 `git lfs install`
+#    若未安装 LFS 就克隆，这些文件会变成几十字节的 pointer 文本
+# 2) 行尾：仓库内一律 LF；Windows 脚本例外保留 CRLF
+# 注意：git 属性后出现的规则覆盖先出现的同属性规则，故 LFS 行必须放在通用行尾规则之后
+# ============================================================
+
+# ------------------------------------------------------------
+# 通用行尾规则
+# ------------------------------------------------------------
+* text=auto eol=lf
+
+# ------------------------------------------------------------
+# Git LFS 托管（覆盖上面的 -text 之外的行尾设置）
+# ------------------------------------------------------------
+*.glb filter=lfs diff=lfs merge=lfs -text
+*.gltf filter=lfs diff=lfs merge=lfs -text
+*.hdr filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.ogg filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.ttf filter=lfs diff=lfs merge=lfs -text
+*.otf filter=lfs diff=lfs merge=lfs -text
+
+# ------------------------------------------------------------
+# 文本：Godot 资源、源码与数据（保证可 diff）
+# ------------------------------------------------------------
+*.gd text
+*.cs text
+*.tscn text
+*.tres text
+*.godot text
+*.import text
+*.cfg text
+*.gdshader text
+*.gdshaderinc text
+*.shader text
+*.json text
+*.md text
+*.svg text
+*.mjs text
+*.js text
+*.py text
+*.yml text
+*.yaml text
+*.sh text
+# Windows 脚本用 CRLF，避免 PowerShell 5.1 下的行尾意外
+*.ps1 text eol=crlf
+
+# ------------------------------------------------------------
+# 二进制但不走 LFS（体积小、数量多，如 meadow 地形瓦片 3165 个 × ~4 KB）
+# ------------------------------------------------------------
+*.bin binary
+*.pck binary
+*.scn binary
+*.res binary
+*.ctex binary
