@@ -251,8 +251,17 @@ func toast(text: String, seconds := 3.0) -> void:
 
 
 func toggle_fps() -> void:
-	_show_fps = not _show_fps
-	_fps_label.visible = _show_fps
+	set_fps_visible(not _show_fps)
+
+
+## 供设置页直接设值（不用先查当前状态再翻转）
+func set_fps_visible(v: bool) -> void:
+	_show_fps = v
+	_fps_label.visible = v
+
+
+func is_fps_visible() -> bool:
+	return _show_fps
 
 
 func toggle_tips() -> void:

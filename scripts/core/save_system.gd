@@ -24,8 +24,9 @@ signal full_state_saved()
 
 
 func _ready() -> void:
-	load_graphics_quality()
 	load_audio()
+	# 画质存档由 GraphicsQuality._ready 主动拉取（load_graphics_quality），
+	# 这里不调 —— 本文件不引用 GraphicsQuality，避免 autoload 循环引用。
 
 
 func _write(key: String, d: Dictionary) -> bool:
@@ -139,17 +140,52 @@ func erase_all() -> void:
 # 画质 / 音频
 # ---------------------------------------------------------------------------
 
-func save_graphics_quality(tier: String) -> void:
-	_write(KEY_GRAPHICS, {"version": 1, "tier": tier})
+## 画质存档 v2：档位 + 玩家逐项覆盖（overrides）。
+## v1 只有 tier —— 旧存档照常读取，overrides 取默认空表。
+## 只放行白名单里的键与类型，防止手改存档把脏数据灌进渲染管线。
+##
+## 注意：这里**不能引用 GraphicsQuality**（autoload 循环引用会让两边都编译失败，
+## "Identifier not declared"）。本文件只负责读写与白名单校验，把解析结果原样
+## 返回，由 GraphicsQuality._ready 主动拉取并写回自己。
+const GRAPHICS_OVERRIDE_KEYS := {
+	"scaling": "float", "aa": "int", "shadows": "int",
+	"ao": "bool", "bloom": "bool", "lamps": "int",
+	"tree_budget": "int", "fps": "bool",
+}
 
 
-func load_graphics_quality() -> void:
+func save_graphics_quality(tier: String, overrides: Dictionary = {}) -> void:
+	_write(KEY_GRAPHICS, {"version": 2, "tier": tier, "overrides": overrides})
+
+
+## 读取画质存档，返回 {"tier": String, "overrides": Dictionary}（已白名单过滤）。
+func load_graphics_quality() -> Dictionary:
+	var out := {"tier": "medium", "overrides": {}}
 	var d := _read(KEY_GRAPHICS)
 	if d.is_empty():
-		return
+		return out
 	var tier := str(d.get("tier", "medium"))
 	if ["low", "medium", "high"].has(tier):
-		GameState.graphics_tier = tier
+		out["tier"] = tier
+	var raw = d.get("overrides", {})
+	if raw is Dictionary:
+		var clean: Dictionary = {}
+		for k in raw:
+			if not GRAPHICS_OVERRIDE_KEYS.has(str(k)):
+				continue
+			var v = raw[k]
+			match str(GRAPHICS_OVERRIDE_KEYS[str(k)]):
+				"int":
+					if v is int or v is float:
+						clean[str(k)] = int(v)
+				"float":
+					if v is int or v is float:
+						clean[str(k)] = float(v)
+				"bool":
+					if v is bool:
+						clean[str(k)] = bool(v)
+		out["overrides"] = clean
+	return out
 
 
 func save_audio(enabled: bool) -> void:

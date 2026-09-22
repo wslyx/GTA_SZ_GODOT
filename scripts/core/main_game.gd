@@ -194,6 +194,8 @@ func _on_built() -> void:
 	hud.setup(world, self)
 	maps.setup(world, self)
 	panels.setup(world, self, career, story)
+	# 设置页的「帧率显示」行要操作 HUD
+	panels.hud = hud
 
 	# 出生点
 	var sp := CityData.spawn_pos
@@ -204,7 +206,7 @@ func _on_built() -> void:
 
 	session_ready = true
 	panels.finish_loading()
-	hud.toast("深城纪 · 按 P 查看帧率，Esc 暂停", 5.0)
+	hud.toast("深城纪 · F10 图像设置 · P 帧率 · Esc 暂停", 5.0)
 
 # ---------------------------------------------------------------------------
 # 输入
@@ -252,6 +254,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_key(k: InputEventKey) -> void:
 	var code := k.keycode
+	# 图像设置页（F10）打开时接管按键：↑↓ 选择、←→ 调整、F10/Esc 关闭。
+	# 其余按键一律吞掉（此时游戏处于暂停态，不该误触车辆或其它面板）。
+	if panels.settings_visible:
+		if panels.handle_settings_key(k):
+			paused = panels.settings_visible
+		return
 	match code:
 		KEY_ESCAPE:
 			if panels.dialog_active:
@@ -264,6 +272,10 @@ func _on_key(k: InputEventKey) -> void:
 				_exit_observer()
 			else:
 				paused = not paused
+		KEY_F10:
+			# CS2 风格图像设置页：打开即暂停，关闭即恢复
+			panels.toggle_settings()
+			paused = panels.settings_visible
 		KEY_C:
 			if mode == Mode.WALKING:
 				_walk_first_person = not _walk_first_person
@@ -295,6 +307,9 @@ func _on_key(k: InputEventKey) -> void:
 			panels.toggle_journal()
 		KEY_P:
 			hud.toggle_fps()
+			# 与设置页的「帧率显示」行保持同步（overrides 持久化）
+			GraphicsQuality.set_override("fps", hud.is_fps_visible())
+			GraphicsQuality.save()
 		KEY_E:
 			_interact()
 		KEY_H:

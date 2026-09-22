@@ -22,6 +22,10 @@ config/icon="res://icon.svg"
 CoordinateUtil="*res://scripts/utils/coordinate_util.gd"
 GameContent="*res://scripts/core/game_content.gd"
 GameState="*res://scripts/core/game_state.gd"
+; SaveSystem 必须排在 GraphicsQuality 之前：GraphicsQuality._ready 会调
+; SaveSystem.load_graphics_quality() 拉取档位与逐项覆盖（依赖单向：
+; GraphicsQuality → SaveSystem，SaveSystem 不得反向引用 GraphicsQuality，
+; 否则 autoload 循环引用两边都编译失败）。
 SaveSystem="*res://scripts/core/save_system.gd"
 GraphicsQuality="*res://scripts/core/graphics_quality.gd"
 CityData="*res://scripts/core/city_data.gd"

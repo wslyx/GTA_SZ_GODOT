@@ -23,6 +23,8 @@ const FURNITURE_LIMIT := 12
 
 ## 原版树木总量上限（三级 LOD 各自的实例预算）
 const TREE_BUDGET := {"low": 4000, "medium": 9000, "high": 16000}
+## 生效中的林冠实例预算（set_quality / 设置页可覆盖）
+var _tree_budget := 9000
 
 var world: CityWorld
 var enabled := true
@@ -65,6 +67,8 @@ func set_quality(p: Dictionary) -> void:
 		"near_trees": int(p.get("near_trees", 36)),
 		"canopy_full": int(p.get("canopy_full", 36)),
 	}
+	# 林冠实例预算：设置页可调（TREE_STEPS 4000/9000/16000），档位默认见 PROFILES
+	_tree_budget = int(p.get("tree_budget", TREE_BUDGET.get(GameState.graphics_tier, 9000)))
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +167,7 @@ func _canopy_start(focus: Vector3, aerial: bool) -> void:
 		return
 	var fx := focus.x
 	var fz := -focus.z
-	var budget: int = TREE_BUDGET.get(GameState.graphics_tier, 9000)
+	var budget := clampi(_tree_budget, 1000, 32000)
 	var near: Array[Vector2] = []
 	if _canopy_grid != null:
 		near = _canopy_grid.query_radius_sorted2(Vector2(fx, fz), STREET_RADIUS, _canopy_points)

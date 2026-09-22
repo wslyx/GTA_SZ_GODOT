@@ -13,7 +13,6 @@ var career: CareerSystem
 var story: StorySystem
 
 var journal: Control
-var graphics_panel: Control
 var loading: Control
 var dialog: Control
 
@@ -99,8 +98,7 @@ func _build() -> void:
 	journal = _panel("城市手账 · J 关闭", Vector2(720, 620), Vector2(600, 180))["root"]
 	journal_body = journal.get_child(3)
 
-	graphics_panel = _panel("画质设置 · G+Shift 关闭", Vector2(560, 320), Vector2(680, 820))["root"]
-	graphics_body = graphics_panel.get_child(3)
+	_build_settings()
 
 	# 对话
 	dialog = Control.new()
@@ -130,7 +128,6 @@ func _build() -> void:
 
 
 var journal_body: Label
-var graphics_body: Label
 var dialog_body: Label
 var dialog_options: Label
 
@@ -317,41 +314,237 @@ func refresh_journal() -> void:
 
 
 # ---------------------------------------------------------------------------
-# 画质面板
+# 图像设置页（CS2 风格：↑↓ 选择，←→ 调整，即时生效并自动保存）
+#
+# 替换了旧版只读的"画质设置"面板（refresh_graphics 只展示档位参数，
+# cycle_quality 从未被任何按键调用过）。所有选项实时下发：
+#   预设 → GraphicsQuality.set_tier（并清空逐项覆盖）
+#   其余 → 写 overrides 后立即 apply（视口属性 / apply_to_world 广播）
 # ---------------------------------------------------------------------------
 
-func toggle_graphics() -> void:
-	graphics_panel.visible = not graphics_panel.visible
-	if graphics_panel.visible:
-		refresh_graphics()
+## 设置行定义：key / 显示名 / 选项标签（←→ 在选项间循环）
+const SETTINGS_ROWS := [
+	{"key": "preset", "name": "画质预设", "opts": ["低", "中", "高"]},
+	{"key": "scaling", "name": "渲染缩放", "opts": ["50%", "65%", "75%", "88%", "100%", "125%", "150%"]},
+	{"key": "aa", "name": "抗锯齿", "opts": ["关", "FXAA"]},
+	{"key": "shadows", "name": "阴影", "opts": ["关", "低 (1024)", "高 (2048)"]},
+	{"key": "ao", "name": "环境光遮蔽", "opts": ["关", "开"]},
+	{"key": "bloom", "name": "泛光 (Bloom)", "opts": ["关", "开"]},
+	{"key": "lamps", "name": "夜间路灯数量", "opts": ["8 盏", "16 盏", "24 盏"]},
+	{"key": "trees", "name": "植被密度", "opts": ["低 (4000)", "中 (9000)", "高 (16000)"]},
+	{"key": "fps", "name": "帧率显示", "opts": ["关", "开"]},
+]
+
+var settings_root: Control
+var settings_rows_box: Control
+var hud = null                    ## 帧率显示行需要操作 HUD（main_game 注入）
+var settings_visible := false
+var settings_sel := 0
+var _settings_name_labels: Array = []
+var _settings_value_labels: Array = []
 
 
-func refresh_graphics() -> void:
-	var p := GraphicsQuality.profile()
-	var lines: Array = []
-	lines.append("当前档位：%s（共 low / medium / high）" % GraphicsQuality.tier())
-	lines.append("")
-	lines.append("最大分辨率    %d × %d" % [p["max_pixels"].x, p["max_pixels"].y])
-	lines.append("阴影贴图      %d" % int(p["shadow_size"]))
-	lines.append("环境光遮蔽    %s（采样 %d）" % ["开" if p["ao"] else "关", int(p["ao_samples"])])
-	lines.append("镜面反射      %d" % int(p["mirror_size"]))
-	lines.append("MSAA          %d×" % int(p["msaa"]))
-	lines.append("Bloom 强度    %.2f" % float(p["bloom_scale"]))
-	lines.append("镜头效果      %s" % ["开" if p["lens_effects"] else "关"])
-	lines.append("细节比例      %.2f" % float(p["detail_scale"]))
-	lines.append("近景树木      %d" % int(p["near_trees"]))
-	lines.append("林冠 full     %d" % int(p["canopy_full"]))
-	lines.append("")
-	lines.append("按 L 循环切换光照，按 Y 切换雨天")
-	graphics_body.text = "\n".join(PackedStringArray(lines))
+func toggle_settings() -> bool:
+	settings_visible = not settings_visible
+	settings_root.visible = settings_visible
+	if settings_visible:
+		refresh_settings()
+	return settings_visible
 
 
-func cycle_quality() -> void:
-	GraphicsQuality.set_tier(GraphicsQuality.cycle())
-	if world != null:
-		GraphicsQuality.apply_to_world(world)
-	if graphics_panel.visible:
-		refresh_graphics()
+func _mk_settings_row(parent: Control, y: float) -> void:
+	var name_l := Label.new()
+	name_l.add_theme_font_override("font", _font(19))
+	name_l.add_theme_color_override("font_color", Color(0.86, 0.89, 0.93))
+	name_l.position = Vector2(30, y)
+	name_l.size = Vector2(300, 26)
+	parent.add_child(name_l)
+	_settings_name_labels.append(name_l)
+	var value_l := Label.new()
+	value_l.add_theme_font_override("font", _font(19))
+	value_l.add_theme_color_override("font_color", Color(0.85, 0.72, 0.40))
+	value_l.position = Vector2(360, y)
+	value_l.size = Vector2(240, 26)
+	value_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	parent.add_child(value_l)
+	_settings_value_labels.append(value_l)
+
+
+func _build_settings() -> void:
+	if settings_root != null:
+		return
+	settings_root = Control.new()
+	settings_root.name = "SettingsPanel"
+	settings_root.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	settings_root.position = Vector2(620, 200)
+	settings_root.size = Vector2(660, 480)
+	settings_root.visible = false
+	add_child(settings_root)
+	var bg := ColorRect.new()
+	bg.color = Color(0.045, 0.055, 0.075, 0.94)
+	bg.size = Vector2(660, 480)
+	settings_root.add_child(bg)
+	var border := ColorRect.new()
+	border.color = Color(0.28, 0.32, 0.38, 0.9)
+	border.size = Vector2(660, 2)
+	settings_root.add_child(border)
+	var t := Label.new()
+	t.add_theme_font_override("font", _font(26))
+	t.add_theme_color_override("font_color", Color(0.96, 0.94, 0.88))
+	t.text = "图像设置"
+	t.position = Vector2(28, 16)
+	settings_root.add_child(t)
+	var hint := Label.new()
+	hint.add_theme_font_override("font", _font(15))
+	hint.add_theme_color_override("font_color", Color(0.55, 0.60, 0.66))
+	hint.text = "↑↓ 选择   ←→ 调整   F10 / Esc 关闭 · 即时生效并自动保存"
+	hint.position = Vector2(330, 24)
+	hint.size = Vector2(310, 22)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	settings_root.add_child(hint)
+	settings_rows_box = Control.new()
+	settings_rows_box.position = Vector2.ZERO
+	settings_rows_box.size = Vector2(660, 400)
+	settings_root.add_child(settings_rows_box)
+	for i in SETTINGS_ROWS.size():
+		_mk_settings_row(settings_rows_box, 72.0 + i * 34.0)
+	var note := Label.new()
+	note.add_theme_font_override("font", _font(15))
+	note.add_theme_color_override("font_color", Color(0.50, 0.55, 0.62))
+	note.text = "选「画质预设」会重置下面的高级选项为该档位默认值"
+	note.position = Vector2(28, 72.0 + SETTINGS_ROWS.size() * 34.0 + 8.0)
+	note.size = Vector2(600, 22)
+	settings_root.add_child(note)
+
+
+## 当前选项在每行的下标（读 GraphicsQuality 的生效状态）
+func _setting_current_index(key: String) -> int:
+	match key:
+		"preset":
+			return clampi(GraphicsQuality.tier_index(), 0, 2)
+		"scaling":
+			return GraphicsQuality.scaling_step_index()
+		"aa":
+			return clampi(int(GraphicsQuality.overrides.get("aa", 1)), 0, 1)
+		"shadows":
+			return clampi(int(GraphicsQuality.effective().get("shadows", 2)), 0, 2)
+		"ao":
+			return 1 if bool(GraphicsQuality.effective().get("ao", true)) else 0
+		"bloom":
+			if GraphicsQuality.overrides.has("bloom"):
+				return 1 if bool(GraphicsQuality.overrides["bloom"]) else 0
+			return 1 if float(GraphicsQuality.profile().get("bloom_scale", 0.5)) > 0.0 else 0
+		"lamps":
+			var lv := int(GraphicsQuality.effective().get("lamps", 24))
+			var best := 2
+			for i in GraphicsQuality.LAMP_STEPS.size():
+				if int(GraphicsQuality.LAMP_STEPS[i]) == lv:
+					best = i
+					break
+			return best
+		"trees":
+			var tv := int(GraphicsQuality.effective().get("tree_budget", 9000))
+			var tbest := 1
+			for i in GraphicsQuality.TREE_STEPS.size():
+				if int(GraphicsQuality.TREE_STEPS[i]) == tv:
+					tbest = i
+					break
+			return tbest
+		"fps":
+			if GraphicsQuality.overrides.has("fps"):
+				return 1 if bool(GraphicsQuality.overrides["fps"]) else 0
+			return 0
+	return 0
+
+
+## 应用某行的选项：写入 overrides 并立即下发。
+func _apply_setting(key: String, idx: int) -> void:
+	match key:
+		"preset":
+			# 预设 = 重置高级选项（CS2 同款行为）
+			GraphicsQuality.clear_overrides()
+			GraphicsQuality.set_tier(GraphicsQuality.TIERS[clampi(idx, 0, 2)])
+			GraphicsQuality.apply_to_world(world)
+		"scaling":
+			GraphicsQuality.set_override("scaling",
+				float(GraphicsQuality.SCALING_STEPS[clampi(idx, 0, GraphicsQuality.SCALING_STEPS.size() - 1)]))
+			GraphicsQuality.apply_resolution_scale()
+		"aa":
+			GraphicsQuality.set_override("aa", clampi(idx, 0, 1))
+			GraphicsQuality.apply_aa()
+		"shadows", "ao", "bloom", "lamps", "trees":
+			match key:
+				"shadows":
+					GraphicsQuality.set_override("shadows", clampi(idx, 0, 2))
+				"ao":
+					GraphicsQuality.set_override("ao", idx >= 1)
+				"bloom":
+					GraphicsQuality.set_override("bloom", idx >= 1)
+				"lamps":
+					GraphicsQuality.set_override("lamps",
+						int(GraphicsQuality.LAMP_STEPS[clampi(idx, 0, GraphicsQuality.LAMP_STEPS.size() - 1)]))
+				"trees":
+					GraphicsQuality.set_override("tree_budget",
+						int(GraphicsQuality.TREE_STEPS[clampi(idx, 0, GraphicsQuality.TREE_STEPS.size() - 1)]))
+			GraphicsQuality.apply_to_world(world)
+		"fps":
+			var on := idx >= 1
+			GraphicsQuality.set_override("fps", on)
+			if hud != null and hud.has_method("set_fps_visible"):
+				hud.set_fps_visible(on)
+	GraphicsQuality.save()
+
+
+func refresh_settings() -> void:
+	if settings_root == null:
+		_build_settings()
+	for i in SETTINGS_ROWS.size():
+		var row: Dictionary = SETTINGS_ROWS[i]
+		var sel := i == settings_sel
+		var name_l: Label = _settings_name_labels[i]
+		name_l.text = ("▶  " if sel else "    ") + str(row["name"])
+		name_l.add_theme_color_override("font_color",
+			Color(0.98, 0.90, 0.55) if sel else Color(0.86, 0.89, 0.93))
+		var value_l: Label = _settings_value_labels[i]
+		var oi := _setting_current_index(str(row["key"]))
+		var opts: Array = row["opts"]
+		value_l.text = "‹ %s ›" % str(opts[clampi(oi, 0, opts.size() - 1)])
+		value_l.add_theme_color_override("font_color",
+			Color(1.0, 0.82, 0.45) if sel else Color(0.85, 0.72, 0.40))
+
+
+## 设置页打开时的按键路由。返回 true 表示按键已消费。
+func handle_settings_key(k: InputEventKey) -> bool:
+	if not settings_visible:
+		return false
+	match k.keycode:
+		KEY_F10, KEY_ESCAPE:
+			toggle_settings()
+			return true
+		KEY_UP:
+			settings_sel = (settings_sel - 1 + SETTINGS_ROWS.size()) % SETTINGS_ROWS.size()
+			refresh_settings()
+			return true
+		KEY_DOWN:
+			settings_sel = (settings_sel + 1) % SETTINGS_ROWS.size()
+			refresh_settings()
+			return true
+		KEY_LEFT:
+			_nudge_setting(-1)
+			return true
+		KEY_RIGHT:
+			_nudge_setting(1)
+			return true
+	return false
+
+
+func _nudge_setting(dir: int) -> void:
+	var row: Dictionary = SETTINGS_ROWS[settings_sel]
+	var key := str(row["key"])
+	var n: int = row["opts"].size()
+	var idx := (_setting_current_index(key) + dir + n) % n
+	_apply_setting(key, idx)
+	refresh_settings()
 
 
 # ---------------------------------------------------------------------------

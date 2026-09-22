@@ -242,22 +242,36 @@ func cycle_mode() -> int:
 
 
 func set_quality(p: Dictionary) -> void:
-	# 低画质档把路灯池砍到 8 盏：省下的逐像素光照开销比少几盏灯更值钱
-	_active_lamps = 8 if float(p.get("detail_scale", 1.0)) <= 0.5 else LAMP_POOL
+	# —— 路灯池数量（设置页可调 8/16/24；低画质档默认 8）——
+	var lamps := int(p.get("lamps", 8 if float(p.get("detail_scale", 1.0)) <= 0.5 else LAMP_POOL))
+	_active_lamps = clampi(lamps, 0, LAMP_POOL)
 	var env := env_node.environment
 	env.ssao_enabled = bool(p.get("ao", true))
-	env.glow_enabled = float(p.get("bloom_scale", 0.5)) > 0.0
-	# —— 阴影按档位接线（原来无条件 shadow_enabled = true，
-	# 低档也跑 4-split 全尺寸阴影图，是 Forward+ 下最大的单项 GPU 开销之一）——
+	# Bloom：显式开关（设置页）优先，回退到档位的 bloom_scale
+	if p.has("bloom"):
+		env.glow_enabled = bool(p["bloom"])
+	else:
+		env.glow_enabled = float(p.get("bloom_scale", 0.5)) > 0.0
+	# —— 阴影：0 关 / 1 低（1024, 2-split）/ 2 高（2048, 4-split）——
+	# （早期版本这里无条件 shadow_enabled = true，低档也跑 4-split 全尺寸
+	# 阴影图，是 Forward+ 下最大的单项 GPU 开销之一。）
 	if sun != null:
-		var size := int(p.get("shadow_size", 2048))
-		# 低档（shadow_size 1024）降为 2-split：省一次深度 pass，观感差别很小
-		var splits := DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if size <= 1024 \
-			else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-		sun.directional_shadow_mode = splits
-		sun.directional_shadow_blend_splits = size > 1024
-		# 阴影图集尺寸是引擎级设置（默认 4096），按档位降到 1024/2048
-		RenderingServer.directional_shadow_atlas_set_size(size, true)
+		var opt := clampi(int(p.get("shadows", 2)), 0, GraphicsQuality.SHADOW_STEPS.size() - 1)
+		var step: Dictionary = GraphicsQuality.SHADOW_STEPS[opt]
+		var splits: int = step["splits"]
+		sun.shadow_enabled = splits > 0
+		match splits:
+			0:
+				pass
+			2:
+				sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+				sun.directional_shadow_blend_splits = false
+			4:
+				sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+				sun.directional_shadow_blend_splits = true
+		if splits > 0:
+			# 阴影图集尺寸是引擎级设置（默认 4096），按档位降到 1024/2048
+			RenderingServer.directional_shadow_atlas_set_size(int(step["size"]), true)
 	# 阴影绘制距离：街面 260m / 高空 1050m（原版 SHADOW_ORTHO_*），比默认省一大截
 	_apply_shadow_distance()
 
