@@ -28,9 +28,13 @@ const HDR_ROTATION := {
 	GameContent.LightMode.NIGHT: 0.65,
 }
 ## 环境反射强度（CINEMATIC_LOOK.environment）
+## 这份能量同时是 HDR 全景的背景亮度与 IBL 镜面反射强度。背景被程序化
+## 天空球挡住（玩家看到的是 mesh 不是 pano），真正起作用的是**反射**：
+## 原值（0.78/0.40/0.55）会让湿滑路面与玻璃幕墙把天空镜像得过亮
+## （实测白天 46% 像素过曝的一部分），按实测压低昼/夜两档。
 const ENV_INTENSITY := {
-	GameContent.LightMode.DAY: 0.78,
-	GameContent.LightMode.SUNSET: 0.40,
+	GameContent.LightMode.DAY: 0.45,
+	GameContent.LightMode.SUNSET: 0.32,
 	GameContent.LightMode.NIGHT: 0.55,
 }
 

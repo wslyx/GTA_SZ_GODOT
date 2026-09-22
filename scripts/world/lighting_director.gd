@@ -23,7 +23,7 @@ const LOOK := {
 		"environment": 0.40,
 		"fog_density": 0.00011,
 		"fog_color": Color(0.44, 0.27, 0.31),
-		"exposure": 1.00,
+		"exposure": 0.78,
 		"contrast": 1.09,
 		"bloom_threshold": 1.35,
 		"bloom_weight": 0.19,
@@ -62,7 +62,7 @@ const LOOK := {
 		"environment": 0.78,
 		"fog_density": 0.000045,
 		"fog_color": Color(0.57, 0.70, 0.84),
-		"exposure": 1.08,
+		"exposure": 0.74,
 		"contrast": 1.10,
 		"bloom_threshold": 2.5,
 		"bloom_weight": 0.045,
@@ -85,6 +85,14 @@ const LAMP_PARK_HEIGHT := 11.56
 const LAMP_FULL_DISTANCE := 30.0
 const LAMP_END_DISTANCE := 72.0
 const LAMP_LATERAL := 1.5
+
+## —— 光照强度单位换算（实测标定）——
+## LOOK 表里的数值是 Babylon 的光照单位，直接搬进 Godot 后总入光量严重超标：
+## 实测白天 mean 亮度 0.79、46% 像素过曝（>0.95），路面接近纯白；
+## 黄昏路面被太阳镜面反射糊成一片白斑。按「反照率 0.75 的表面落在
+## ACES 输出 ~0.8」重新标定：太阳 ×0.55、半球环境 ×2.2（原 ×4）。
+const SUN_ENERGY_SCALE := 0.55
+const AMBIENT_ENERGY_SCALE := 2.2
 
 ## 池大小：原版是 2 个 SpotLight 轮转；Godot 里给多一点让近处路灯都能亮
 const LAMP_POOL := 24
@@ -166,6 +174,9 @@ func _create_sun() -> void:
 	# 原版 shadow map 2048（low 1024），normalBias 街 .10 / 空中 .8
 	sun.shadow_bias = 0.10
 	sun.shadow_normal_bias = 1.0
+	# 太阳镜面反射从默认 0.5 降到 0.35：路面在日落低角度下会被镜面高光
+	# 糊成一片白斑（实测），漫反射亮度不受影响
+	sun.light_specular = 0.35
 	add_child(sun)
 
 
@@ -192,11 +203,11 @@ func apply_mode(m: int) -> void:
 	sun.global_position = origin - dir_world * 800.0
 	sun.look_at(origin, Vector3.UP)
 	sun.light_color = look["sun_color"]
-	sun.light_energy = look["sun_energy"]
+	sun.light_energy = float(look["sun_energy"]) * SUN_ENERGY_SCALE
 
-	# 半球光 → Godot 的环境光（颜色取天空色，能量取半球强度）
+	# 半球光 → Godot 的环境光（颜色取天空色，能量取半球强度 × 单位换算）
 	env.ambient_light_color = look["hemi_sky"]
-	env.ambient_light_energy = look["hemi_energy"] * 4.0
+	env.ambient_light_energy = float(look["hemi_energy"]) * AMBIENT_ENERGY_SCALE
 	env.ambient_light_sky_contribution = 0.0
 
 	# 雾
@@ -211,8 +222,8 @@ func apply_mode(m: int) -> void:
 	env.fog_density = float(look["fog_density"])
 	env.fog_sky_affect = 0.0
 
-	# 曝光 / 对比度
-	env.tonemap_exposure = look["exposure"]
+	# 曝光 / 对比度（曝光补偿来自图像设置页，默认 1.0）
+	env.tonemap_exposure = float(look["exposure"]) * GraphicsQuality.exposure_scale()
 	env.adjustment_enabled = true
 	env.adjustment_contrast = look["contrast"]
 	env.adjustment_saturation = 1.0 + float(look["shadow_sat"]) * 0.5

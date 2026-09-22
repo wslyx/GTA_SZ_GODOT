@@ -150,7 +150,7 @@ func erase_all() -> void:
 const GRAPHICS_OVERRIDE_KEYS := {
 	"scaling": "float", "aa": "int", "shadows": "int",
 	"ao": "bool", "bloom": "bool", "lamps": "int",
-	"tree_budget": "int", "fps": "bool",
+	"tree_budget": "int", "exposure": "float", "fps": "bool",
 }
 
 

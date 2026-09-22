@@ -25,6 +25,8 @@ const SHADOW_STEPS := [
 ]
 const LAMP_STEPS := [8, 16, 24]
 const TREE_STEPS := [4000, 9000, 16000]
+## 曝光补偿档位（乘在 tonemap_exposure 上）
+const EXPOSURE_STEPS := [0.7, 0.85, 1.0, 1.15, 1.3]
 
 ## 原版 PROFILE 表
 ## shadows：0 关 / 1 低（1024, 2-split）/ 2 高（2048, 4-split）
@@ -96,6 +98,7 @@ var _tier := "medium"
 ##   ao / bloom: bool      SSAO / Bloom 开关
 ##   lamps: int            夜间路灯池数量
 ##   tree_budget: int      林冠实例预算
+##   exposure: float       曝光补偿（乘在 tonemap_exposure 上）
 ##   fps: bool             帧率显示
 var overrides := {}
 
@@ -110,6 +113,24 @@ func _ready() -> void:
 		GameState.graphics_tier = t
 		_tier = t
 	apply_aa()
+
+
+## 曝光补偿系数（设置页可调；光照 apply_mode 每次套用时乘上去）
+func exposure_scale() -> float:
+	return clampf(float(overrides.get("exposure", 1.0)), 0.5, 1.6)
+
+
+## 最近的曝光补偿档位下标（设置页高亮当前值用）
+func exposure_step_index() -> int:
+	var cur := exposure_scale()
+	var best := 2
+	var best_d := INF
+	for i in EXPOSURE_STEPS.size():
+		var d2: float = absf(float(EXPOSURE_STEPS[i]) - cur)
+		if d2 < best_d:
+			best_d = d2
+			best = i
+	return best
 
 
 func tier() -> String:

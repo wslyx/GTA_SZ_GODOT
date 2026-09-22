@@ -332,6 +332,7 @@ const SETTINGS_ROWS := [
 	{"key": "bloom", "name": "泛光 (Bloom)", "opts": ["关", "开"]},
 	{"key": "lamps", "name": "夜间路灯数量", "opts": ["8 盏", "16 盏", "24 盏"]},
 	{"key": "trees", "name": "植被密度", "opts": ["低 (4000)", "中 (9000)", "高 (16000)"]},
+	{"key": "exposure", "name": "曝光补偿", "opts": ["-30%", "-15%", "标准", "+15%", "+30%"]},
 	{"key": "fps", "name": "帧率显示", "opts": ["关", "开"]},
 ]
 
@@ -450,6 +451,8 @@ func _setting_current_index(key: String) -> int:
 					tbest = i
 					break
 			return tbest
+		"exposure":
+			return GraphicsQuality.exposure_step_index()
 		"fps":
 			if GraphicsQuality.overrides.has("fps"):
 				return 1 if bool(GraphicsQuality.overrides["fps"]) else 0
@@ -472,7 +475,7 @@ func _apply_setting(key: String, idx: int) -> void:
 		"aa":
 			GraphicsQuality.set_override("aa", clampi(idx, 0, 1))
 			GraphicsQuality.apply_aa()
-		"shadows", "ao", "bloom", "lamps", "trees":
+		"shadows", "ao", "bloom", "lamps", "trees", "exposure":
 			match key:
 				"shadows":
 					GraphicsQuality.set_override("shadows", clampi(idx, 0, 2))
@@ -486,7 +489,13 @@ func _apply_setting(key: String, idx: int) -> void:
 				"trees":
 					GraphicsQuality.set_override("tree_budget",
 						int(GraphicsQuality.TREE_STEPS[clampi(idx, 0, GraphicsQuality.TREE_STEPS.size() - 1)]))
+				"exposure":
+					GraphicsQuality.set_override("exposure",
+						float(GraphicsQuality.EXPOSURE_STEPS[clampi(idx, 0, GraphicsQuality.EXPOSURE_STEPS.size() - 1)]))
 			GraphicsQuality.apply_to_world(world)
+			# 曝光补偿乘在 tonemap_exposure 上，要重放一次当前光照模式才生效
+			if key == "exposure" and world != null and world.lighting != null:
+				world.lighting.apply_mode(world.lighting.mode)
 		"fps":
 			var on := idx >= 1
 			GraphicsQuality.set_override("fps", on)
