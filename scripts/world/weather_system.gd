@@ -25,7 +25,11 @@ var intensity := 0.0
 
 var rain_node: Node3D
 var puddle_mesh: MeshInstance3D
-var _streaks: Array = []
+## 雨丝渲染：单 MultiMesh + 单材质。
+## 原实现是 240 个独立 MeshInstance3D，各自 new 一份 StandardMaterial3D ——
+## 240 个透明 draw call + 240 个节点 transform 更新，下雨天帧率直接腰斩。
+var _rain_mm: MultiMesh
+var _rain_seeds := PackedFloat32Array()
 var _puddles: Array = []
 var _built := false
 ## 干燥状态的材质快照，只建一次：[{mat, albedo, roughness}]
@@ -71,22 +75,28 @@ func _process(_delta: float) -> void:
 func _build_rain() -> void:
 	rain_node = Node3D.new()
 	rain_node.name = "rain"
+	rain_node.visible = false
 	add_child(rain_node)
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(0.035, 1.6, 0.035)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.72, 0.80, 0.88, 0.42)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.disable_receive_shadows = true
+	_rain_mm = MultiMesh.new()
+	_rain_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_rain_mm.mesh = mesh
+	_rain_mm.instance_count = RAIN_STREAK_COUNT
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "rain-streaks"
+	mmi.multimesh = _rain_mm
+	mmi.material_override = mat
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rain_node.add_child(mmi)
+	_rain_seeds.resize(RAIN_STREAK_COUNT)
 	for i in RAIN_STREAK_COUNT:
-		var mi := MeshInstance3D.new()
-		mi.mesh = mesh
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.72, 0.80, 0.88, 0.42)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.disable_receive_shadows = true
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visible = false
-		rain_node.add_child(mi)
-		_streaks.append({"mi": mi, "seed": randf()})
+		_rain_seeds[i] = randf()
 
 
 ## 启动后台线程生成积水网格。
@@ -174,8 +184,6 @@ func set_raining(v: bool) -> void:
 	intensity = 1.0 if v else 0.0
 	if rain_node != null:
 		rain_node.visible = v
-		for s in _streaks:
-			s["mi"].visible = v
 	if puddle_mesh != null:
 		puddle_mesh.visible = v
 	# 只在"开始下雨"或"雨停需要还原"时才动材质：地面 + 道路共 765+ 个 mesh，
@@ -243,17 +251,16 @@ func update_system(delta: float, focus: Vector3) -> void:
 	if rain_node != null:
 		rain_node.global_position = Vector3(focus.x, focus.y + 12.0, focus.z)
 	var t := Time.get_ticks_msec() / 1000.0
-	for s in _streaks:
-		var mi: MeshInstance3D = s["mi"]
-		var seed_v := float(s["seed"])
+	for i in RAIN_STREAK_COUNT:
+		var seed_v := _rain_seeds[i]
 		# 原版：y = mod(y - t*(13 + g*8) + 40, 20) - 6
 		var y := fposmod(seed_v * 20.0 - t * (13.0 + seed_v * 8.0) + 40.0, 20.0) - 6.0
-		mi.position = Vector3(
+		_rain_mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(
 			(seed_v * 7.0 - fposmod(seed_v * 3.0, 1.0) * 14.0),
 			y,
-			(fposmod(seed_v * 11.0, 1.0) * 28.0 - 14.0))
+			(fposmod(seed_v * 11.0, 1.0) * 28.0 - 14.0))))
 
 
 func diagnostics() -> Dictionary:
-	return {"raining": raining, "streaks": _streaks.size(), "puddles": _puddles.size(),
+	return {"raining": raining, "streaks": _rain_seeds.size(), "puddles": _puddles.size(),
 			"built": _built}

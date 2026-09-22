@@ -42,7 +42,18 @@ var _rng := RandomNumberGenerator.new()
 var _built := false
 ## 停车排重扫间隔：21110 辆车逐个测距，不能每帧都来
 const RESCAN_INTERVAL := 0.5
+## 重扫移动阈值：车是静止的，焦点挪动不到 30m 时可见集合几乎不变，
+## 跳过整轮「查询 + 排序 + 700 次实例重写」。原实现**没有任何跳过条件**，
+## 原地不动也每 0.5s 白付一轮，是最稳定的周期性尖峰。
+const REBUILD_MOVE := 30.0
 var _rescan_timer := 0.0
+var _last_origin := Vector2(INF, INF)
+var _last_aerial := false
+## 每车缓存：车是静止的，Transform3D / 颜色算一次就够。
+## 原实现每次重扫都对选中的 700 辆各调一次 ground_height()（五层采样）
+## 并重建 Basis —— 这些结果永远不变，纯浪费。
+var _bike_xf: Array = []
+var _bike_col: Array = []
 
 
 func setup(p_world: CityWorld) -> void:
@@ -132,28 +143,35 @@ func update_system(delta: float, focus: Vector3) -> void:
 	_rescan_timer = RESCAN_INTERVAL
 	if origin == Vector2.ZERO:
 		origin = Vector2(px, pz)
-	_build_parked(px, pz, world != null and world.aerial)
+	# 跳过条件：焦点几乎没动且视角模式没变 → 可见集合不变，直接返回。
+	# （traffic / pedestrian / canopy 都有同样的阈值机制，唯独这里原来没有。）
+	var cur := Vector2(px, pz)
+	if cur.distance_to(_last_origin) < REBUILD_MOVE and _last_aerial == (world != null and world.aerial):
+		return
+	_last_origin = cur
+	_last_aerial = world != null and world.aerial
+	_build_parked(px, pz, _last_aerial)
 
 
 ## 只渲染焦点附近的停车排（对应原版 80m 格 3×3 邻域 + 上限）。
 ## 用网格索引取半径内的车，不再全量扫 21110 辆。
+## Transform3D / 颜色按车缓存：车是静止的，重复计算毫无意义。
 func _build_parked(px: float, pz: float, aerial: bool) -> void:
 	var radius := NEARBY_RADIUS_AERIAL if aerial else NEARBY_RADIUS_STREET
 	var limit := LIMIT_AERIAL if aerial else LIMIT_STREET
 	var chosen: Array = []
 	if _bike_grid != null:
 		var center := Vector2(px, pz)
-		var near: Array = _bike_grid.query_radius(center, radius)
-		# 按距离升序取前 limit 辆，保证近处的优先
-		var scored: Array = []
-		for idx in near:
-			scored.append({"idx": int(idx), "d": _bike_points[idx].distance_to(center)})
-		scored.sort_custom(func(a, b): return a["d"] < b["d"])
+		# 距离升序取前 limit 辆（Vector2 承载 idx/dist，不建临时字典）
+		var scored := _bike_grid.query_radius_sorted2(center, radius, _bike_points)
 		for i in mini(limit, scored.size()):
-			chosen.append(bikes[int(scored[i]["idx"])])
+			chosen.append(int(scored[i].x))
+	if _bike_xf.size() != bikes.size():
+		_bike_xf.resize(bikes.size())
+		_bike_col.resize(bikes.size())
 	var by_type := [[], [], []]
-	for b in chosen:
-		by_type[int(b["type"])].append(b)
+	for idx in chosen:
+		by_type[int(bikes[idx]["type"])].append(idx)
 
 	for entry in _multimeshes:
 		var t := int(entry["type"])
@@ -162,17 +180,29 @@ func _build_parked(px: float, pz: float, aerial: bool) -> void:
 		mm.instance_count = list.size()
 		mm.visible_instance_count = list.size()
 		for i in list.size():
-			var b: Dictionary = list[i]
-			var g := world.ground_height(float(b["x"]), -float(b["z"]))
-			# 不能叫 basis —— Node3D 已有 basis 属性，本地变量重名会触发
-			# SHADOWED_VARIABLE_BASE_CLASS 告警
-			var xf_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(b["yaw"])))
-			# 车身倾角
-			if absf(float(b["lean"])) > 0.001:
-				xf_basis = xf_basis.rotated(Vector3.FORWARD, float(b["lean"]))
-			mm.set_instance_transform(i, Transform3D(xf_basis,
-				CoordinateUtil.to_world(float(b["x"]), float(b["z"]), g)))
-			mm.set_instance_color(i, _colour_for(t, int(b["palette"])))
+			var bi: int = list[i]
+			var xf = _bike_xf[bi]
+			if xf == null:
+				xf = _compute_bike_xf(bikes[bi])
+				_bike_xf[bi] = xf
+			mm.set_instance_transform(i, xf)
+			var col = _bike_col[bi]
+			if col == null:
+				col = _colour_for(t, int(bikes[bi]["palette"]))
+				_bike_col[bi] = col
+			mm.set_instance_color(i, col)
+
+
+## 一辆停车电摩的世界变换（数据不变 → 结果不变，算一次缓存在 _bike_xf）
+func _compute_bike_xf(b: Dictionary) -> Transform3D:
+	# 不能叫 basis —— Node3D 已有 basis 属性，本地变量重名会触发
+	# SHADOWED_VARIABLE_BASE_CLASS 告警
+	var xf_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(b["yaw"])))
+	# 车身倾角
+	if absf(float(b["lean"])) > 0.001:
+		xf_basis = xf_basis.rotated(Vector3.FORWARD, float(b["lean"]))
+	var g := world.ground_height(float(b["x"]), -float(b["z"]))
+	return Transform3D(xf_basis, CoordinateUtil.to_world(float(b["x"]), float(b["z"]), g))
 
 
 ## 骑手 NPC（原版默认 18 个）

@@ -38,6 +38,16 @@ var _multimeshes: Array = []      ## 每个 mesh role 一个 MultiMesh
 var _roles: Array = []            ## {name, mesh, material, is_lens, lens_index}
 var _instance_transforms: Array = []
 var _active_arms: Array = []
+## 路口空间索引：原来 _rescan 每 0.5s 把 395 个路口全量测距 + sort_custom
+## （约 3400 次 lambda 比较），是各系统里唯一没建网格索引的一个。
+var _junc_points := PackedVector2Array()
+var _junc_grid: PointGrid
+## 上次重扫的焦点与时间：焦点不动就不重摆实例（灯是静止的），
+## 灯色刷新（_refresh_colors）不受影响，照常按相位走。
+const RESCAN_MOVE := 40.0
+const RESCAN_FALLBACK := 3.0
+var _last_rescan_focus := Vector2(INF, INF)
+var _fallback_timer := 0.0
 
 
 func setup(p_world: CityWorld) -> void:
@@ -48,8 +58,17 @@ func setup(p_world: CityWorld) -> void:
 		+ 2.0 * (float(cycle.get("amber", 3.0)) + float(cycle.get("allRed", 1.2))))
 	junctions = data.get("junctions", [])
 	_build_cells()
+	_build_junction_index()
 	_load_signal_asset()
 	print("[TrafficSignals] %d 个路口，周期 %.1fs" % [junctions.size(), cycle_length])
+
+
+func _build_junction_index() -> void:
+	_junc_points.resize(junctions.size())
+	for i in junctions.size():
+		_junc_points[i] = Vector2(float(junctions[i]["x"]), float(junctions[i]["z"]))
+	_junc_grid = PointGrid.new(320.0)
+	_junc_grid.build(_junc_points)
 
 
 # ---------------------------------------------------------------------------
@@ -189,25 +208,36 @@ func _lens_kind(mesh_name: String) -> int:
 	return -1
 
 
-func _arm_transform(arm: Dictionary, junction: Dictionary) -> Transform3D:
+func _arm_transform(arm: Dictionary, _junction: Dictionary) -> Transform3D:
+	# 灯臂是静止的：Transform3D 算一次就缓存进 arm["_xf"]。
+	# 原来 _rescan 每轮对 140 条臂各调一次 ground_height()（五层采样串行）。
+	if arm.has("_xf"):
+		return arm["_xf"]
 	# 不能叫 basis —— Node3D 已有 basis 属性
 	var arm_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(arm.get("yaw", 0.0))))
 	var g := world.ground_height(float(arm["x"]), -float(arm["z"]))
-	return Transform3D(arm_basis, CoordinateUtil.to_world(float(arm["x"]), float(arm["z"]), g))
+	var xf := Transform3D(arm_basis, CoordinateUtil.to_world(float(arm["x"]), float(arm["z"]), g))
+	arm["_xf"] = xf
+	return xf
 
 
-## 挑最近的若干路口重排实例（对应原版的距离裁剪）
+## 挑最近的若干路口重排实例（对应原版的距离裁剪）。
+## 用路口网格索引取候选，不再全量扫 395 个路口。
 func _rescan(focus: Vector3) -> void:
-	var cands: Array = []
 	var fd := Vector2(focus.x, -focus.z)
-	for j in junctions:
-		var d := Vector2(float(j["x"]), float(j["z"])).distance_to(fd)
-		cands.append({"d": d, "j": j})
-	cands.sort_custom(func(a, b): return a["d"] < b["d"])
+	var cands: Array[Vector2] = []
+	if _junc_grid != null:
+		# 半径从小到大扩，保证密市疏郊都凑得满 VISIBLE_LIMIT 个路口
+		for r in [800.0, 1600.0, 4000.0]:
+			cands = _junc_grid.query_radius_sorted2(fd, r, _junc_points)
+			if cands.size() >= VISIBLE_LIMIT:
+				break
+		if cands.is_empty():
+			cands = _junc_grid.query_radius_sorted2(fd, 100000.0, _junc_points)
 
 	_active_arms.clear()
 	for i in mini(VISIBLE_LIMIT, cands.size()):
-		var j: Dictionary = cands[i]["j"]
+		var j: Dictionary = junctions[int(cands[i].x)]
 		for arm in j.get("arms", []):
 			_active_arms.append({"arm": arm, "junction": j})
 
@@ -247,10 +277,19 @@ func _refresh_colors() -> void:
 func update_system(delta: float, focus: Vector3) -> void:
 	time += delta
 	_scan_timer -= delta
-	if _scan_timer <= 0.0:
-		_scan_timer = RESCAN_INTERVAL
-		_rescan(focus)
-		_refresh_colors()
+	if _scan_timer > 0.0:
+		return
+	_scan_timer = RESCAN_INTERVAL
+	# 重摆实例只在焦点移动超过阈值时做（灯是静止的）；每 3s 兜底重扫一次，
+	# 防止缓慢挪动时远处新路口长时间进不了可见集。灯色刷新照常跟随相位。
+	var fd := Vector2(focus.x, -focus.z)
+	_fallback_timer += RESCAN_INTERVAL
+	if fd.distance_to(_last_rescan_focus) < RESCAN_MOVE and _fallback_timer < RESCAN_FALLBACK:
+		return
+	_fallback_timer = 0.0
+	_last_rescan_focus = fd
+	_rescan(focus)
+	_refresh_colors()
 
 
 func diagnostics() -> Dictionary:

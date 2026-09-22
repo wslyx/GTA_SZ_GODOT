@@ -63,3 +63,18 @@ func query_radius_sorted(center: Vector2, radius: float, points: PackedVector2Ar
 			out.append({"idx": idx, "dist": d})
 	out.sort_custom(func(a, b): return a["dist"] < b["dist"])
 	return out
+
+
+## 同 query_radius_sorted，但返回 Array[Vector2]（x=点下标, y=距离）。
+## 每项是内建 Variant 类型 Vector2 而不是 Dictionary —— 不进堆，
+## 上千个候选排序时不再造成 GC 压力（林冠 / 电摩 / 信号灯的周期性重建
+## 原来每 0.5–2s 分配上千个临时字典，是偶发卡顿的来源之一）。
+func query_radius_sorted2(center: Vector2, radius: float, points: PackedVector2Array) -> Array[Vector2]:
+	var ids := query_radius(center, radius)
+	var out: Array[Vector2] = []
+	for idx in ids:
+		var d := points[idx].distance_to(center)
+		if d <= radius:
+			out.append(Vector2(idx, d))
+	out.sort_custom(func(a: Vector2, b: Vector2): return a.y < b.y)
+	return out

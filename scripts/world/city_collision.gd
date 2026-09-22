@@ -190,6 +190,26 @@ static func closest_point(x: float, north: float, a: Vector2, b: Vector2) -> Dic
 	return {"point": Vector2(px, pz), "d": sqrt((x - px) * (x - px) + (north - pz) * (north - pz)), "t": t}
 
 
+## 点到线段距离（数据坐标）。blocked() 对建筑环的**每条边**都要测距，
+## 原来每一次都走 closest_point() 新建一个 Dictionary（内含 Vector2），
+## 建筑密集区每帧产生几十上百个临时字典 → GDScript GC 压力 → 偶发卡顿。
+## 这个纯数值版本零分配，专给 blocked() 的逐边判定用。
+static func seg_distance(x: float, north: float, a: Vector2, b: Vector2) -> float:
+	var dx := b.x - a.x
+	var dz := b.y - a.y
+	var len2 := dx * dx + dz * dz
+	var t := 0.0
+	if len2 > 0.0:
+		t = ((x - a.x) * dx + (north - a.y) * dz) / len2
+	if t < 0.0:
+		t = 0.0
+	elif t > 1.0:
+		t = 1.0
+	var px := x - (a.x + dx * t)
+	var pz := north - (a.y + dz * t)
+	return sqrt(px * px + pz * pz)
+
+
 ## 射线法环包含测试（数据坐标）
 static func in_ring(x: float, z: float, ring: PackedVector2Array) -> bool:
 	var yes := false
@@ -217,7 +237,8 @@ func blocked(x: float, z: float) -> bool:
 		if in_ring(x, z, r):
 			return true
 		for i in range(1, r.size()):
-			if closest_point(x, z, r[i - 1], r[i])["d"] < WALL_MARGIN:
+			# 零分配版本：这里原来是 closest_point()，每条边建一个临时字典
+			if seg_distance(x, z, r[i - 1], r[i]) < WALL_MARGIN:
 				return true
 
 	# 地标阻挡圈：扁平数组 + 距离平方比较，不再逐条做 dict.get

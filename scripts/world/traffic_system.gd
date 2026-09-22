@@ -41,11 +41,16 @@ var enabled := true
 
 var _source_meshes: Array = []
 var _multimeshes: Array = []   ## 每 group × 每个源 mesh 一个 MultiMesh
+var _mms_by_group: Array = []  ## group → [MultiMesh]（同步时免去每车扫 69 项）
 var _mesh_built := false
 var _rng := RandomNumberGenerator.new()
 ## 实例变换重写节流：69 个 MultiMesh 节点，每帧重写太重
 const SYNC_INTERVAL := 0.1
 var _sync_timer := 0.0
+## 累计的实际流逝时间：_sync_instances 每 0.1s 才跑一次，但原实现推进用的是
+## 单帧 delta（≈16ms）—— 车流实际速度只有标称的 1/6。改为累积 delta、
+## 同步时一次性推进，速度才是真实的 7–13 m/s。
+var _sync_acc := 0.0
 ## 路网节点空间索引。
 ## place() 原本每 450m 就把 42829 个节点全量扫一遍，再对上千个候选跑
 ## sort_custom（GDScript 的 lambda 比较器，单次几十毫秒）—— 开车时表现为
@@ -90,7 +95,9 @@ func _load_car_asset() -> void:
 
 
 func _build_multimeshes() -> void:
+	_mms_by_group.clear()
 	for g in CAR_COLORS.size():
+		_mms_by_group.append([])
 		for mi in _source_meshes:
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -104,6 +111,7 @@ func _build_multimeshes() -> void:
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(node)
 			_multimeshes.append({"mm": mm, "group": g})
+			(_mms_by_group[g] as Array).append(mm)
 	_mesh_built = true
 
 
@@ -216,17 +224,18 @@ func update_system(delta: float, focus: Vector3) -> void:
 	# （约 900 次 set_instance_transform）在 GDScript 里太重，降到 10Hz。
 	# 车速 7–13 m/s，0.1s 位移不到 1.3m，视觉上可接受。
 	_sync_timer -= delta
+	_sync_acc += delta
 	if _sync_timer > 0.0:
 		return
 	_sync_timer = SYNC_INTERVAL
-	_sync_instances(px, pz)
+	_sync_instances(px, pz, clampf(_sync_acc, 0.0, 0.5))
+	_sync_acc = 0.0
 
 
-func _sync_instances(px: float, pz: float) -> void:
+func _sync_instances(px: float, pz: float, advance_dt := 0.0) -> void:
 	var buffers := {}
 	for b in _multimeshes:
 		buffers[b["mm"]] = []
-
 	for c in cars:
 		var a: Vector2 = graph.nodes[c["from"]]
 		var b: Vector2 = graph.nodes[c["to"]]
@@ -249,8 +258,8 @@ func _sync_instances(px: float, pz: float) -> void:
 					blocked = true
 					break
 
-		var dt := clampf(world.get_process_delta_time(), 0.0, 0.05)
-		c["t"] = float(c["t"]) + dt * (0.0 if blocked else float(c["speed"])) / maxf(0.1, seg_len)
+		# 用同步间隔的真实流逝时间推进（原来是单帧 delta，车速缩水 6 倍）
+		c["t"] = float(c["t"]) + advance_dt * (0.0 if blocked else float(c["speed"])) / maxf(0.1, seg_len)
 
 		# 到达节点后选下一条边
 		var guard := 0
@@ -292,9 +301,9 @@ func _sync_instances(px: float, pz: float) -> void:
 			# car_led（前灯）Z = -2.24 ／ car_redled（尾灯）Z = +1.62。
 			Basis(Vector3.UP, CoordinateUtil.node_yaw(yaw, CoordinateUtil.ModelForward.MINUS_Z)),
 			CoordinateUtil.to_world(float(c["x"]), float(c["z"]), g + CAR_HEIGHT))
-		for entry in _multimeshes:
-			if int(entry["group"]) == int(c["group"]):
-				buffers[entry["mm"]].append(xf)
+		# 直接取本组的 MultiMesh 列表（原来每车线性扫 69 项找 group）
+		for mm in _mms_by_group[int(c["group"])]:
+			buffers[mm].append(xf)
 
 	for entry in _multimeshes:
 		var list: Array = buffers[entry["mm"]]

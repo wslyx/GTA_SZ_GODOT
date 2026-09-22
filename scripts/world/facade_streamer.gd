@@ -24,6 +24,13 @@ const AERIAL_LOAD_DELAY_MS := 250
 ## 每帧一条 push_warning，永不收敛。
 const FAILED_RETRY_DELAY := 4.0
 const MAX_ATTEMPTS := 3
+## 两次入队之间的冷却：每块瓦片 5~7MB，instantiate 在主线程执行，
+## 连续两块背靠背会把尖峰叠成长帧。冷却 2s 把尖峰拆开，且串行加载本来
+## 就一次一块，不会因此拖慢整体吞吐太多。
+const LOAD_COOLDOWN := 2.0
+## 显示/隐藏 + 卸载扫描的降频间隔：原来每帧对全部 150 块瓦片跑 3 趟
+## O(N) 距离循环，量小但每帧都付。0.25s 的粒度对 640m 瓦片毫无影响。
+const VIS_INTERVAL := 0.25
 
 var world: CityWorld
 var enabled := true
@@ -37,6 +44,8 @@ var _attempts: Dictionary = {}
 var _retry_timer := 0.0
 var _aerial_delay := 0.0
 var _quality_scale := 1.0
+var _vis_timer := 0.0
+var _cooldown := 0.0
 var stats_loaded := 0
 var stats_unloaded := 0
 var stats_failed := 0
@@ -158,27 +167,33 @@ func update_system(delta: float, focus: Vector3) -> void:
 		return
 	var fx := focus.x
 	var fz := -focus.z
+	_cooldown -= delta
 
-	# 1) 卸载
-	for t in tiles:
-		if t["state"] != "loaded":
-			continue
-		var d := Vector2(float(t["x"]) - fx, float(t["z"]) - fz).length()
-		if d > UNLOAD_RADIUS:
+	# 1) 卸载 + 2) 显示/隐藏：降频到 4Hz（瓦片 640m 粒度，没必要每帧扫）
+	_vis_timer -= delta
+	if _vis_timer <= 0.0:
+		_vis_timer = VIS_INTERVAL
+		for t in tiles:
+			if t["state"] != "loaded":
+				continue
+			var dx := float(t["x"]) - fx
+			var dz := float(t["z"]) - fz
+			if dx * dx + dz * dz > UNLOAD_RADIUS * UNLOAD_RADIUS:
+				var node: Node3D = t["node"]
+				if node != null and is_instance_valid(node):
+					node.queue_free()
+				t["node"] = null
+				t["state"] = "pending"
+				stats_unloaded += 1
+		for t in tiles:
 			var node: Node3D = t["node"]
-			if node != null and is_instance_valid(node):
-				node.queue_free()
-			t["node"] = null
-			t["state"] = "pending"
-			stats_unloaded += 1
-
-	# 2) 显示 / 隐藏
-	for t in tiles:
-		var node: Node3D = t["node"]
-		if node == null or not is_instance_valid(node):
-			continue
-		var d := Vector2(float(t["x"]) - fx, float(t["z"]) - fz).length()
-		node.visible = d <= SHOW_RADIUS * _quality_scale
+			if node == null or not is_instance_valid(node):
+				continue
+			var dx := float(t["x"]) - fx
+			var dz := float(t["z"]) - fz
+			var show := dx * dx + dz * dz <= SHOW_RADIUS * _quality_scale * SHOW_RADIUS * _quality_scale
+			if node.visible != show:
+				node.visible = show
 
 	# 3) 串行排队加载：1050m 内最近的未加载瓦片
 	if not _loader.is_idle():
@@ -194,17 +209,23 @@ func update_system(delta: float, focus: Vector3) -> void:
 	else:
 		_aerial_delay = 0.0
 
+	# 冷却期不选新瓦片：刚实例化完一块，别让下一块的尖峰贴上来
+	if _cooldown > 0.0:
+		return
+
 	_retry_timer -= delta
 	var best := ""
-	var best_d := INF
+	var best_d2 := INF
 	for t in tiles:
 		if t["state"] != "pending":
 			continue
 		if _failed.has(t["id"]) and _retry_timer > 0.0:
 			continue
-		var d := Vector2(float(t["x"]) - fx, float(t["z"]) - fz).length()
-		if d <= QUEUE_RADIUS and d < best_d:
-			best_d = d
+		var dx := float(t["x"]) - fx
+		var dz := float(t["z"]) - fz
+		var d2 := dx * dx + dz * dz
+		if d2 <= QUEUE_RADIUS * QUEUE_RADIUS and d2 < best_d2:
+			best_d2 = d2
 			best = str(t["id"])
 	if best == "":
 		if _retry_timer <= 0.0:
@@ -215,6 +236,7 @@ func update_system(delta: float, focus: Vector3) -> void:
 	var entry: Dictionary = _by_id[best]
 	entry["state"] = "loading"
 	_current_id = best
+	_cooldown = LOAD_COOLDOWN
 	_loader.enqueue(_tile_path(best), self, best)
 
 

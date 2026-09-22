@@ -43,6 +43,10 @@ var _canopy_job: Dictionary = {"phase": 0}
 var _canopy_last_focus := Vector2.ZERO
 ## 林冠每帧最多处理的候选树数（计算 + 写入都计入），把上万次 set_instance_transform 摊到多帧
 const CANOPY_CHUNK := 2600
+## 每棵树的最终 Transform3D 缓存（树是静止的）。
+## 原来每次重建都对每棵候选树调一次 ground_height()（五层串行采样）再重建 Basis，
+## 预算 9000–16000 棵时这是重建开销的大头；缓存后重扫只剩查表 + 追加。
+var _canopy_xf: Array = []
 
 
 func setup(p_world: CityWorld) -> void:
@@ -160,49 +164,64 @@ func _canopy_start(focus: Vector3, aerial: bool) -> void:
 	var fx := focus.x
 	var fz := -focus.z
 	var budget: int = TREE_BUDGET.get(GameState.graphics_tier, 9000)
-	var near: Array = []
+	var near: Array[Vector2] = []
 	if _canopy_grid != null:
-		near = _canopy_grid.query_radius_sorted(Vector2(fx, fz), STREET_RADIUS, _canopy_points)
+		near = _canopy_grid.query_radius_sorted2(Vector2(fx, fz), STREET_RADIUS, _canopy_points)
+	if _canopy_xf.size() != _canopy_instances.size():
+		_canopy_xf.resize(_canopy_instances.size())
 	_canopy_job = {
 		"phase": 1, "buckets": {}, "node_list": [], "node_idx": 0, "write_i": 0,
 		"cand": near, "ci": 0, "used": 0, "budget": budget, "aerial": aerial,
 	}
 
 
+## 每帧处理量的自适应：帧率掉到 50 以下时把分帧量减半，
+## 高速行驶时宁可林冠多铺几帧，也不把单帧时间撑爆。
+func _current_chunk() -> int:
+	if Engine.get_frames_per_second() >= 50.0:
+		return CANOPY_CHUNK
+	return int(CANOPY_CHUNK * 0.5)
+
+
 ## 分帧推进林冠重建：
-##   phase 1 —— 把候选树分到各 LOD 桶（算变换矩阵 + 查地面高度）
+##   phase 1 —— 把候选树分到各 LOD 桶（查缓存的变换矩阵，首次才算地面高度）
 ##   phase 2 —— 把桶写入各 MultiMesh
-## 每帧只处理 CANOPY_CHUNK 个候选树，把「上万次 set_instance_transform」摊到多帧，
+## 每帧只处理一小块，把「上万次 set_instance_transform」摊到多帧，
 ## 消除原来每 2 秒一次的主线程尖峰（1.6 万实例单帧重写）。
 func _canopy_step(focus: Vector3) -> void:
 	var job: Dictionary = _canopy_job
 	if int(job["phase"]) == 0:
 		return
+	var chunk := _current_chunk()
 
 	if int(job["phase"]) == 1:
-		var near: Array = job["cand"]
+		var near: Array[Vector2] = job["cand"]
 		var processed := 0
-		while int(job["ci"]) < near.size() and int(job["used"]) < int(job["budget"]) and processed < CANOPY_CHUNK:
-			var it: Dictionary = near[int(job["ci"])]
+		while int(job["ci"]) < near.size() and int(job["used"]) < int(job["budget"]) and processed < chunk:
+			var it: Vector2 = near[int(job["ci"])]
 			job["ci"] = int(job["ci"]) + 1
 			processed += 1
-			var idx: int = int(it["idx"])
-			var d: float = float(it["dist"])
-			var t: Dictionary = _canopy_instances[idx]
-			var sid := _species_id(int(t["species"]))
+			var idx: int = int(it.x)
+			var d: float = it.y
+			var sid := _species_id(int(_canopy_instances[idx]["species"]))
 			if sid.is_empty():
 				continue
 			var tier := _canopy_tier(d, bool(job["aerial"]))
 			var key := "%s|%s" % [sid, tier]
 			if not job["buckets"].has(key):
 				job["buckets"][key] = []
-			var tx := float(t["x"])
-			var tz := float(t["z"])
-			var g := world.ground_height(tx, -tz)
-			job["buckets"][key].append(Transform3D(
-				Basis(Vector3.UP, CoordinateUtil.node_yaw(float(t["yaw"]))).scaled(
-					Vector3(float(t["scale"]), float(t["scale"]), float(t["scale"]))),
-				CoordinateUtil.to_world(tx, tz, g)))
+			var xf = _canopy_xf[idx]
+			if xf == null:
+				var t: Dictionary = _canopy_instances[idx]
+				var tx := float(t["x"])
+				var tz := float(t["z"])
+				var g := world.ground_height(tx, -tz)
+				xf = Transform3D(
+					Basis(Vector3.UP, CoordinateUtil.node_yaw(float(t["yaw"]))).scaled(
+						Vector3(float(t["scale"]), float(t["scale"]), float(t["scale"]))),
+					CoordinateUtil.to_world(tx, tz, g))
+				_canopy_xf[idx] = xf
+			job["buckets"][key].append(xf)
 			job["used"] = int(job["used"]) + 1
 		if int(job["ci"]) >= near.size() or int(job["used"]) >= int(job["budget"]):
 			job["node_list"] = []
@@ -215,7 +234,7 @@ func _canopy_step(focus: Vector3) -> void:
 
 	if int(job["phase"]) == 2:
 		var written := 0
-		while int(job["node_idx"]) < job["node_list"].size() and written < CANOPY_CHUNK:
+		while int(job["node_idx"]) < job["node_list"].size() and written < chunk:
 			var nk: String = job["node_list"][int(job["node_idx"])]
 			var node: MultiMeshInstance3D = _canopy_nodes[nk]
 			var parts: Array = nk.split("|")
@@ -224,7 +243,7 @@ func _canopy_step(focus: Vector3) -> void:
 			var mm: MultiMesh = node.multimesh
 			if int(job["write_i"]) == 0:
 				mm.instance_count = list.size()
-			while int(job["write_i"]) < list.size() and written < CANOPY_CHUNK:
+			while int(job["write_i"]) < list.size() and written < chunk:
 				mm.set_instance_transform(int(job["write_i"]), list[int(job["write_i"])])
 				job["write_i"] = int(job["write_i"]) + 1
 				written += 1

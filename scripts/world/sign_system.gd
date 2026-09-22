@@ -29,6 +29,13 @@ var _sign_grid: PointGrid
 var _pool: Array = []
 var _font: Font
 var _timer := 0.0
+## 每个 Label3D 槽位上次写入的文字：Label3D.text 赋**相同的值**也会触发
+## 字形重排与纹理上传（64 个 × 4Hz 就是持续的隐性开销），必须短路。
+var _pool_texts: Array = []
+## 相机几乎没动时跳过整轮选择（招牌选择依赖相机位置与朝向，25m 内结果基本不变）
+const UPDATE_MOVE := 25.0
+var _last_cam := Vector3(INF, INF, INF)
+var _last_night := false
 
 
 func setup(p_world: CityWorld) -> void:
@@ -87,6 +94,7 @@ func _make_pool() -> void:
 		l.render_priority = 1
 		add_child(l)
 		_pool.append(l)
+		_pool_texts.append("")
 
 
 ## 视线朝向系数（原版 facing）：招牌法线朝向相机的程度，0–1
@@ -103,6 +111,13 @@ func _facing(normal: Vector3, cam_pos: Vector3, sign_pos: Vector3) -> float:
 func update_signs(cam_pos: Vector3) -> void:
 	if not enabled:
 		return
+	# 相机几乎没动且昼夜模式没变 → 选择结果基本不变，整轮跳过
+	# （签名选择依赖相机位置，驱动时 25m 也就 0.5~1s 的粒度，视觉无感）
+	var night := GameState.light_mode == GameContent.LightMode.NIGHT
+	if cam_pos.distance_to(_last_cam) < UPDATE_MOVE and night == _last_night:
+		return
+	_last_cam = cam_pos
+	_last_night = night
 	# 网格索引：只取 MAX_DISTANCE 内的招牌，不再全量扫 3077 条
 	var center := Vector2(cam_pos.x, -cam_pos.z)
 	var near_ids: Array = []
@@ -141,7 +156,11 @@ func update_signs(cam_pos: Vector3) -> void:
 			continue
 		var e: Dictionary = selected[i]
 		var s: Dictionary = e["s"]
-		l.text = str(s.get("text", ""))
+		var text := str(s.get("text", ""))
+		# 相同值短路：赋同样的 text 也会触发字形重排 + 纹理上传
+		if str(_pool_texts[i]) != text:
+			l.text = text
+			_pool_texts[i] = text
 		l.visible = true
 		var pos: Array = s["position"]
 		var nrm: Array = s.get("normal", [0.0, 0.0, 1.0])
@@ -159,8 +178,7 @@ func update_signs(cam_pos: Vector3) -> void:
 		l.global_transform = Transform3D(sign_basis,
 			CoordinateUtil.to_world(float(pos[0]), float(pos[2]), float(pos[1])))
 		l.pixel_size = clampf(height / 64.0, 0.004, 0.06)
-		# 夜间提亮（原版 night 亮度 0.72 → 1.9）
-		var night := GameState.light_mode == GameContent.LightMode.NIGHT
+		# 夜间提亮（原版 night 亮度 0.72 → 1.9）；night 在函数开头已判定
 		l.modulate = Color(1.0, 0.97, 0.90) * (1.35 if night else 1.0)
 
 

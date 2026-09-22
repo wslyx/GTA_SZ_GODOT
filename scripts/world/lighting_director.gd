@@ -103,6 +103,24 @@ var _lamp_pool: Array = []
 var _scan_timer := 0.0
 var _built := false
 var lamp_lit := false
+## 阴影绘制距离随街面/高空切换（原版 SHADOW_ORTHO_NORMAL 260 / AERIAL 1050）
+const SHADOW_DIST_STREET := 260.0
+const SHADOW_DIST_AERIAL := 1050.0
+var _last_aerial_shadow := false
+var _shadow_dist_ready := false
+
+
+## 把阴影最大距离套到太阳上；只在切换时赋值，避免每帧重设触发阴影重画
+func _apply_shadow_distance() -> void:
+	if sun == null:
+		return
+	var aerial := world != null and world.aerial
+	if _shadow_dist_ready and aerial == _last_aerial_shadow:
+		return
+	_last_aerial_shadow = aerial
+	_shadow_dist_ready = true
+	sun.directional_shadow_max_distance = SHADOW_DIST_AERIAL if aerial else SHADOW_DIST_STREET
+	sun.directional_shadow_fade_start = 0.8
 ## 实际参与分配的灯数（低画质档会调小）。Forward+ 下每盏 OmniLight 都是
 ## 逐像素开销，24 盏铺满夜景城区并不便宜。
 var _active_lamps := LAMP_POOL
@@ -224,13 +242,24 @@ func cycle_mode() -> int:
 
 
 func set_quality(p: Dictionary) -> void:
-	if sun != null:
-		sun.shadow_enabled = true
 	# 低画质档把路灯池砍到 8 盏：省下的逐像素光照开销比少几盏灯更值钱
 	_active_lamps = 8 if float(p.get("detail_scale", 1.0)) <= 0.5 else LAMP_POOL
 	var env := env_node.environment
 	env.ssao_enabled = bool(p.get("ao", true))
 	env.glow_enabled = float(p.get("bloom_scale", 0.5)) > 0.0
+	# —— 阴影按档位接线（原来无条件 shadow_enabled = true，
+	# 低档也跑 4-split 全尺寸阴影图，是 Forward+ 下最大的单项 GPU 开销之一）——
+	if sun != null:
+		var size := int(p.get("shadow_size", 2048))
+		# 低档（shadow_size 1024）降为 2-split：省一次深度 pass，观感差别很小
+		var splits := DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if size <= 1024 \
+			else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		sun.directional_shadow_mode = splits
+		sun.directional_shadow_blend_splits = size > 1024
+		# 阴影图集尺寸是引擎级设置（默认 4096），按档位降到 1024/2048
+		RenderingServer.directional_shadow_atlas_set_size(size, true)
+	# 阴影绘制距离：街面 260m / 高空 1050m（原版 SHADOW_ORTHO_*），比默认省一大截
+	_apply_shadow_distance()
 
 
 # ---------------------------------------------------------------------------
@@ -289,21 +318,22 @@ func _create_lamp_pool() -> void:
 func _assign_lamps(focus: Vector3) -> void:
 	if _lamps.is_empty() or not lamp_lit:
 		return
-	var scored: Array = []
-	# 网格索引：只取 LAMP_END_DISTANCE 内的灯位，不再全量扫 20409 个
+	# 网格索引：只取 LAMP_END_DISTANCE 内的灯位，不再全量扫 20409 个。
+	# Vector2(idx, dist) 承载结果，不建临时字典。
+	var scored: Array[Vector2] = []
 	if _lamp_grid != null:
-		scored = _lamp_grid.query_radius_sorted(Vector2(focus.x, focus.z),
+		scored = _lamp_grid.query_radius_sorted2(Vector2(focus.x, focus.z),
 			LAMP_END_DISTANCE, _lamp_points)
 	var n := mini(mini(_active_lamps, _lamp_pool.size()), scored.size())
 	for i in _lamp_pool.size():
 		var l: OmniLight3D = _lamp_pool[i]
 		if i < n:
-			var e: Dictionary = scored[i]
-			var p: Vector3 = _lamps[int(e["idx"])]["pos"]
+			var e: Vector2 = scored[i]
+			var p: Vector3 = _lamps[int(e.x)]["pos"]
 			l.global_position = p
 			l.visible = true
 			# 距离越远越弱（原版 full 30 / end 72 的线性过渡）
-			var t: float = clamp((float(e["dist"]) - LAMP_FULL_DISTANCE) /
+			var t: float = clamp((e.y - LAMP_FULL_DISTANCE) /
 				maxf(LAMP_END_DISTANCE - LAMP_FULL_DISTANCE, 1.0), 0.0, 1.0)
 			l.light_energy = lerpf(LAMP_NIGHT_ENERGY, LAMP_DUSK_ENERGY, t) / 100.0
 		else:
@@ -315,6 +345,7 @@ func update_system(delta: float, focus: Vector3) -> void:
 	if _scan_timer <= 0.0:
 		_scan_timer = 0.4
 		_assign_lamps(focus)
+		_apply_shadow_distance()
 	# 太阳跟随视野中心，保证阴影贴图覆盖玩家附近（原版 sun.position = p - dir*800）
 	if sun != null:
 		var look: Dictionary = LOOK.get(mode, LOOK[GameContent.LightMode.SUNSET])
