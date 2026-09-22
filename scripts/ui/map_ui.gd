@@ -25,6 +25,7 @@ var world: CityWorld
 var player = null
 
 var minimap: Control
+var minimap_holder: Control
 var big_map: Control
 var big_map_visible := false
 
@@ -52,14 +53,24 @@ func setup(p_world: CityWorld, p_player) -> void:
 
 
 func _build() -> void:
+	# 小地图需要裁剪：道路/水面等多边形顶点在方框外，不裁剪会画到方框外面。
+	# 注意 clip_contents 只裁剪**子控件**的绘制、不裁控件自己的 _draw，
+	# 所以结构必须是：holder（裁剪）→ minimap（实际绘制）。
+	minimap_holder = Control.new()
+	minimap_holder.name = "minimap-clip"
+	minimap_holder.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	minimap_holder.position = Vector2(28, 96)
+	minimap_holder.size = Vector2(320, 320)
+	minimap_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_holder.clip_contents = true
+	add_child(minimap_holder)
+
 	minimap = Control.new()
 	minimap.name = "minimap"
-	minimap.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	minimap.position = Vector2(28, 96)
-	minimap.size = Vector2(320, 320)
+	minimap.set_anchors_preset(Control.PRESET_FULL_RECT)
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap.draw.connect(_draw_minimap)
-	add_child(minimap)
+	minimap_holder.add_child(minimap)
 
 	big_map = Control.new()
 	big_map.name = "map-panel"
