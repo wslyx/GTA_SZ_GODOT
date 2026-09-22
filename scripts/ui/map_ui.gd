@@ -21,6 +21,14 @@ const TILE_PX := 256.0
 const MINIMAP_SCALE := 0.38
 const MAX_TILE_CACHE := 96
 
+## 大地图上点选地标命中半径（像素）
+const PICK_RADIUS := 26.0
+## 按下-松开位移小于该值视为"点击"而不是拖动
+const CLICK_SLOP := 6.0
+
+## 点选了目的地（大地图左键点地标）→ main_game 接管并启动自动驾驶
+signal destination_picked(pos: Vector2, dest_name: String)
+
 var world: CityWorld
 var player = null
 
@@ -33,6 +41,11 @@ var big_scale := 3.0
 var big_view := Vector2.ZERO
 var _dragging := false
 var _drag_last := Vector2.ZERO
+## 点选目的地：按下位置与是否已拖动（区分点击与拖图）
+var _press_pos := Vector2.ZERO
+var _press_dragged := false
+## 当前选中的目的地（供绘制标记）
+var _dest := {}
 
 var _tilt := 0.40
 ## 包围盒缓存：小地图/大地图都要做"视野剔除"，
@@ -306,12 +319,55 @@ func _on_map_input(event: InputEvent) -> void:
 			big_map.queue_redraw()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
 			_dragging = mb.pressed
+			if mb.pressed:
+				_press_pos = mb.position
+				_press_dragged = false
+			elif not _press_dragged and _press_pos.distance_to(mb.position) < CLICK_SLOP:
+				# 原版交互：大地图上点选地标 → 自动驾驶前往（city-map.ts onAutoDrive）
+				_pick_destination(mb.position)
 			_drag_last = mb.position
 	elif event is InputEventMouseMotion and _dragging:
 		var mm := event as InputEventMouseMotion
+		if mm.position.distance_to(_press_pos) > CLICK_SLOP:
+			_press_dragged = true
 		var delta := mm.position - _drag_last
 		_drag_last = mm.position
 		big_view += Vector2(-delta.x / big_scale, delta.y / big_scale)
+		big_map.queue_redraw()
+
+
+## 在屏幕坐标附近找最近的地标；命中则记录目的地并广播。
+##
+## 路线目标必须用地标的 **arrival**（道路上的到达点）——地标的 x/z 是
+## 建筑中心，10/44 个落在街区/园区内部的孤立路网岛上，用它规划路线
+## 会静默失败（no-route）。原版 city-map.ts 的目的地同样是 arrival。
+func _pick_destination(s: Vector2) -> void:
+	var best_pos := Vector2.ZERO
+	var best_name := ""
+	var best_d := PICK_RADIUS
+	for lm in CityData.all_landmarks():
+		var p := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
+		var sp := map_to_screen(p, big_view, big_scale, big_map.size)
+		var d := sp.distance_to(s)
+		if d < best_d:
+			best_d = d
+			var arr = lm.get("arrival", null)
+			if arr is Array and (arr as Array).size() >= 2:
+				best_pos = Vector2(float(arr[0]), float(arr[1]))
+			else:
+				best_pos = p
+			best_name = str(lm.get("name", ""))
+	if best_name == "":
+		return
+	_dest = {"pos": best_pos, "name": best_name}
+	big_map.queue_redraw()
+	destination_picked.emit(best_pos, best_name)
+
+
+## 自动驾驶取消 / 结束时清除目的地标记
+func clear_destination() -> void:
+	if not _dest.is_empty():
+		_dest = {}
 		big_map.queue_redraw()
 
 
@@ -402,6 +458,25 @@ func _draw_big_map() -> void:
 			big_map.draw_string(font, s + Vector2(8, 5), str(lm.get("name", "")),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.96, 0.94, 0.88))
 
+	# 自动驾驶路线（浅绿，双层描边；原版 onAutoDrive 后大地图同样绘制）
+	if player != null and player.has_route():
+		var route: PackedVector2Array = player.route_points()
+		if route.size() >= 2:
+			var rline := PackedVector2Array()
+			for p in route:
+				rline.append(map_to_screen(p, big_view, big_scale, size))
+			big_map.draw_polyline(rline, Color(0.10, 0.12, 0.14, 0.85), 6.0, true)
+			big_map.draw_polyline(rline, Color(0.55, 0.95, 0.60), 3.0, true)
+
+	# 目的地标记（金色圆点 + 名字）
+	if not _dest.is_empty():
+		var dpos: Vector2 = _dest["pos"]
+		var ds := map_to_screen(dpos, big_view, big_scale, size)
+		big_map.draw_circle(ds, 7.0, Color(0.98, 0.80, 0.35))
+		big_map.draw_arc(ds, 12.0, 0.0, TAU, 28, Color(0.98, 0.80, 0.35), 2.0, true)
+		big_map.draw_string(_font(15), ds + Vector2(14, 5), str(_dest.get("name", "")),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.98, 0.90, 0.70))
+
 	# 玩家
 	if player != null:
 		var ps := map_to_screen(player.data_position(), big_view, big_scale, size)
@@ -418,7 +493,7 @@ func _draw_big_map() -> void:
 	big_map.draw_string(font2, Vector2(40, size.y - 50), "%.0f m" % (scale_len * big_scale),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.90, 0.92, 0.94))
 	big_map.draw_string(font2, Vector2(40, size.y - 20),
-		"M 关闭地图 · 滚轮缩放 · 左键拖动 · 缩放 %.2f" % big_scale,
+		"M 关闭 · 滚轮缩放 · 拖动平移 · 点击地标 = 自动驾驶 · 缩放 %.2f" % big_scale,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.80, 0.85, 0.90))
 
 

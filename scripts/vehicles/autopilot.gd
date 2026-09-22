@@ -42,6 +42,8 @@ var reason := ""
 
 var _route: PackedVector2Array = PackedVector2Array()
 var _index := 0
+## 车在 _index 段上的投影点（前瞻距离从它起算）
+var _proj := Vector2.ZERO
 var _wait_timer := 0.0
 var _stall_timer := 0.0
 var _last_pos := Vector2.ZERO
@@ -72,6 +74,7 @@ func start(target: Vector2, from: Vector2) -> bool:
 		reason = "no-route"
 		return false
 	_index = 0
+	_proj = _route[0]
 	active = true
 	phase = Phase.DRIVING
 	reason = ""
@@ -88,22 +91,49 @@ func cancel() -> void:
 	reason = ""
 
 
+## 点到线段的投影（数据坐标）
+static func _closest_on_segment(p: Vector2, a: Vector2, b: Vector2) -> Vector2:
+	var ab := b - a
+	var l2 := ab.length_squared()
+	var t := 0.0
+	if l2 > 0.0001:
+		t = clampf((p - a).dot(ab) / l2, 0.0, 1.0)
+	return a + ab * t
+
+
+## 把游标推进到车在折线上最近的段（原版 nearest 的窗口做法：
+## 在 [cursor-3, cursor+25] 内找最近**段**，而不是"距路点 <6m 才推进"）。
+##
+## ⚠️ 之前的移植写成 `距 _route[_index] < 6m 才 _index+1` —— 车以巡航速度
+## 靠近路点时最小转弯半径 >6m，永远进不了 6m 圈，游标卡死、目标点落到
+## 身后，车就在原地无限绕圈（实测 400s 只挪了 50m）。投影式游标随车走，
+## 不存在卡死。
+func _advance_cursor(pos: Vector2) -> void:
+	var best_d := INF
+	var best_i := _index
+	var lo := maxi(0, _index - 3)
+	var hi := mini(_route.size() - 2, _index + 25)
+	for i in range(lo, hi + 1):
+		var cp := _closest_on_segment(pos, _route[i], _route[i + 1])
+		var d := cp.distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best_i = i
+	_index = best_i
+	_proj = _closest_on_segment(pos, _route[_index], _route[_index + 1])
+
+
 func _target_point(pos: Vector2) -> Vector2:
-	# 沿折线推进索引到前瞻距离
-	while _index < _route.size() - 1 and pos.distance_to(_route[_index]) < 6.0:
-		_index += 1
-	var ahead := _route[mini(_index, _route.size() - 1)]
-	# 找前瞻点
+	_advance_cursor(pos)
+	# 从投影点沿折线累计前瞻距离（纯追踪 pure pursuit）
 	var acc := 0.0
-	var prev := pos
-	for i in range(_index, _route.size()):
+	var prev := _proj
+	for i in range(_index + 1, _route.size()):
 		acc += prev.distance_to(_route[i])
 		prev = _route[i]
 		if acc >= LOOKAHEAD:
-			ahead = _route[i]
-			break
-		ahead = _route[i]
-	return ahead
+			return _route[i]
+	return _route[_route.size() - 1]
 
 
 ## 单步决策。返回 {throttle, steer}
@@ -218,6 +248,11 @@ func _rollout_score(pos: Vector2, yaw: float, speed: float, delta: float, offset
 	car.speed = speed
 	var steer := clampf(delta * 1.6 + offset * 0.05, -1.0, 1.0)
 	var min_clearance := INF
+	# 贴路线的扫描窗口：只看游标附近的段（原版同款 28 段窗口）。
+	# 之前是「从 _index-2 扫到路线末尾」—— 500+ 路点的长路线每帧要算
+	# 3×30×500 次距离，是自动驾驶开起来掉帧的元凶之一。
+	var lo := maxi(0, _index - 2)
+	var hi := mini(_route.size() - 2, _index + 25)
 	for i in ROLLOUT_STEPS:
 		car.step({"throttle": 0.35, "steer": steer, "handbrake": false}, ROLLOUT_DT)
 		var p := Vector2(car.x, car.z)
@@ -225,8 +260,8 @@ func _rollout_score(pos: Vector2, yaw: float, speed: float, delta: float, offset
 		var to_route := 0.0
 		if not _route.is_empty():
 			var best_d := INF
-			for k in range(maxi(0, _index - 2), _route.size()):
-				var d := p.distance_to(_route[k])
+			for k in range(lo, hi + 1):
+				var d := p.distance_to(_closest_on_segment(p, _route[k], _route[k + 1]))
 				if d < best_d:
 					best_d = d
 			to_route = -best_d

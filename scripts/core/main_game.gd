@@ -193,6 +193,8 @@ func _on_built() -> void:
 
 	hud.setup(world, self)
 	maps.setup(world, self)
+	# 大地图点选地标 → 自动驾驶前往（原版 city-map.ts 的 onAutoDrive）
+	maps.destination_picked.connect(_on_destination_picked)
 	panels.setup(world, self, career, story)
 	# 设置页的「帧率显示」行要操作 HUD
 	panels.hud = hud
@@ -363,6 +365,10 @@ func _snap_to_road(x: float, z: float) -> Vector3:
 var _last_road_message := ""
 
 func _reset_to_road() -> void:
+	# 原版 reset-road 时取消自动驾驶
+	if autopilot.active:
+		autopilot.cancel()
+		maps.clear_destination()
 	if mode == Mode.TANK:
 		var t := _snap_to_road(tank.x, tank.z)
 		tank.x = t.x
@@ -458,6 +464,9 @@ func _toggle_vehicle_entry() -> void:
 			_car_model.visible = false
 		_flush_speed()
 		mode = Mode.WALKING
+		# 原版 exit-car 时取消自动驾驶
+		autopilot.cancel()
+		maps.clear_destination()
 		_walk_first_person = false
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
 		hud.toast("步行：W/A/S/D 走，Shift 跑，C 换人称")
@@ -500,6 +509,9 @@ func _enter_observer() -> void:
 	observer.ground_height = func(x: float, z: float) -> float: return world.height_field.height_at(x, z)
 	observer.blocked = func(x: float, z: float) -> bool: return world.collision.blocked(x, z)
 	mode = Mode.OBSERVER
+	# 原版 observer 进入时取消自动驾驶
+	autopilot.cancel()
+	maps.clear_destination()
 	paused = true
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
@@ -612,13 +624,22 @@ func _step_car(dt: float) -> void:
 
 	var throttle := _axis_key([KEY_W, KEY_UP], [KEY_S, KEY_DOWN])
 	var steer_in := _axis_key([KEY_D, KEY_RIGHT], [KEY_A, KEY_LEFT])
+	# 自动驾驶的人工接管：任何驾驶按键一按就交还控制权
+	# （原版提示语"方向键 / WASD 随时接管"）
+	var manual_drive := absf(throttle) > 0.0 or absf(steer_in) > 0.0
 	steer_in = CarDrive.manual_steering(steer_in, car.speed)
 	var handbrake := Input.is_key_pressed(KEY_SPACE)
 
 	if autopilot.active:
-		var ap := autopilot.compute(Vector2(car.x, car.z), car.yaw, car.speed, dt)
-		throttle = float(ap["throttle"])
-		steer_in = float(ap["steer"])
+		if manual_drive:
+			autopilot.cancel()
+			maps.clear_destination()
+			hud.toast("已切换为手动驾驶", 2.5)
+		else:
+			var ap := autopilot.compute(Vector2(car.x, car.z), car.yaw, car.speed, dt)
+			throttle = float(ap["throttle"])
+			steer_in = float(ap["steer"])
+			_autopilot_phase_toasts()
 
 	# 物理推进：只更新速度/转角/朝向，位置由下面的固定子步负责
 	car.step({"throttle": throttle, "steer": steer_in, "handbrake": handbrake}, dt, 1.0, false)
@@ -927,14 +948,53 @@ func has_route() -> bool:
 func route_points() -> PackedVector2Array:
 	return autopilot.route_points()
 
-func start_autopilot(target: Vector2) -> void:
+func start_autopilot(target: Vector2) -> bool:
 	autopilot.setup(world)
 	autopilot.signal_hold = func(pos: Vector2, dir: Vector2) -> float:
 		return world.signals.hold_distance(pos, dir) if world.signals != null else INF
 	autopilot.blocked_fn = func(pos: Vector2) -> bool: return world.collision.blocked(pos.x, pos.y)
 	autopilot.traffic_positions = func() -> Array:
 		return world.traffic.positions() if world.traffic != null else []
-	autopilot.start(target, Vector2(car.x, car.z))
+	_ap_arrived_toast = false
+	_ap_blocked_toast = false
+	var ok := autopilot.start(target, Vector2(car.x, car.z))
+	if not ok:
+		hud.toast("无法规划到该目的地的路线", 3.0)
+	return ok
+
+## 大地图上点选了目的地（原版 startAutoDrive 的模式守卫照搬）
+func _on_destination_picked(pos: Vector2, dest_name: String) -> void:
+	match mode:
+		Mode.TANK:
+			hud.toast("坦克使用手动驾驶，按 T 换回轿车再自动导航")
+			return
+		Mode.WALKING:
+			hud.toast("走回车旁，按 F 上车后再开始自动导航")
+			return
+		Mode.OBSERVER, Mode.AIRCRAFT:
+			hud.toast("退出当前视角后才能开始自动导航")
+			return
+		Mode.CAR:
+			pass
+	if maps.big_map_visible:
+		maps.toggle_big_map()
+	if not start_autopilot(pos):
+		maps.clear_destination()
+		return
+	hud.toast("自动驾驶 · %s · WASD 随时接管" % dest_name, 4.0)
+
+## 自动驾驶的阶段性提示（到达 / 受阻），每次启动只报一次
+var _ap_arrived_toast := false
+var _ap_blocked_toast := false
+
+func _autopilot_phase_toasts() -> void:
+	if autopilot.phase == Autopilot.Phase.ARRIVED and not _ap_arrived_toast:
+		_ap_arrived_toast = true
+		maps.clear_destination()
+		hud.toast("已到达目的地 · 自动驾驶结束", 4.0)
+	elif autopilot.phase == Autopilot.Phase.BLOCKED and not _ap_blocked_toast:
+		_ap_blocked_toast = true
+		hud.toast("前方暂时无法通过，已尝试重新规划路线", 4.0)
 
 func diagnostics() -> Dictionary:
 	return {
