@@ -51,9 +51,23 @@ const RELIEF_CELL := 64.0
 var _relief_grid: Dictionary = {}
 var _has_relief := false
 
-## 跨海桥梁
-var _crossings: Array = []  ## {a: Vector2, b: Vector2, height, ramp, width}
+## 跨水桥梁（原版 src/city-coastal-infrastructure.ts 的 createBridgeHeightSampler）
+##
+## crossings 的 points 是**折线**，要按相邻点对拆成段来登记 —— 原版：
+##   `for (let i=1;i<b.points.length;i++) add(crossings,{a:points[i-1],b:points[i],...}, b.ramp)`
+var _bridge_segs: Array = []          ## [{a:Vector2, b:Vector2, width, height, ramp}]
+var _bridge_cells: Dictionary = {}    ## 格键 → Array(int)，_bridge_segs 下标
+## 原版还有一个 roads 索引：桥面标高**只在路面上生效**（onRoad 闸门）。
+## 全量索引 1.2 万条道路要跑几万次格子登记，而桥面标高只在桥附近非零，
+## 所以只收录"外扩 width/2+8 之后能碰到某个已登记桥格"的路段。
+var _gate_segs: Array = []            ## [{a:Vector2, b:Vector2, margin}]
+var _gate_cells: Dictionary = {}
 var water_height := -0.25
+
+## 桥梁索引网格边长（原版 `const size = 100`）
+const BRIDGE_CELL := 100.0
+## 原版 onRoad 判据里的固定余量：`closest(x,z,s.a,s.b).d <= s.width/2 + 8`
+const BRIDGE_ROAD_SLACK := 8.0
 
 ## 咖啡馆地板回调（由 bamboo_cafe 注入）
 var cafe_floor: Callable = Callable()
@@ -301,71 +315,161 @@ static func _barycentric(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> Vect
 
 
 # ---------------------------------------------------------------------------
-# 4) 跨海桥梁引桥
+# 4) 跨水桥梁（原版 createBridgeHeightSampler）
 # ---------------------------------------------------------------------------
+
+static func _cell_key(cx: int, cz: int) -> int:
+	return (cx + 32768) * 65536 + (cz + 32768)
+
+
+## 把线段 a-b 的包围盒（外扩 margin）覆盖到的格子全部登记上 idx（原版 add()）。
+## 大线段会跨多格，所以两端都要登记 —— 否则跨格查询会漏。
+func _index_segment(cells: Dictionary, a: Vector2, b: Vector2, margin: float, idx: int) -> void:
+	var x0 := int(floor((minf(a.x, b.x) - margin) / BRIDGE_CELL))
+	var x1 := int(floor((maxf(a.x, b.x) + margin) / BRIDGE_CELL))
+	var z0 := int(floor((minf(a.y, b.y) - margin) / BRIDGE_CELL))
+	var z1 := int(floor((maxf(a.y, b.y) + margin) / BRIDGE_CELL))
+	for cx in range(x0, x1 + 1):
+		for cz in range(z0, z1 + 1):
+			var k := _cell_key(cx, cz)
+			if cells.has(k):
+				var arr: Array = cells[k]
+				arr.append(idx)
+			else:
+				cells[k] = [idx]
+
+
+func _touches_bridge_cells(a: Vector2, b: Vector2, margin: float) -> bool:
+	var x0 := int(floor((minf(a.x, b.x) - margin) / BRIDGE_CELL))
+	var x1 := int(floor((maxf(a.x, b.x) + margin) / BRIDGE_CELL))
+	var z0 := int(floor((minf(a.y, b.y) - margin) / BRIDGE_CELL))
+	var z1 := int(floor((maxf(a.y, b.y) + margin) / BRIDGE_CELL))
+	for cx in range(x0, x1 + 1):
+		for cz in range(z0, z1 + 1):
+			if _bridge_cells.has(_cell_key(cx, cz)):
+				return true
+	return false
+
 
 func load_crossings() -> void:
 	var infra: Dictionary = CityData.coastal_infrastructure
 	if infra.is_empty():
 		infra = DataLoader.json_dict("/city/coastal/infrastructure.json")
 	water_height = float(infra.get("waterHeight", -0.25))
-	_crossings.clear()
+
+	_bridge_segs.clear()
+	_bridge_cells.clear()
 	for c in infra.get("crossings", []):
 		var pts: Array = c.get("points", [])
 		if pts.size() < 2:
 			continue
-		_crossings.append({
-			"a": Vector2(float(pts[0][0]), float(pts[0][1])),
-			"b": Vector2(float(pts[1][0]), float(pts[1][1])),
-			"height": float(c.get("height", 2.8)),
-			"ramp": float(c.get("ramp", 70.0)),
-			"width": float(c.get("width", 6.0)),
-		})
-	if not _crossings.is_empty():
-		loaded_layers.append("crossings(%d)" % _crossings.size())
+		var h := float(c.get("height", 2.8))
+		var ramp := float(c.get("ramp", 70.0))
+		var w := float(c.get("width", 6.0))
+		# ⚠️ 逐段登记，不能只取 pts[0]/pts[1]：crossings 里 164 条里有不少是
+		# 3~9 个点的折线（笋岗东立交 9 点 74m、人民公园路 5 点 61m），
+		# 只认第一段的话，折线后半截完全没有桥面标高。
+		for i in range(1, pts.size()):
+			var a := Vector2(float(pts[i - 1][0]), float(pts[i - 1][1]))
+			var b := Vector2(float(pts[i][0]), float(pts[i][1]))
+			var idx := _bridge_segs.size()
+			_bridge_segs.append({"a": a, "b": b, "width": w, "height": h, "ramp": ramp})
+			_index_segment(_bridge_cells, a, b, ramp, idx)
+
+	_build_gate_index()
+	if not _bridge_segs.is_empty():
+		loaded_layers.append("crossings(%d 段, 路面门 %d 段)"
+			% [_bridge_segs.size(), _gate_segs.size()])
 
 
-## 原版 bridgeRamp：t = d / ramp，抬升 height * (1 - t²(3-2t))
+## 原版 `roads` 索引。判定用的格子与查询用的格子是同一套，不会漏段。
+##
+## ⚠️ 必须带 `grade >= 0` 过滤：原版是
+##   `for(const r of data.roads) if(Number(r.grade) >= 0) ... add(roads, ...)`
+## 本城 12202 条道路里有 **177 条负 grade**（grade=-1/-2/-3/-4，地下/下穿路段）。
+## 它们不算"路面上"，所以不参与 onRoad 闸门 —— 否则桥底下穿的道路会把本该
+## 只在桥面上的抬升漏给整片地面。
+func _build_gate_index() -> void:
+	_gate_segs.clear()
+	_gate_cells.clear()
+	if _bridge_segs.is_empty():
+		return
+	for road in CityData.roads:
+		if str(road.get("grade", "0")).to_float() < 0.0:
+			continue
+		var margin := float(road["width"]) * 0.5 + BRIDGE_ROAD_SLACK
+		var pts: PackedVector2Array = road["points"]
+		for i in range(1, pts.size()):
+			var a := pts[i - 1]
+			var b := pts[i]
+			if not _touches_bridge_cells(a, b, margin):
+				continue
+			var idx := _gate_segs.size()
+			_gate_segs.append({"a": a, "b": b, "margin": margin})
+			_index_segment(_gate_cells, a, b, margin, idx)
+
+
+## 原版 bridgeRamp：t = clamp(d / ramp, 0, 1)，抬升 height * (1 - t²(3 - 2t))
+static func bridge_ramp(distance: float, height: float, ramp: float) -> float:
+	var t := clampf(distance / maxf(ramp, 0.001), 0.0, 1.0)
+	return height * (1.0 - t * t * (3.0 - 2.0 * t))
+
+
+## 原版 `bridgeHeight(x, z)`。
+##
+## ⚠️⚠️ 这里的 `d` 必须是**到桥段线段的最短距离**（原版 `closest(x,z,s.a,s.b).d`），
+## 不是"到折线首点的距离"。桥面在 d≈0 处取满高 height(2.8m)，然后沿**横向**
+## 在 ramp(70m) 内三次平滑衰减到 0。这条衰减带同时就是**引桥**：
+## 车辆沿路驶近桥头时，到桥段的距离从 70m 连续递减到 0，路面高度随之从地面
+## 平滑抬到桥面 —— 桥头不会出现 2.8m 的台阶。
+##
+## 旧实现把 `d` 传成了 `p.distance_to(a)`（到**首点 a** 的距离），又把门限写成
+## `lateral <= width/2 + 6`，于是"桥面"变成以 a 为圆心、半径 70m、宽仅 9m 的
+## 一个窄条：桥中段和整条引桥的标高都是 0。车开上桥 → 车身掉回地面 →
+## 直接钻到桥面底下（用户反馈的"过桥穿模到桥下"）。
 func bridge_lift(east: float, north: float) -> float:
-	if _crossings.is_empty():
+	if _bridge_segs.is_empty():
 		return 0.0
-	var p := Vector2(east, north)
-	var best := 0.0
-	for c in _crossings:
-		var a: Vector2 = c["a"]
-		var b: Vector2 = c["b"]
-		var ab := b - a
-		var len2 := ab.length_squared()
-		var t := 0.0
-		if len2 > 0.0:
-			t = clamp((p - a).dot(ab) / len2, 0.0, 1.0)
-		var q := a + ab * t
-		var along := p.distance_to(a)
-		var lateral := p.distance_to(q)
-		if lateral > c["width"] * 0.5 + 6.0:
-			continue
-		var ramp: float = c["ramp"]
-		if along > ramp:
-			continue
-		# 用 maxf 而不是 max：max() 是无类型通用函数，返回 Variant，`:=` 推断不出来
-		var u := along / maxf(ramp, 0.001)
-		var lift: float = c["height"] * (1.0 - u * u * (3.0 - 2.0 * u))
-		best = maxf(best, lift)
-	return best
+	var k := _cell_key(int(floor(east / BRIDGE_CELL)), int(floor(north / BRIDGE_CELL)))
+	var cands = _bridge_cells.get(k)
+	if cands == null:
+		return 0.0
+	var h := 0.0
+	for i in cands:
+		var s: Dictionary = _bridge_segs[i]
+		var d := CityCollision.seg_distance(east, north, s["a"], s["b"])
+		h = maxf(h, bridge_ramp(d, float(s["height"]), float(s["ramp"])))
+	if h <= 0.0:
+		return 0.0
+	# 原版 onRoad 闸门：只有落在路面（距路中心线 ≤ width/2+8）上的点才抬。
+	# 去掉这道门，桥两侧 70m 范围内的水面/绿地/人行道都会一起鼓起来。
+	var rcands = _gate_cells.get(k)
+	if rcands == null:
+		return 0.0
+	for i in rcands:
+		var r: Dictionary = _gate_segs[i]
+		if CityCollision.seg_distance(east, north, r["a"], r["b"]) <= float(r["margin"]):
+			return h
+	return 0.0
 
 
 # ---------------------------------------------------------------------------
 # 总入口
 # ---------------------------------------------------------------------------
 
-## 数据坐标下的地面高度
+## 数据坐标下的地面高度。
+##
+## ⚠️ 桥梁是 **max** 不是加法：原版是
+##   `heightAt: (x, z) => Math.max(base(x, z), bridgeHeight(x, z))`
+## 桥面是**固定标高**（crossings 的 height，本城 2.8m），不是"在起伏地形上
+## 再叠 2.8m"。旧实现写成 `base += bridge_lift(...)`，桥下水深为负 / 地形抬高
+## 时车身高度会跟着漂，而且和 `roads.glb` 里已经烘好的桥面几何对不上。
 func height_at(east: float, north: float) -> float:
 	var base := 0.0
 	base += lianhua_height(east, north)
 	base += mountain_delta(east, north)
 	base += relief_height(east, north)
-	base += bridge_lift(east, north)
-	base += 0.0  # 咖啡馆地板在下面单独叠加
+	base = maxf(base, bridge_lift(east, north))
 	if cafe_floor.is_valid():
 		base = cafe_floor.call(east, north, base)
 	return base
@@ -380,6 +484,7 @@ func stats() -> Dictionary:
 	return {
 		"layers": loaded_layers,
 		"reliefTriangles": _relief_tris.size(),
-		"crossings": _crossings.size(),
+		"crossings": _bridge_segs.size(),
+		"bridgeGateSegments": _gate_segs.size(),
 		"waterHeight": water_height,
 	}

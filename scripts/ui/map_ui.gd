@@ -37,6 +37,10 @@ signal pick_failed(reason: String)
 ## city-map.ts 的 `#auto-drive` / `#drive-route` 两个按钮）。
 ## auto = true 自动驾驶前往，false 自己开过去。
 signal route_mode_chosen(auto: bool)
+## 大地图开/关（true = 展开）。main_game 用它清掉相机拖拽状态：
+## 开图那一刻若正按着右键拖视角，之后的松开事件会被地图吞掉，main_game
+## 的 _dragging 就永远停在 true —— 关图后不按键也会转视角。
+signal big_map_toggled(visible: bool)
 
 var world: CityWorld
 var player = null
@@ -76,11 +80,22 @@ var _building_boxes: Array = []
 func setup(p_world: CityWorld, p_player) -> void:
 	world = p_world
 	player = p_player
-	layer = 8
+	# 层级：地图要**盖在 HUD 之上**。
+	# 原版 city-map.css 给地图面板 z-index:12，而 city-hud.css 的 HUD 只有 2~6 ——
+	# 地图一开就压住 HUD。移植版原先给 8（HUD 是 10），方向正好反了，于是
+	# HUD 的速度表/里程条压在左下角比例尺上、底部 toast 压住路线信息行，
+	# 两段文字叠在一起，看起来就是"乱码"。
+	# 取 11：高于 HUD(10)，低于 PanelsUI(12)（手账/设置页/加载画面仍在其上）。
+	layer = 11
 	_build()
 
 
 func _build() -> void:
+	# 预热字体缓存。⚠️ 必须赶在**第一次绘制之前**建好，原因见 _font() 的注释：
+	# 当帧 new 出来的 SystemFont 当帧拿去 draw_string，画出来是一排实心方块。
+	for s in FONT_SIZES:
+		_font(s)
+
 	# 小地图需要裁剪：道路/水面等多边形顶点在方框外，不裁剪会画到方框外面。
 	# 注意 clip_contents 只裁剪**子控件**的绘制、不裁控件自己的 _draw，
 	# 所以结构必须是：holder（裁剪）→ minimap（实际绘制）。
@@ -169,13 +184,43 @@ func hide_route_choice() -> void:
 		_choice_panel.visible = false
 
 
+## 字号 → 字体缓存。
+##
+## ⚠️ 必须缓存，而且必须在**真正拿它画之前至少一帧**就建好。
+##
+## 实测（Godot 4.7.1，最小工程逐条对照）：
+##   ① 本帧 `SystemFont.new()` + 设 font_names，本帧就 draw_string → **一整排实心方块**
+##   ② 构建时建好、隔帧再用                                      → 正常中文
+##   ③ 上一帧建好、本帧用                                        → 正常中文
+##   ④ 本帧新建的 SystemFont 包一层 FontVariation 也一样是方块    → 方块
+##   ⑤ 同一个新建字体给 Label 用（下一帧才绘制）                  → 正常中文
+## 系统字体的解析是延迟的：新建那一帧内还没拿到真实字形，TextServer 只能画出
+## "缺字方块"。等它跨过一次帧边界就好了。
+##
+## 原来的写法是**每次调用都新建**，而 `_draw_big_map()` 每次重绘要调 4 次
+## （16 / 15 / 18 / 14），于是大地图上**所有** draw_string 文字 —— 地标名、
+## 比例尺、点选目的地后的路线信息行、底部操作提示 —— 全是方块乱码，
+## 每帧新建一次就永远等不到那一帧。而 Label / Button 用的字体是 `_build()`
+## 里一次性建好、隔了很多帧才绘制的，所以从来不出问题（这正是"只有大地图上的
+## 文字乱码"的原因）。
+##
+## 顺带把开销也降下来了：原来每次重绘都要重新枚举一遍系统字体。
+var _font_cache := {}
+## `_draw_big_map()` 与路线按钮用到的全部字号，在 `_build()` 里一次性预热
+const FONT_SIZES := [14, 15, 16, 18, 20]
+
+
 func _font(size: int) -> Font:
+	var hit: Font = _font_cache.get(size)
+	if hit != null:
+		return hit
 	var sf := SystemFont.new()
 	sf.font_names = PackedStringArray(["Microsoft YaHei", "微软雅黑", "SimHei",
 		"PingFang SC", "Noto Sans CJK SC", "sans-serif"])
 	sf.allow_system_fallback = true
 	# SystemFont 没有 font_size 属性（那是 Label 的主题字号），删掉
 	# 由 add_theme_font_size_override / Label3D.font_size 控制
+	_font_cache[size] = sf
 	return sf
 
 
@@ -413,9 +458,22 @@ func toggle_big_map() -> void:
 	elif _choice_panel != null:
 		# 关地图只是收起按钮，目的地本身仍然有效（原版 selected 也保留）
 		_choice_panel.visible = false
+	big_map_toggled.emit(big_map_visible)
 
 
+## 大地图上的鼠标事件。
+##
+## ⚠️ 进来第一件事就是 accept_event()，把事件标记为"已处理"、不再往下发。
+##
+## 实测（Godot 4.7.1，最小工程验证过）：`mouse_filter = MOUSE_FILTER_STOP`
+## **拦不住滚轮** —— 地图展开时同一发 Mouse Wheel Up 既进了 GUI 的 gui_input，
+## 又照样进了 `_unhandled_input`。后果就是在地图上滚滚轮时，地图缩放了，
+## 相机距离 / 步行视距也跟着一起缩放，也就是"鼠标事件穿透到游戏画面"。
+## （按键与移动事件 STOP 会自动吞掉，但为免版本行为差异，这里对所有鼠标
+## 事件统一 accept_event()，让大地图成为鼠标的绝对屏障。）
 func _on_map_input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		big_map.accept_event()
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:

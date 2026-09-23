@@ -197,6 +197,8 @@ func _on_built() -> void:
 	maps.destination_picked.connect(_on_destination_picked)
 	# 大地图上「自动驾驶前往 / 自己开过去」两个按钮
 	maps.route_mode_chosen.connect(_on_route_mode_chosen)
+	# 大地图开/关：开图时丢掉相机拖拽状态（见 _on_big_map_toggled）
+	maps.big_map_toggled.connect(_on_big_map_toggled)
 	maps.pick_failed.connect(func(reason: String): hud.toast(reason, 2.5))
 	panels.setup(world, self, career, story)
 	# 设置页的「帧率显示」行要操作 HUD
@@ -219,6 +221,14 @@ func _on_built() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not session_ready:
+		return
+	# 大地图展开时，鼠标完全归地图：这里整体不改相机、不缩放。
+	#
+	# map_ui 那边已经在 gui_input 里 accept_event()，正常情况事件根本到不了这里；
+	# 这道闸是兜底 —— 万一有事件从别的控件（地图里的按钮、将来新增的面板）漏下来，
+	# 也不会把相机/步行视距带着一起动。
+	if maps != null and maps.big_map_visible and event is InputEventMouse:
+		_dragging = false
 		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
@@ -256,6 +266,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_camera_yaw -= d.x * 0.004
 			_look_pitch = clampf(_look_pitch - d.y * 0.003, -0.2, 1.0)
+
+
+## 大地图展开 → 主动清掉相机拖拽状态。
+##
+## 场景：玩家正按着右键拖视角时按 M 开图，之后的右键松开落在图上、被地图吞掉，
+## main_game 就再也收不到那个"松开"，`_dragging` 卡在 true —— 关图后不按任何键
+## 移动鼠标，视角也会跟着转。开图瞬间把它归零即可。
+func _on_big_map_toggled(visible: bool) -> void:
+	if visible:
+		_dragging = false
+
 
 func _on_key(k: InputEventKey) -> void:
 	var code := k.keycode
