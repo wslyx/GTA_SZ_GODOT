@@ -575,6 +575,14 @@ func _process(delta: float) -> void:
 	# 光照跟随、路灯、招牌、立面流式
 	if world.lighting != null:
 		world.lighting.update_system(dt, focus)
+	# 天空球跟随相机 —— 原版 atmosphere 是 infiniteDistance（永远在无限远），
+	# Godot 里只能每帧把球心搬到相机上。**漏掉这一句的后果**：
+	# 天空球（直径 8000）会永远停在世界原点，而玩家出生点距原点 2800m，
+	# 于是朝外看时视线只打到球面赤道附近一条极窄的带 —— 着色器的
+	# h = smoothstep(-0.05, 0.85, p.y) 恒在 0.0~0.2，整屏都是 horizon_color，
+	# 表现为"从路面一直顶到天空的一整片纯色幕布"，把远处城市切成一刀。
+	if world.sky != null:
+		world.sky.update_system(dt, focus)
 	world.facades.update_system(dt, focus)
 
 	# 玩法

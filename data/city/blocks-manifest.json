@@ -1,0 +1,1057 @@
+{
+  "chunkSize": 640.0,
+  "generatedBy": "split_city_blocks.py",
+  "note": "x/z 为数据坐标(east,north)；chunk_streamer 用焦点数据坐标算距离，GLB 几何体已是世界坐标，加载即落位。",
+  "blocks": [
+    {
+      "i": -11,
+      "j": -5,
+      "x": -6720.0,
+      "z": -2880.0,
+      "file": "res://data/city/blocks/-11_-5.glb"
+    },
+    {
+      "i": -11,
+      "j": -4,
+      "x": -6720.0,
+      "z": -2240.0,
+      "file": "res://data/city/blocks/-11_-4.glb"
+    },
+    {
+      "i": -11,
+      "j": -3,
+      "x": -6720.0,
+      "z": -1600.0,
+      "file": "res://data/city/blocks/-11_-3.glb"
+    },
+    {
+      "i": -11,
+      "j": -2,
+      "x": -6720.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-11_-2.glb"
+    },
+    {
+      "i": -11,
+      "j": -1,
+      "x": -6720.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-11_-1.glb"
+    },
+    {
+      "i": -11,
+      "j": 0,
+      "x": -6720.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-11_0.glb"
+    },
+    {
+      "i": -11,
+      "j": 1,
+      "x": -6720.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-11_1.glb"
+    },
+    {
+      "i": -11,
+      "j": 2,
+      "x": -6720.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-11_2.glb"
+    },
+    {
+      "i": -11,
+      "j": 3,
+      "x": -6720.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-11_3.glb"
+    },
+    {
+      "i": -11,
+      "j": 4,
+      "x": -6720.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/-11_4.glb"
+    },
+    {
+      "i": -10,
+      "j": -5,
+      "x": -6080.0,
+      "z": -2880.0,
+      "file": "res://data/city/blocks/-10_-5.glb"
+    },
+    {
+      "i": -10,
+      "j": -4,
+      "x": -6080.0,
+      "z": -2240.0,
+      "file": "res://data/city/blocks/-10_-4.glb"
+    },
+    {
+      "i": -10,
+      "j": -3,
+      "x": -6080.0,
+      "z": -1600.0,
+      "file": "res://data/city/blocks/-10_-3.glb"
+    },
+    {
+      "i": -10,
+      "j": -2,
+      "x": -6080.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-10_-2.glb"
+    },
+    {
+      "i": -10,
+      "j": -1,
+      "x": -6080.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-10_-1.glb"
+    },
+    {
+      "i": -10,
+      "j": 0,
+      "x": -6080.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-10_0.glb"
+    },
+    {
+      "i": -10,
+      "j": 1,
+      "x": -6080.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-10_1.glb"
+    },
+    {
+      "i": -10,
+      "j": 2,
+      "x": -6080.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-10_2.glb"
+    },
+    {
+      "i": -10,
+      "j": 3,
+      "x": -6080.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-10_3.glb"
+    },
+    {
+      "i": -10,
+      "j": 4,
+      "x": -6080.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/-10_4.glb"
+    },
+    {
+      "i": -9,
+      "j": -5,
+      "x": -5440.0,
+      "z": -2880.0,
+      "file": "res://data/city/blocks/-9_-5.glb"
+    },
+    {
+      "i": -9,
+      "j": -4,
+      "x": -5440.0,
+      "z": -2240.0,
+      "file": "res://data/city/blocks/-9_-4.glb"
+    },
+    {
+      "i": -9,
+      "j": -3,
+      "x": -5440.0,
+      "z": -1600.0,
+      "file": "res://data/city/blocks/-9_-3.glb"
+    },
+    {
+      "i": -9,
+      "j": -2,
+      "x": -5440.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-9_-2.glb"
+    },
+    {
+      "i": -9,
+      "j": -1,
+      "x": -5440.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-9_-1.glb"
+    },
+    {
+      "i": -9,
+      "j": 0,
+      "x": -5440.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-9_0.glb"
+    },
+    {
+      "i": -9,
+      "j": 1,
+      "x": -5440.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-9_1.glb"
+    },
+    {
+      "i": -9,
+      "j": 2,
+      "x": -5440.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-9_2.glb"
+    },
+    {
+      "i": -9,
+      "j": 3,
+      "x": -5440.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-9_3.glb"
+    },
+    {
+      "i": -9,
+      "j": 4,
+      "x": -5440.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/-9_4.glb"
+    },
+    {
+      "i": -8,
+      "j": -5,
+      "x": -4800.0,
+      "z": -2880.0,
+      "file": "res://data/city/blocks/-8_-5.glb"
+    },
+    {
+      "i": -8,
+      "j": -4,
+      "x": -4800.0,
+      "z": -2240.0,
+      "file": "res://data/city/blocks/-8_-4.glb"
+    },
+    {
+      "i": -8,
+      "j": -3,
+      "x": -4800.0,
+      "z": -1600.0,
+      "file": "res://data/city/blocks/-8_-3.glb"
+    },
+    {
+      "i": -8,
+      "j": -2,
+      "x": -4800.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-8_-2.glb"
+    },
+    {
+      "i": -8,
+      "j": -1,
+      "x": -4800.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-8_-1.glb"
+    },
+    {
+      "i": -8,
+      "j": 0,
+      "x": -4800.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-8_0.glb"
+    },
+    {
+      "i": -8,
+      "j": 1,
+      "x": -4800.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-8_1.glb"
+    },
+    {
+      "i": -8,
+      "j": 2,
+      "x": -4800.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-8_2.glb"
+    },
+    {
+      "i": -8,
+      "j": 3,
+      "x": -4800.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-8_3.glb"
+    },
+    {
+      "i": -8,
+      "j": 4,
+      "x": -4800.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/-8_4.glb"
+    },
+    {
+      "i": -7,
+      "j": -2,
+      "x": -4160.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-7_-2.glb"
+    },
+    {
+      "i": -7,
+      "j": -1,
+      "x": -4160.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-7_-1.glb"
+    },
+    {
+      "i": -7,
+      "j": 0,
+      "x": -4160.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-7_0.glb"
+    },
+    {
+      "i": -7,
+      "j": 1,
+      "x": -4160.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-7_1.glb"
+    },
+    {
+      "i": -7,
+      "j": 2,
+      "x": -4160.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-7_2.glb"
+    },
+    {
+      "i": -7,
+      "j": 3,
+      "x": -4160.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-7_3.glb"
+    },
+    {
+      "i": -7,
+      "j": 4,
+      "x": -4160.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/-7_4.glb"
+    },
+    {
+      "i": -6,
+      "j": -2,
+      "x": -3520.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-6_-2.glb"
+    },
+    {
+      "i": -6,
+      "j": -1,
+      "x": -3520.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-6_-1.glb"
+    },
+    {
+      "i": -6,
+      "j": 0,
+      "x": -3520.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-6_0.glb"
+    },
+    {
+      "i": -6,
+      "j": 1,
+      "x": -3520.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-6_1.glb"
+    },
+    {
+      "i": -6,
+      "j": 2,
+      "x": -3520.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-6_2.glb"
+    },
+    {
+      "i": -6,
+      "j": 3,
+      "x": -3520.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-6_3.glb"
+    },
+    {
+      "i": -5,
+      "j": -2,
+      "x": -2880.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-5_-2.glb"
+    },
+    {
+      "i": -5,
+      "j": -1,
+      "x": -2880.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-5_-1.glb"
+    },
+    {
+      "i": -5,
+      "j": 0,
+      "x": -2880.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-5_0.glb"
+    },
+    {
+      "i": -5,
+      "j": 1,
+      "x": -2880.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-5_1.glb"
+    },
+    {
+      "i": -5,
+      "j": 2,
+      "x": -2880.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-5_2.glb"
+    },
+    {
+      "i": -5,
+      "j": 3,
+      "x": -2880.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-5_3.glb"
+    },
+    {
+      "i": -4,
+      "j": -2,
+      "x": -2240.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-4_-2.glb"
+    },
+    {
+      "i": -4,
+      "j": -1,
+      "x": -2240.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-4_-1.glb"
+    },
+    {
+      "i": -4,
+      "j": 0,
+      "x": -2240.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-4_0.glb"
+    },
+    {
+      "i": -4,
+      "j": 1,
+      "x": -2240.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-4_1.glb"
+    },
+    {
+      "i": -4,
+      "j": 2,
+      "x": -2240.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-4_2.glb"
+    },
+    {
+      "i": -4,
+      "j": 3,
+      "x": -2240.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-4_3.glb"
+    },
+    {
+      "i": -3,
+      "j": -2,
+      "x": -1600.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-3_-2.glb"
+    },
+    {
+      "i": -3,
+      "j": -1,
+      "x": -1600.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-3_-1.glb"
+    },
+    {
+      "i": -3,
+      "j": 0,
+      "x": -1600.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-3_0.glb"
+    },
+    {
+      "i": -3,
+      "j": 1,
+      "x": -1600.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-3_1.glb"
+    },
+    {
+      "i": -3,
+      "j": 2,
+      "x": -1600.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-3_2.glb"
+    },
+    {
+      "i": -2,
+      "j": -1,
+      "x": -960.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-2_-1.glb"
+    },
+    {
+      "i": -2,
+      "j": 0,
+      "x": -960.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-2_0.glb"
+    },
+    {
+      "i": -2,
+      "j": 1,
+      "x": -960.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-2_1.glb"
+    },
+    {
+      "i": -2,
+      "j": 2,
+      "x": -960.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-2_2.glb"
+    },
+    {
+      "i": -2,
+      "j": 3,
+      "x": -960.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-2_3.glb"
+    },
+    {
+      "i": -1,
+      "j": -2,
+      "x": -320.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/-1_-2.glb"
+    },
+    {
+      "i": -1,
+      "j": -1,
+      "x": -320.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/-1_-1.glb"
+    },
+    {
+      "i": -1,
+      "j": 0,
+      "x": -320.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/-1_0.glb"
+    },
+    {
+      "i": -1,
+      "j": 1,
+      "x": -320.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/-1_1.glb"
+    },
+    {
+      "i": -1,
+      "j": 2,
+      "x": -320.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/-1_2.glb"
+    },
+    {
+      "i": -1,
+      "j": 3,
+      "x": -320.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/-1_3.glb"
+    },
+    {
+      "i": 0,
+      "j": -2,
+      "x": 320.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/0_-2.glb"
+    },
+    {
+      "i": 0,
+      "j": -1,
+      "x": 320.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/0_-1.glb"
+    },
+    {
+      "i": 0,
+      "j": 0,
+      "x": 320.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/0_0.glb"
+    },
+    {
+      "i": 0,
+      "j": 1,
+      "x": 320.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/0_1.glb"
+    },
+    {
+      "i": 0,
+      "j": 2,
+      "x": 320.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/0_2.glb"
+    },
+    {
+      "i": 0,
+      "j": 3,
+      "x": 320.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/0_3.glb"
+    },
+    {
+      "i": 1,
+      "j": -2,
+      "x": 960.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/1_-2.glb"
+    },
+    {
+      "i": 1,
+      "j": -1,
+      "x": 960.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/1_-1.glb"
+    },
+    {
+      "i": 1,
+      "j": 0,
+      "x": 960.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/1_0.glb"
+    },
+    {
+      "i": 1,
+      "j": 1,
+      "x": 960.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/1_1.glb"
+    },
+    {
+      "i": 1,
+      "j": 2,
+      "x": 960.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/1_2.glb"
+    },
+    {
+      "i": 1,
+      "j": 3,
+      "x": 960.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/1_3.glb"
+    },
+    {
+      "i": 1,
+      "j": 4,
+      "x": 960.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/1_4.glb"
+    },
+    {
+      "i": 2,
+      "j": -2,
+      "x": 1600.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/2_-2.glb"
+    },
+    {
+      "i": 2,
+      "j": -1,
+      "x": 1600.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/2_-1.glb"
+    },
+    {
+      "i": 2,
+      "j": 0,
+      "x": 1600.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/2_0.glb"
+    },
+    {
+      "i": 2,
+      "j": 1,
+      "x": 1600.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/2_1.glb"
+    },
+    {
+      "i": 2,
+      "j": 2,
+      "x": 1600.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/2_2.glb"
+    },
+    {
+      "i": 2,
+      "j": 3,
+      "x": 1600.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/2_3.glb"
+    },
+    {
+      "i": 2,
+      "j": 4,
+      "x": 1600.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/2_4.glb"
+    },
+    {
+      "i": 3,
+      "j": -2,
+      "x": 2240.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/3_-2.glb"
+    },
+    {
+      "i": 3,
+      "j": -1,
+      "x": 2240.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/3_-1.glb"
+    },
+    {
+      "i": 3,
+      "j": 0,
+      "x": 2240.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/3_0.glb"
+    },
+    {
+      "i": 3,
+      "j": 1,
+      "x": 2240.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/3_1.glb"
+    },
+    {
+      "i": 3,
+      "j": 2,
+      "x": 2240.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/3_2.glb"
+    },
+    {
+      "i": 3,
+      "j": 3,
+      "x": 2240.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/3_3.glb"
+    },
+    {
+      "i": 3,
+      "j": 4,
+      "x": 2240.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/3_4.glb"
+    },
+    {
+      "i": 4,
+      "j": -2,
+      "x": 2880.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/4_-2.glb"
+    },
+    {
+      "i": 4,
+      "j": -1,
+      "x": 2880.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/4_-1.glb"
+    },
+    {
+      "i": 4,
+      "j": 0,
+      "x": 2880.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/4_0.glb"
+    },
+    {
+      "i": 4,
+      "j": 1,
+      "x": 2880.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/4_1.glb"
+    },
+    {
+      "i": 4,
+      "j": 2,
+      "x": 2880.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/4_2.glb"
+    },
+    {
+      "i": 4,
+      "j": 3,
+      "x": 2880.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/4_3.glb"
+    },
+    {
+      "i": 4,
+      "j": 4,
+      "x": 2880.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/4_4.glb"
+    },
+    {
+      "i": 5,
+      "j": -2,
+      "x": 3520.0,
+      "z": -960.0,
+      "file": "res://data/city/blocks/5_-2.glb"
+    },
+    {
+      "i": 5,
+      "j": -1,
+      "x": 3520.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/5_-1.glb"
+    },
+    {
+      "i": 5,
+      "j": 0,
+      "x": 3520.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/5_0.glb"
+    },
+    {
+      "i": 5,
+      "j": 1,
+      "x": 3520.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/5_1.glb"
+    },
+    {
+      "i": 5,
+      "j": 2,
+      "x": 3520.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/5_2.glb"
+    },
+    {
+      "i": 5,
+      "j": 3,
+      "x": 3520.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/5_3.glb"
+    },
+    {
+      "i": 5,
+      "j": 4,
+      "x": 3520.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/5_4.glb"
+    },
+    {
+      "i": 6,
+      "j": -1,
+      "x": 4160.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/6_-1.glb"
+    },
+    {
+      "i": 6,
+      "j": 0,
+      "x": 4160.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/6_0.glb"
+    },
+    {
+      "i": 6,
+      "j": 1,
+      "x": 4160.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/6_1.glb"
+    },
+    {
+      "i": 6,
+      "j": 2,
+      "x": 4160.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/6_2.glb"
+    },
+    {
+      "i": 6,
+      "j": 3,
+      "x": 4160.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/6_3.glb"
+    },
+    {
+      "i": 7,
+      "j": -1,
+      "x": 4800.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/7_-1.glb"
+    },
+    {
+      "i": 7,
+      "j": 0,
+      "x": 4800.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/7_0.glb"
+    },
+    {
+      "i": 7,
+      "j": 1,
+      "x": 4800.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/7_1.glb"
+    },
+    {
+      "i": 7,
+      "j": 2,
+      "x": 4800.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/7_2.glb"
+    },
+    {
+      "i": 7,
+      "j": 3,
+      "x": 4800.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/7_3.glb"
+    },
+    {
+      "i": 8,
+      "j": -1,
+      "x": 5440.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/8_-1.glb"
+    },
+    {
+      "i": 8,
+      "j": 0,
+      "x": 5440.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/8_0.glb"
+    },
+    {
+      "i": 8,
+      "j": 1,
+      "x": 5440.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/8_1.glb"
+    },
+    {
+      "i": 8,
+      "j": 2,
+      "x": 5440.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/8_2.glb"
+    },
+    {
+      "i": 8,
+      "j": 3,
+      "x": 5440.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/8_3.glb"
+    },
+    {
+      "i": 8,
+      "j": 4,
+      "x": 5440.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/8_4.glb"
+    },
+    {
+      "i": 9,
+      "j": -1,
+      "x": 6080.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/9_-1.glb"
+    },
+    {
+      "i": 9,
+      "j": 0,
+      "x": 6080.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/9_0.glb"
+    },
+    {
+      "i": 9,
+      "j": 1,
+      "x": 6080.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/9_1.glb"
+    },
+    {
+      "i": 9,
+      "j": 2,
+      "x": 6080.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/9_2.glb"
+    },
+    {
+      "i": 9,
+      "j": 3,
+      "x": 6080.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/9_3.glb"
+    },
+    {
+      "i": 9,
+      "j": 4,
+      "x": 6080.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/9_4.glb"
+    },
+    {
+      "i": 10,
+      "j": -1,
+      "x": 6720.0,
+      "z": -320.0,
+      "file": "res://data/city/blocks/10_-1.glb"
+    },
+    {
+      "i": 10,
+      "j": 0,
+      "x": 6720.0,
+      "z": 320.0,
+      "file": "res://data/city/blocks/10_0.glb"
+    },
+    {
+      "i": 10,
+      "j": 1,
+      "x": 6720.0,
+      "z": 960.0,
+      "file": "res://data/city/blocks/10_1.glb"
+    },
+    {
+      "i": 10,
+      "j": 2,
+      "x": 6720.0,
+      "z": 1600.0,
+      "file": "res://data/city/blocks/10_2.glb"
+    },
+    {
+      "i": 10,
+      "j": 3,
+      "x": 6720.0,
+      "z": 2240.0,
+      "file": "res://data/city/blocks/10_3.glb"
+    },
+    {
+      "i": 10,
+      "j": 4,
+      "x": 6720.0,
+      "z": 2880.0,
+      "file": "res://data/city/blocks/10_4.glb"
+    }
+  ]
+}

@@ -240,7 +240,7 @@ func update_system(delta: float, focus: Vector3) -> void:
 	_loader.enqueue(_tile_path(best), self, best)
 
 
-func _on_loaded(_path: String, node: Node3D, meta: Variant) -> void:
+func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource = null) -> void:
 	var id := str(meta)
 	_current_id = ""
 	var e: Dictionary = _by_id.get(id, {})

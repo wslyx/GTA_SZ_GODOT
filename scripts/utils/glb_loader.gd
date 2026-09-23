@@ -14,7 +14,11 @@ class_name GlbLoader
 ##   # 每帧调用 q.poll()
 ##   if q.is_idle(): ...
 
-signal entry_loaded(path: String, node: Node3D, meta: Variant)
+## 第 4 个参数 scene 是加载得到的 PackedScene（chunk 流式用它持有引用以便卸载时
+## 真正释放显存）。注意：**信号参数不能带默认值**（GDScript 语法限制），因此这里
+## 不写 `= null`；已有的 city_world / facade_streamer 回调把第 4 参声明为可选
+## （`_scene: Resource = null`），3 参/4 参调用都能接，保持向后兼容。
+signal entry_loaded(path: String, node: Node3D, meta: Variant, scene: Resource)
 signal entry_failed(path: String, reason: String)
 signal queue_done()
 
@@ -28,14 +32,20 @@ var failed_count := 0
 var enqueued_count := 0
 
 
-func enqueue(path: String, parent: Node, meta: Variant = null) -> void:
+## cache_mode 透传给 ResourceLoader.load_threaded_request：
+##   CACHE_MODE_REUSE（默认）—— 资源按路径入全局缓存，适合一次性常驻资源（地形/道路/立面）。
+##   CACHE_MODE_IGNORE        —— 不入全局缓存，区块实例被 queue_free 且引用归零后即被 GC，
+##                                是动态区块流式卸载、真正回收显存的关键（见 chunk_streamer.gd）。
+func enqueue(path: String, parent: Node, meta: Variant = null,
+		cache_mode: ResourceLoader.CacheMode = ResourceLoader.CACHE_MODE_REUSE) -> void:
 	enqueued_count += 1
-	_queue.append({"path": path, "parent": parent, "meta": meta, "state": "pending"})
+	_queue.append({"path": path, "parent": parent, "meta": meta, "cache_mode": cache_mode, "state": "pending"})
 
 
-func enqueue_many(paths: Array, parent: Node, meta: Variant = null) -> void:
+func enqueue_many(paths: Array, parent: Node, meta: Variant = null,
+		cache_mode: ResourceLoader.CacheMode = ResourceLoader.CACHE_MODE_REUSE) -> void:
 	for p in paths:
-		enqueue(str(p), parent, meta)
+		enqueue(str(p), parent, meta, cache_mode)
 
 
 func pending() -> int:
@@ -124,7 +134,7 @@ func _finish(scene: Resource) -> void:
 	# 三角绕序反转（见 CoordinateUtil 头部说明）。
 	if parent != null and is_instance_valid(parent):
 		parent.add_child(inst)
-	entry_loaded.emit(p, inst, meta)
+	entry_loaded.emit(p, inst, meta, scene)
 	if _queue.is_empty():
 		queue_done.emit()
 

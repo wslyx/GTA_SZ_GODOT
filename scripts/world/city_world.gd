@@ -46,6 +46,8 @@ var landmarks_root: Node3D
 var facades_root: Node3D
 var scenery_root: Node3D
 var water_root: Node3D
+## 流式建筑区块挂这里（与 buildings_root 分离，便于整体剔除/统计）
+var chunks_root: Node3D
 
 # --- 分块索引 ---------------------------------------------------------------
 ## {node:Node3D, x:float, z:float, road:bool, detail:bool}
@@ -68,6 +70,8 @@ var traffic = null
 var pedestrians = null
 var ebikes = null
 var facades = null
+## 建筑区块动态流式（buildings.glb 切块后按 640m 区块加载/卸载）
+var chunk_streamer = null
 
 var loader := GlbLoader.new()
 
@@ -94,7 +98,7 @@ func _ready() -> void:
 	collision = CityCollision.new()
 	graph = RoadGraph.new()
 
-	for n in ["terrain", "roads", "buildings", "landmarks", "facades", "scenery", "water"]:
+	for n in ["terrain", "roads", "buildings", "landmarks", "facades", "scenery", "water", "chunks"]:
 		var node := Node3D.new()
 		node.name = n
 		add_child(node)
@@ -106,6 +110,12 @@ func _ready() -> void:
 			"facades": facades_root = node
 			"scenery": scenery_root = node
 			"water": water_root = node
+			"chunks": chunks_root = node
+
+	chunk_streamer = ChunkStreamer.new()
+	chunk_streamer.name = "ChunkStreamer"
+	add_child(chunk_streamer)
+	chunk_streamer.setup(self)
 
 	loader.entry_loaded.connect(_on_entry_loaded)
 	loader.entry_failed.connect(func(p: String, r: String): stats_failed += 1)
@@ -123,6 +133,7 @@ func build() -> void:
 		_plan_coastal,
 		_plan_buildings,
 		_plan_landmarks,
+		_plan_chunks,
 		_plan_facades,
 		_plan_water_sky,
 		_plan_distant,
@@ -157,7 +168,11 @@ func _process(delta: float) -> void:
 	_cull_timer -= delta
 	if _cull_timer <= 0.0:
 		_cull_timer = 0.25
-		_cull_chunks()
+		# 流式激活时由 chunk_streamer 负责加载/卸载与阴影；否则走原 visibility 剔除。
+		if chunk_streamer != null and chunk_streamer.active:
+			chunk_streamer.update_system(delta, focus)
+		else:
+			_cull_chunks()
 	_update_subsystems(delta)
 
 
@@ -185,7 +200,11 @@ func _step_fraction() -> float:
 	match _step:
 		5:  # 地标：landmarks → detail → candidates 三段
 			return clampf(float(_landmark_stage) / 3.0, 0.0, 1.0)
-		6:  # 立面瓦片预加载
+		6:  # 建筑区块预加载
+			if chunk_streamer != null and chunk_streamer.active:
+				return float(chunk_streamer.preload_progress())
+			return 1.0
+		7:  # 立面瓦片预加载
 			if facades != null and facades.has_method("preload_progress"):
 				return float(facades.call("preload_progress"))
 			return 1.0
@@ -197,7 +216,7 @@ func _step_fraction() -> float:
 
 ## 加载界面下方的明细文案
 func progress_detail() -> String:
-	if _step == 6:
+	if _step == 7:
 		if facades != null and facades.has_method("preload_detail"):
 			return str(facades.call("preload_detail"))
 	var c := loader.counters()
@@ -217,13 +236,14 @@ func _step_label(i: int) -> String:
 		3: return "正在架设跨水桥梁"
 		4: return "正在载入南山、福田、罗湖建筑"
 		5: return "正在装配深圳地标"
-		6: return "正在流式加载近景立面"
-		7: return "正在注满深圳湾"
-		8: return "正在展开深圳山脊"
-		9: return "正在种植榕树、木棉与樟树林冠"
-		10: return "正在点亮城市招牌"
-		11: return "正在放入车流、行人与电摩"
-		12: return "准备出发"
+		6: return "正在流式加载建筑区块"
+		7: return "正在流式加载近景立面"
+		8: return "正在注满深圳湾"
+		9: return "正在展开深圳山脊"
+		10: return "正在种植榕树、木棉与樟树林冠"
+		11: return "正在点亮城市招牌"
+		12: return "正在放入车流、行人与电摩"
+		13: return "准备出发"
 	return "加载中"
 
 
@@ -279,7 +299,11 @@ func _plan_coastal() -> bool:
 
 
 # --- 步骤 4：建筑 -----------------------------------------------------------
+## 流式模式下建筑改为逐 640m 区块加载（见 _plan_chunks + chunk_streamer.gd），
+## 这里跳过 monolithic 加载，避免 266MB 一次性进显存；manifest 缺失时回退老路径。
 func _plan_buildings() -> bool:
+	if ChunkStreamer.manifest_available():
+		return true
 	return _enqueue_step(["res://data/city/buildings.glb"], buildings_root, "buildings")
 
 
@@ -288,7 +312,10 @@ func _plan_buildings() -> bool:
 # → 按前缀剔除 → landmark-candidates.glb。顺序与原版 init() 完全一致。
 func _plan_landmarks() -> bool:
 	if _phase == "":
-		_index_building_chunks()
+		# 流式模式下建筑区块索引由 chunk_streamer 维护（按加载情况动态增减），
+		# 这里只在回退路径里索引 monolithic 建筑/道路 mesh。
+		if not ChunkStreamer.manifest_available():
+			_index_building_chunks()
 		_landmark_stage = 0
 		_phase = "landmarks"
 		loader.enqueue("res://data/city/landmarks.glb", landmarks_root, "landmarks")
@@ -317,7 +344,33 @@ func _plan_landmarks() -> bool:
 	return true
 
 
-# --- 步骤 6：立面 -----------------------------------------------------------
+# --- 步骤 6：建筑区块流式（出生点预加载）------------------------------------
+## 仅当 blocks-manifest.json 存在时激活。此时 buildings.glb 已被 _plan_buildings 跳过，
+## 由 chunk_streamer 按 640m 区块加载：先把出生点 LOAD_RADIUS(3000m) 内一次性铺满，
+## 保证角色落地即"离边界约 3km"；运行时再随移动加载/卸载（见 chunk_streamer.update_system）。
+## manifest 缺失则整步跳过，退化回 monolithic 老路径，工程照常可跑。
+func _plan_chunks() -> bool:
+	if chunk_streamer == null or not ChunkStreamer.manifest_available():
+		return true
+	if not chunk_streamer.active:
+		chunk_streamer.setup(self)
+		if not chunk_streamer.init_manifest():
+			return true
+	var f := _focus_data
+	if f == Vector2.ZERO:
+		f = CityData.spawn_pos
+	match _phase:
+		"":
+			chunk_streamer.begin_preload(f)
+			_phase = "wait"
+			return false
+		"wait":
+			chunk_streamer.poll_preload()
+			return bool(chunk_streamer.preload_done())
+	return true
+
+
+# --- 步骤 7：立面 -----------------------------------------------------------
 ## 出生点附近的立面瓦片在**加载阶段**一次性预载完。
 ## 原实现只在 init_streaming 里建清单就返回 true，剩下的瓦片留给行驶途中
 ## 逐个加载 —— 每块 5~7MB 的 GLB 在开车时入队会在那一帧砸出明显卡顿。
@@ -412,7 +465,7 @@ func _plan_finish() -> bool:
 # 队列回调
 # ---------------------------------------------------------------------------
 
-func _on_entry_loaded(path: String, node: Node3D, meta: Variant) -> void:
+func _on_entry_loaded(path: String, node: Node3D, meta: Variant, _scene: Resource = null) -> void:
 	stats_loaded += 1
 	GlbLoader.configure_meshes(GlbLoader.meshes_of(node), true, true)
 	match str(meta):
@@ -550,7 +603,10 @@ func is_blocked_data(east: float, north: float) -> bool:
 
 func set_aerial(v: bool) -> void:
 	aerial = v
-	_cull_chunks()
+	if chunk_streamer != null and chunk_streamer.active:
+		chunk_streamer.set_aerial(v)
+	else:
+		_cull_chunks()
 
 
 func on_quality_changed(p: Dictionary) -> void:
@@ -565,13 +621,16 @@ func on_quality_changed(p: Dictionary) -> void:
 
 
 func counts() -> Dictionary:
-	return {
+	var c := {
 		"blocks": blocks.size(),
 		"landmarks": landmark_nodes.size(),
 		"glbLoaded": stats_loaded,
 		"glbFailed": stats_failed,
 		"chunks": _chunk_index.size(),
 	}
+	if chunk_streamer != null:
+		c["chunkStreamer"] = chunk_streamer.diagnostics()
+	return c
 
 
 func diagnostics() -> Dictionary:
@@ -583,6 +642,7 @@ func diagnostics() -> Dictionary:
 		"collision": collision.stats(),
 		"graph": graph.stats(),
 		"counts": counts(),
+		"chunkStreamer": chunk_streamer.diagnostics() if chunk_streamer != null else {},
 		"subsystems": {
 			"sky": sky != null, "lighting": lighting != null, "water": water != null,
 			"weather": weather != null, "scenery": scenery != null, "signs": signs != null,

@@ -112,10 +112,12 @@ GTA_SZ_GODOT/
 ├── icon.svg
 ├── data/                       ← 由 tools/convert_glb.mjs 从 GTA_SZ/public 生成
 │   ├── city/                     city.json、各紧凑 JSON、GLB、贴图、HDR
+│   │                             blocks/ + blocks-manifest.json（640m 建筑流式区块）
 │   ├── assets/                   旧城原型资产（street/room/chenye/linxia/bicycle）
 │   └── characters/               MMD 角色（kuki / yelan）
 ├── tools/
 │   ├── convert_glb.mjs           资产转换（meshopt/量化/texture-transform 剥离）
+│   ├── split_city_blocks.py      把 buildings.glb 按 640m 区块切成流式 GLB + manifest
 │   ├── verify_glb.py             转换后体检
 │   └── validate_project.py       静态体检（路径 / 括号 / class_name 引用）
 ├── scripts/
@@ -125,7 +127,7 @@ GTA_SZ_GODOT/
 │   │                             game_content、save_system、graphics_quality、
 │   │                             procedural_audio
 │   ├── world/                    city_world（主编排）、height_field、city_collision、
-│   │                             road_graph、facade_streamer、sky_system、
+│   │                             road_graph、chunk_streamer、facade_streamer、sky_system、
 │   │                             lighting_director、bay_water、weather_system、
 │   │                             scenery_system、sign_system、distant_system、
 │   │                             traffic_signals、traffic_system、
