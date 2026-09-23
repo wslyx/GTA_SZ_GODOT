@@ -25,9 +25,18 @@ const MAX_TILE_CACHE := 96
 const PICK_RADIUS := 26.0
 ## 按下-松开位移小于该值视为"点击"而不是拖动
 const CLICK_SLOP := 6.0
+## 没点中地标时，把点击处吸附到最近道路的最大距离（米）
+const SNAP_RADIUS := 90.0
 
-## 点选了目的地（大地图左键点地标）→ main_game 接管并启动自动驾驶
+## 点选了目的地（大地图左键点地标/任意路面）→ main_game 接管并启动自动驾驶
 signal destination_picked(pos: Vector2, dest_name: String)
+## 点选失败（点到了海面/山体等无路可达处）——给玩家一句明确反馈，
+## 否则点击毫无反应，看起来就像功能坏了。
+signal pick_failed(reason: String)
+## 路线规划好后，玩家在大地图上点按钮选驾驶方式（原版
+## city-map.ts 的 `#auto-drive` / `#drive-route` 两个按钮）。
+## auto = true 自动驾驶前往，false 自己开过去。
+signal route_mode_chosen(auto: bool)
 
 var world: CityWorld
 var player = null
@@ -36,6 +45,12 @@ var minimap: Control
 var minimap_holder: Control
 var big_map: Control
 var big_map_visible := false
+## 驾驶方式选择按钮（原版 .atlas-route-actions 里的两个按钮）
+var _choice_panel: Control
+var _btn_auto: Button
+var _btn_manual: Button
+var _choice_visible := false
+var _choice_name := ""
 
 var big_scale := 3.0
 var big_view := Vector2.ZERO
@@ -94,6 +109,65 @@ func _build() -> void:
 	big_map.gui_input.connect(_on_map_input)
 	add_child(big_map)
 
+	_build_route_choice()
+
+
+## 原版 city-map.ts:93 —— 选好地点后地图面板底部出现两个按钮：
+##   「自动驾驶前往 ↗」→ onAutoDrive
+##   「自己开过去 →」  → onManualRoute
+## 两个回调都会先 selectDestination 再 openMap(false)，也就是**按钮在地图里点，
+## 点了才关地图**。这里照搬：按钮是 big_map 的子控件，点完由 main_game 关地图。
+func _build_route_choice() -> void:
+	_choice_panel = Control.new()
+	_choice_panel.name = "route-actions"
+	_choice_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	# -108 而不是更靠上：HUD 的 toast 在底部 -150 一带，别和它叠在一起
+	_choice_panel.position = Vector2(-232, -108)
+	_choice_panel.size = Vector2(464, 54)
+	_choice_panel.visible = false
+	big_map.add_child(_choice_panel)
+
+	_btn_auto = _mk_choice_button("自动驾驶前往 ↗", Vector2(0, 0))
+	_btn_auto.pressed.connect(func(): _on_choice_pressed(true))
+	_btn_manual = _mk_choice_button("自己开过去 →", Vector2(240, 0))
+	_btn_manual.pressed.connect(func(): _on_choice_pressed(false))
+
+
+func _mk_choice_button(text: String, pos: Vector2) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.size = Vector2(224, 54)
+	b.position = pos
+	# ⚠️ 不能让按钮拿到焦点：点完地图关闭后，焦点若还留在按钮上，
+	# 开车时按空格（手刹）/ 回车会被当成"再点一次按钮"。
+	b.focus_mode = Control.FOCUS_NONE
+	# 默认字体不含中文，必须显式指定（与 Label 用同一套字体）
+	b.add_theme_font_override("font", _font(20))
+	b.add_theme_font_size_override("font_size", 20)
+	_choice_panel.add_child(b)
+	return b
+
+
+func _on_choice_pressed(auto: bool) -> void:
+	hide_route_choice()
+	route_mode_chosen.emit(auto)
+
+
+## 规划成功 → 显示两个按钮（地图保持打开，等玩家点）
+func show_route_choice(dest_name: String) -> void:
+	_choice_visible = true
+	_choice_name = dest_name
+	if _choice_panel != null:
+		_choice_panel.visible = true
+	big_map.queue_redraw()
+
+
+func hide_route_choice() -> void:
+	_choice_visible = false
+	_choice_name = ""
+	if _choice_panel != null:
+		_choice_panel.visible = false
+
 
 func _font(size: int) -> Font:
 	var sf := SystemFont.new()
@@ -115,9 +189,29 @@ func map_to_screen(p: Vector2, view: Vector2, map_scale: float, size: Vector2) -
 		size.y * 0.5 - (p.y - view.y) * map_scale)
 
 
+## 上式的逆变换。
+##
+## ⚠️ 曾经写成 `(view.y - (s.y - size.y * 0.5)) / map_scale` —— 括号把 view.y
+## 也套进了除法。屏幕 y 轴向下、数据 y 轴向北，二者是
+##   py = view.y - (sy - H/2) / k        （view.y **不**参与除法）
+## 而错误写法给出 (view.y - sy + H/2)/k。只有当 view.y == 0（地图中心恰在
+## 数据原点）时才碰巧等价，实测在出生点附近误差就有数百米、远离原点可达
+## 上万米：滚轮缩放的锚点会整屏飞走，用它算出的视野矩形也整个错位。
 func screen_to_map(s: Vector2, view: Vector2, map_scale: float, size: Vector2) -> Vector2:
-	return Vector2((s.x - size.x * 0.5) / map_scale + view.x,
-		(view.y - (s.y - size.y * 0.5)) / map_scale)
+	return Vector2(view.x + (s.x - size.x * 0.5) / map_scale,
+		view.y - (s.y - size.y * 0.5) / map_scale)
+
+
+## 当前视野对应的数据坐标矩形（用于剔除）。
+##
+## ⚠️ 不能写 `Rect2(br, (tl - br).abs())`：Rect2 的 position 是**左上角**
+## （x 最小、y 最小），而右下角 br 的 x 是最大的 —— 那样整个矩形会向右
+## 平移整整一个屏宽，导致视野内的道路/建筑 100% 被剔除（实测）。
+## 用 `Rect2(tl).expand(br)` 由两点直接取包围盒最稳妥。
+func view_rect(size: Vector2) -> Rect2:
+	var tl := screen_to_map(Vector2.ZERO, big_view, big_scale, size)
+	var br := screen_to_map(size, big_view, big_scale, size)
+	return Rect2(tl, Vector2.ZERO).expand(br)
 
 
 ## 保持指针下的地图点不动地缩放
@@ -128,10 +222,12 @@ func zoom_at(factor: float, screen_point: Vector2, size: Vector2) -> void:
 	big_view += before - after
 
 
+## 让 extent 宽度大致铺满屏幕的缩放。按**实际窗口宽度**算，
+## 不能写死 900 —— 在 1920/2560 宽的窗口上会缩得过小，看不出全城轮廓。
 func base_scale() -> float:
-	# 让 extent 宽度大致铺满屏幕
+	var vw := 900.0 if big_map == null else maxf(big_map.size.x, 240.0)
 	var w := CityData.extent.size.x * 1.2
-	return maxf(0.02, 900.0 / maxf(w, 1.0))
+	return maxf(0.02, vw / maxf(w, 1.0))
 
 
 static func _bbox_of(pts) -> Rect2:
@@ -256,7 +352,9 @@ func _draw_minimap() -> void:
 		if screen.size() >= 2:
 			minimap.draw_polyline(screen, col, wdt, true)
 
-	# 路线（双层描边，原版做法）
+	# 路线（双层描边，原版做法）。
+	# 颜色与大地图一致用**浅绿** —— 原版「自己开过去」的提示语就是
+	# "沿小地图上的浅绿路线行驶"（main.ts onManualRoute）。
 	if player.has_route():
 		var route: PackedVector2Array = player.route_points()
 		var line := PackedVector2Array()
@@ -266,7 +364,7 @@ func _draw_minimap() -> void:
 			line.append(s2)
 		if line.size() >= 2:
 			minimap.draw_polyline(line, Color(0.10, 0.12, 0.14, 0.9), 6.0, true)
-			minimap.draw_polyline(line, Color(0.95, 0.80, 0.35), 3.0, true)
+			minimap.draw_polyline(line, Color(0.55, 0.95, 0.60), 3.0, true)
 
 	# 玩家箭头
 	var c := size * 0.5
@@ -299,13 +397,22 @@ func _fill_ring(ring: Array, view: Vector2, map_scale: float, size: Vector2, col
 # 大地图
 # ---------------------------------------------------------------------------
 
+## 打开时默认**铺满全城**（base_scale），而不是固定 0.6。
+## 0.6 只显示约 2 km 宽 —— 城市有 13.5 km 宽，玩家打开地图看到的只是
+## 出生点周围一角，既看不到路网全貌也找不到地标，点选目的地无从下手。
 func toggle_big_map() -> void:
 	big_map_visible = not big_map_visible
 	big_map.visible = big_map_visible
 	if big_map_visible:
 		big_view = player.data_position() if player != null else CityData.spawn_pos
-		big_scale = maxf(base_scale(), 0.6)
+		big_scale = base_scale()
+		# 已经选好目的地但还没选驾驶方式时，重开地图要把两个按钮带回来
+		if _choice_panel != null:
+			_choice_panel.visible = _choice_visible
 		big_map.queue_redraw()
+	elif _choice_panel != null:
+		# 关地图只是收起按钮，目的地本身仍然有效（原版 selected 也保留）
+		_choice_panel.visible = false
 
 
 func _on_map_input(event: InputEvent) -> void:
@@ -341,6 +448,9 @@ func _on_map_input(event: InputEvent) -> void:
 ## 路线目标必须用地标的 **arrival**（道路上的到达点）——地标的 x/z 是
 ## 建筑中心，10/44 个落在街区/园区内部的孤立路网岛上，用它规划路线
 ## 会静默失败（no-route）。原版 city-map.ts 的目的地同样是 arrival。
+##
+## 没命中地标时不再直接放弃（那样玩家点了地图却毫无反应，会以为功能坏了）：
+## 退化为「把点击处吸附到最近道路」，任意位置都能当作目的地。
 func _pick_destination(s: Vector2) -> void:
 	var best_pos := Vector2.ZERO
 	var best_name := ""
@@ -357,18 +467,60 @@ func _pick_destination(s: Vector2) -> void:
 			else:
 				best_pos = p
 			best_name = str(lm.get("name", ""))
-	if best_name == "":
+	if best_name != "":
+		_emit_destination(best_pos, best_name)
 		return
-	_dest = {"pos": best_pos, "name": best_name}
+
+	var snapped := _snap_to_road(s)
+	if snapped.is_empty():
+		pick_failed.emit("这里没有可到达的道路，换个地点试试")
+		return
+	_emit_destination(Vector2(snapped["pos"]), str(snapped["name"]))
+
+
+## 点击处的地图坐标 → 最近道路上的可停放点（原版 mapPointDestination）。
+##
+## ⚠️ 必须用 `world.graph.nearest_edge`（对应原版 `MapRoadIndex.nearest`，
+## 会一圈圈向外扩散搜索再兜底全扫），**不能**用 `world.collision.nearest`：
+## 后者是碰撞判定用的，只在点所在的**单个 90m 格子**里找、不向外扩散，
+## 点在格子外就直接返回空字典，等于大部分点击都吸附不上。
+## 距离超过 SNAP_RADIUS 就认为点在山体/海面/远处，不作为目的地。
+func _snap_to_road(s: Vector2) -> Dictionary:
+	if world == null or world.graph == null or world.graph.nodes.is_empty():
+		return {}
+	var m := screen_to_map(s, big_view, big_scale, big_map.size)
+	var near: Dictionary = world.graph.nearest_edge(m)
+	if near.is_empty():
+		return {}
+	var pt: Vector2 = near["point"]
+	if m.distance_to(pt) > SNAP_RADIUS:
+		return {}
+	var nm := "地图选点"
+	if world.collision != null:
+		var cn: Dictionary = world.collision.nearest(pt.x, pt.y)
+		if not cn.is_empty():
+			var road: Dictionary = cn.get("road", {})
+			var rn := str(road.get("display_name", road.get("name", "")))
+			if rn != "":
+				nm = rn
+	return {"pos": pt, "name": nm}
+
+
+func _emit_destination(pos: Vector2, dest_name: String) -> void:
+	_dest = {"pos": pos, "name": dest_name}
+	# 按钮先收起来：要等 main_game 规划成功（show_route_choice）后再出现，
+	# 否则会短暂显示一个"规划失败"的目的地也能点的状态
+	hide_route_choice()
 	big_map.queue_redraw()
-	destination_picked.emit(best_pos, best_name)
+	destination_picked.emit(pos, dest_name)
 
 
-## 自动驾驶取消 / 结束时清除目的地标记
+## 自动驾驶取消 / 结束时清除目的地标记与选择按钮
 func clear_destination() -> void:
 	if not _dest.is_empty():
 		_dest = {}
 		big_map.queue_redraw()
+	hide_route_choice()
 
 
 func _draw_big_map() -> void:
@@ -396,14 +548,15 @@ func _draw_big_map() -> void:
 		if not rings.is_empty():
 			_draw_ring_big(rings[0], Color(0.06, 0.14, 0.20))
 
-	# 建筑（仅 zoom > 3.6）—— 16089 个，必须按视野剔除
+	# 可见的地图范围（数据坐标），用于视野剔除 —— 否则每次重绘都要
+	# 变换全部 12202 条道路 / 16089 个建筑的每个顶点，大地图一开就会卡
 	_compute_bboxes()
-	var view_box2 := Rect2(screen_to_map(size, big_view, big_scale, size),
-		(screen_to_map(Vector2.ZERO, big_view, big_scale, size)
-			- screen_to_map(size, big_view, big_scale, size)).abs())
+	var view_box := view_rect(size)
+
+	# 建筑（仅 zoom > 3.6）—— 16089 个，必须按视野剔除
 	if big_scale > 3.6:
 		for bi in CityData.buildings.size():
-			if not (_building_boxes[bi] as Rect2).intersects(view_box2):
+			if not (_building_boxes[bi] as Rect2).intersects(view_box):
 				continue
 			var b: Dictionary = CityData.buildings[bi]
 			var rings: Array = b["rings"]
@@ -415,12 +568,6 @@ func _draw_big_map() -> void:
 			_draw_ring_big(rings[0], col)
 
 	# 道路
-	_compute_bboxes()
-	# 可见的地图范围（数据坐标），用于视野剔除 —— 否则每次重绘都要
-	# 变换全部 12202 条道路的每个顶点，大地图一开就会卡
-	var visible_rect := screen_to_map(Vector2.ZERO, big_view, big_scale, size)
-	var visible_end := screen_to_map(size, big_view, big_scale, size)
-	var view_box := Rect2(visible_end, visible_rect - visible_end).abs()
 	for ri in CityData.roads.size():
 		if not (_road_boxes[ri] as Rect2).intersects(view_box):
 			continue
@@ -446,15 +593,16 @@ func _draw_big_map() -> void:
 		if line.size() >= 2:
 			big_map.draw_polyline(line, col, wdt, true)
 
-	# 地标标注（zoom 门限 ≥ 1.1）
-	if big_scale >= 1.1:
-		var font := _font(16)
-		for lm in CityData.all_landmarks():
-			var p := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
-			var s := map_to_screen(p, big_view, big_scale, size)
-			if s.x < 0.0 or s.y < 0.0 or s.x > size.x or s.y > size.y:
-				continue
-			big_map.draw_circle(s, 4.0, Color(0.95, 0.82, 0.45))
+	# 地标：圆点**始终**绘制（只有几十个，开销可忽略，也是点选目的地的靶心）；
+	# 名称只在 zoom ≥ 1.1 时画，否则全城视图下几十个中文标签会糊成一片。
+	var font := _font(16)
+	for lm in CityData.all_landmarks():
+		var p := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
+		var s := map_to_screen(p, big_view, big_scale, size)
+		if s.x < 0.0 or s.y < 0.0 or s.x > size.x or s.y > size.y:
+			continue
+		big_map.draw_circle(s, 4.0, Color(0.95, 0.82, 0.45))
+		if big_scale >= 1.1:
 			big_map.draw_string(font, s + Vector2(8, 5), str(lm.get("name", "")),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.96, 0.94, 0.88))
 
@@ -483,18 +631,42 @@ func _draw_big_map() -> void:
 		big_map.draw_circle(ps, 6.0, Color(0.98, 0.35, 0.25))
 		big_map.draw_arc(ps, 9.0, 0.0, TAU, 24, Color(0.98, 0.90, 0.60), 2.0, true)
 
-	# 比例尺
-	var scale_len := 100.0
-	if big_scale > 0.0:
-		scale_len = 100.0 / big_scale
+	# 待选驾驶方式：按钮上方给出路线概览（原版 #destination-status：
+	# "沿道路约 3.2 公里 · 抵达目的地周边" / "目的地就在附近"）
+	if _choice_visible and _choice_name != "" and player != null and player.has_route():
+		var route: PackedVector2Array = player.route_points()
+		var length := 0.0
+		for i in range(1, route.size()):
+			length += route[i].distance_to(route[i - 1])
+		var info := "已规划到 %s" % _choice_name
+		if length >= 45.0:
+			info += " · 沿道路约 %.1f 公里 · 抵达目的地周边" % (length / 1000.0)
+		else:
+			info += " · 目的地就在附近"
+		var info_font := _font(18)
+		var w := info_font.get_string_size(info, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		big_map.draw_string(info_font, Vector2(size.x * 0.5 - w * 0.5, size.y - 128), info,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.92, 0.88, 0.70))
+
+	# 比例尺：固定画 100 像素长的横杠，标注它代表的**米数** = 100 / big_scale。
+	# （旧写法把 scale_len 又乘回 big_scale，标签恒为 "100 m"，完全失真。）
+	var bar_px := 100.0
+	var bar_m := bar_px / maxf(big_scale, 0.0001)
 	var font2 := _font(14)
-	big_map.draw_line(Vector2(40, size.y - 40), Vector2(40 + scale_len * big_scale, size.y - 40),
+	big_map.draw_line(Vector2(40, size.y - 40), Vector2(40 + bar_px, size.y - 40),
 		Color(0.90, 0.92, 0.94), 2.0, true)
-	big_map.draw_string(font2, Vector2(40, size.y - 50), "%.0f m" % (scale_len * big_scale),
+	big_map.draw_string(font2, Vector2(40, size.y - 50), _scale_label(bar_m),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.90, 0.92, 0.94))
 	big_map.draw_string(font2, Vector2(40, size.y - 20),
-		"M 关闭 · 滚轮缩放 · 拖动平移 · 点击地标 = 自动驾驶 · 缩放 %.2f" % big_scale,
+		"M 关闭 · 滚轮缩放 · 拖动平移 · 点击地标或任意道路 = 规划路线 · 缩放 %.2f" % big_scale,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.80, 0.85, 0.90))
+
+
+## 比例尺标签：≥1000m 用 km
+static func _scale_label(meters: float) -> String:
+	if meters >= 1000.0:
+		return "%.1f km" % (meters / 1000.0)
+	return "%.0f m" % meters
 
 
 func _draw_ring_big(ring: Array, col: Color) -> void:

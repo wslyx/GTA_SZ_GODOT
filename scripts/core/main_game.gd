@@ -195,6 +195,9 @@ func _on_built() -> void:
 	maps.setup(world, self)
 	# 大地图点选地标 → 自动驾驶前往（原版 city-map.ts 的 onAutoDrive）
 	maps.destination_picked.connect(_on_destination_picked)
+	# 大地图上「自动驾驶前往 / 自己开过去」两个按钮
+	maps.route_mode_chosen.connect(_on_route_mode_chosen)
+	maps.pick_failed.connect(func(reason: String): hud.toast(reason, 2.5))
 	panels.setup(world, self, career, story)
 	# 设置页的「帧率显示」行要操作 HUD
 	panels.hud = hud
@@ -369,6 +372,7 @@ func _reset_to_road() -> void:
 	if autopilot.active:
 		autopilot.cancel()
 		maps.clear_destination()
+	_clear_pending()
 	if mode == Mode.TANK:
 		var t := _snap_to_road(tank.x, tank.z)
 		tank.x = t.x
@@ -404,6 +408,7 @@ func _toggle_tank() -> void:
 		tank.steer = 0.0
 		mode = Mode.TANK
 		autopilot.cancel()
+		_clear_pending()
 		car.speed = 0.0
 		if _car_model != null:
 			_car_model.visible = false
@@ -467,6 +472,7 @@ func _toggle_vehicle_entry() -> void:
 		# 原版 exit-car 时取消自动驾驶
 		autopilot.cancel()
 		maps.clear_destination()
+		_clear_pending()
 		_walk_first_person = false
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
 		hud.toast("步行：W/A/S/D 走，Shift 跑，C 换人称")
@@ -512,6 +518,7 @@ func _enter_observer() -> void:
 	# 原版 observer 进入时取消自动驾驶
 	autopilot.cancel()
 	maps.clear_destination()
+	_clear_pending()
 	paused = true
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
@@ -558,6 +565,7 @@ func _process(delta: float) -> void:
 	var dt := clampf(delta, 0.0, 0.05)
 
 	_update_modes(dt)
+	_check_manual_arrival()
 
 	# 焦点与分块剔除
 	var focus := camera.global_position
@@ -927,6 +935,8 @@ func mode_text() -> String:
 	return "未知"
 
 func route_text() -> String:
+	if not _pending_dest.is_empty():
+		return "待出发 · %s · 按 M 打开地图选择驾驶方式" % _pending_dest["name"]
 	if autopilot.active:
 		var st := autopilot.status()
 		return "自动导航 · %s · 剩余 %d 个路点" % [st["phase"], int(st["remaining"])]
@@ -942,19 +952,30 @@ func route_text() -> String:
 func is_observer() -> bool:
 	return mode == Mode.OBSERVER
 
+## 地图是否要画浅绿路线：自动驾驶中，或已选好目的地正在等玩家选驾驶方式
+## （原版两种情况下小地图都显示同一条浅绿线）
 func has_route() -> bool:
-	return autopilot.active
+	if autopilot.active:
+		return true
+	return _pending_route.size() >= 2
 
 func route_points() -> PackedVector2Array:
-	return autopilot.route_points()
+	if autopilot.active:
+		return autopilot.route_points()
+	return _pending_route
 
-func start_autopilot(target: Vector2) -> bool:
+## 接好自动驾驶的依赖（路网与三个回调），本身不启动
+func _prepare_autopilot() -> void:
 	autopilot.setup(world)
 	autopilot.signal_hold = func(pos: Vector2, dir: Vector2) -> float:
 		return world.signals.hold_distance(pos, dir) if world.signals != null else INF
 	autopilot.blocked_fn = func(pos: Vector2) -> bool: return world.collision.blocked(pos.x, pos.y)
 	autopilot.traffic_positions = func() -> Array:
 		return world.traffic.positions() if world.traffic != null else []
+
+
+func start_autopilot(target: Vector2) -> bool:
+	_prepare_autopilot()
 	_ap_arrived_toast = false
 	_ap_blocked_toast = false
 	var ok := autopilot.start(target, Vector2(car.x, car.z))
@@ -962,26 +983,103 @@ func start_autopilot(target: Vector2) -> bool:
 		hud.toast("无法规划到该目的地的路线", 3.0)
 	return ok
 
-## 大地图上点选了目的地（原版 startAutoDrive 的模式守卫照搬）
+
+## 大地图上点选了目的地。
+##
+## 原版不是"点一下就开"：city-map 的 `onSelect` 会立刻算出 route 并在地图上
+## 画出浅绿预览线，面板底部出现两个按钮「自动驾驶前往 ↗」/「自己开过去 →」，
+## 玩家**点按钮**才走哪条路（main.ts onAutoDrive / onManualRoute，两者都先
+## selectDestination 再 openMap(false)）—— 也就是地图保持打开，点了按钮才关。
+## 这里同构：规划出预览线 → 地图留在屏幕上等玩家点按钮。
 func _on_destination_picked(pos: Vector2, dest_name: String) -> void:
 	match mode:
 		Mode.TANK:
-			hud.toast("坦克使用手动驾驶，按 T 换回轿车再自动导航")
+			hud.toast("坦克使用手动驾驶，按 T 换回轿车再规划路线")
 			return
 		Mode.WALKING:
-			hud.toast("走回车旁，按 F 上车后再开始自动导航")
+			hud.toast("走回车旁，按 F 上车后再规划路线")
 			return
 		Mode.OBSERVER, Mode.AIRCRAFT:
-			hud.toast("退出当前视角后才能开始自动导航")
+			hud.toast("退出当前视角后才能规划路线")
 			return
 		Mode.CAR:
 			pass
-	if maps.big_map_visible:
-		maps.toggle_big_map()
-	if not start_autopilot(pos):
+
+	_prepare_autopilot()
+	var preview := autopilot.plan(Vector2(car.x, car.z), pos)
+	if preview.size() < 2:
+		hud.toast("无法规划到该目的地的路线", 3.0)
 		maps.clear_destination()
 		return
-	hud.toast("自动驾驶 · %s · WASD 随时接管" % dest_name, 4.0)
+
+	_pending_dest = {"pos": pos, "name": dest_name}
+	_pending_route = preview
+	# 地图不关：把两个按钮亮出来等玩家点（原版 .atlas-route-actions）
+	maps.show_route_choice(dest_name)
+
+
+## 玩家点了「自动驾驶前往 ↗」或「自己开过去 →」——关地图并执行
+func _on_route_mode_chosen(auto_drive: bool) -> void:
+	if maps.big_map_visible:
+		maps.toggle_big_map()
+	_choose_route_mode(auto_drive)
+
+
+## 待选中的目的地与预览路线（原版 main.ts 的 `selected` / `route`）
+var _pending_dest: Dictionary = {}
+var _pending_route: PackedVector2Array = PackedVector2Array()
+## 手动模式下判定"到达"的半径（比自动驾驶宽松，玩家自己停车）
+const MANUAL_ARRIVE_RADIUS := 22.0
+
+
+## 玩家点了「自动驾驶前往 ↗」（true）或「自己开过去 →」（false）
+func _choose_route_mode(auto_drive: bool) -> void:
+	if _pending_dest.is_empty():
+		return
+	var dest: Vector2 = _pending_dest["pos"]
+	var dest_name := str(_pending_dest["name"])
+	if auto_drive:
+		_prepare_autopilot()
+		_ap_arrived_toast = false
+		_ap_blocked_toast = false
+		# 预览线是从**选点那一刻**的车位算的。玩家若先自己开了一段再按 1，
+		# 旧线起点已经对不上了 —— 这时让它重新规划（传空即触发重算）。
+		var route := _pending_route
+		if route.size() >= 2 and Vector2(car.x, car.z).distance_to(route[0]) > 50.0:
+			route = PackedVector2Array()
+		var ok := autopilot.start(dest, Vector2(car.x, car.z), route)
+		if not ok:
+			hud.toast("无法规划到该目的地的路线", 3.0)
+			maps.clear_destination()
+			_clear_pending()
+			return
+		# 路线交给 autopilot 显示，避免预览线与行驶线重复叠加
+		_clear_pending()
+		hud.toast("自动驾驶 · %s · WASD 随时接管" % dest_name, 4.0)
+	else:
+		# 自己开：确保没在自动驾驶（原版 cancelAutoDrive('manual-route')），
+		# 但预览路线保留 —— 玩家沿它开
+		if autopilot.active:
+			autopilot.cancel()
+		hud.toast("沿小地图上的浅绿路线行驶 · %s" % dest_name, 5.0)
+
+
+func _clear_pending() -> void:
+	_pending_dest = {}
+	_pending_route = PackedVector2Array()
+
+
+## 手动模式下开到目的地附近就算到达（自动驾驶由 autopilot 自己判定）
+func _check_manual_arrival() -> void:
+	if _pending_dest.is_empty() or autopilot.active:
+		return
+	if mode != Mode.CAR:
+		return
+	var dest: Vector2 = _pending_dest["pos"]
+	if Vector2(car.x, car.z).distance_to(dest) < MANUAL_ARRIVE_RADIUS:
+		hud.toast("已到达 %s" % _pending_dest["name"], 4.0)
+		maps.clear_destination()
+		_clear_pending()
 
 ## 自动驾驶的阶段性提示（到达 / 受阻），每次启动只报一次
 var _ap_arrived_toast := false

@@ -232,7 +232,12 @@ func _plan_data() -> bool:
 	CityData.load_core()
 	height_field.load_all()
 	collision.build()
-	graph.build_from_navigation()
+	# navigation.json 是预计算路网（42829 节点）；万一它没加载成功，
+	# 退回按 roads 现场建图。否则 graph 为空 → 自动驾驶一律
+	# "无法规划到该目的地的路线"，而控制台上只有一句 DataLoader 警告。
+	if not graph.build_from_navigation():
+		push_warning("[CityWorld] navigation.json 不可用，改用 roads 现场建图")
+		graph.build_from_roads(CityData.roads)
 	progress.emit("正在整理地图数据")
 	return true
 

@@ -28,6 +28,12 @@ const OBSTACLE_RADIUS := 3.05
 const STALL_TIMEOUT := 5.0
 const WAIT_TIMEOUT := 3.0
 const ARRIVE_RADIUS := 12.0
+## 两次重规划之间的最小间隔（秒）。
+##
+## `graph.route()` 是一次全图 Dijkstra（42829 节点 / 47218 边），单次就要
+## 几百毫秒。堵在车流里时 WAIT_TIMEOUT 每 3 秒就会触发一次重规划 ——
+## 表现为自动驾驶开着开着每隔几秒卡一下。加冷却把重规划摊开。
+const REROUTE_COOLDOWN := 8.0
 
 ## 路型限速（原版 ROAD_CRUISE）
 const ROAD_CRUISE := {
@@ -64,14 +70,29 @@ func setup(p_world: CityWorld) -> void:
 	graph = p_world.graph
 
 
-## 开始导航到目标点
-func start(target: Vector2, from: Vector2) -> bool:
+## 只规划、不启动 —— 对应原版 city-map 的 `onSelect`：点选目的地的**瞬间**
+## 就把 route 算出来给小/大地图画浅绿预览线；玩家随后选「自动驾驶前往」时
+## 直接复用这条，既省掉第二次全图 Dijkstra，也保证预览线和实际开的是同一条。
+func plan(from: Vector2, target: Vector2) -> PackedVector2Array:
 	if graph == null or graph.nodes.is_empty():
+		return PackedVector2Array()
+	return graph.route(from, target)
+
+
+## 开始导航到目标点。传入 precomputed（≥2 点）时直接沿用预览路线。
+func start(target: Vector2, from: Vector2, precomputed := PackedVector2Array()) -> bool:
+	if graph == null or graph.nodes.is_empty():
+		phase = Phase.BLOCKED
+		reason = "no-graph"
+		push_warning("[Autopilot] 路网为空（节点 %d），无法规划"
+			% [0 if graph == null else graph.nodes.size()])
 		return false
-	_route = graph.route(from, target)
+	_route = precomputed if precomputed.size() >= 2 else graph.route(from, target)
 	if _route.size() < 2:
 		phase = Phase.BLOCKED
 		reason = "no-route"
+		push_warning("[Autopilot] 规划失败：(%.1f, %.1f) → (%.1f, %.1f)，路线点 %d"
+			% [from.x, from.y, target.x, target.y, _route.size()])
 		return false
 	_index = 0
 	_proj = _route[0]
@@ -89,6 +110,7 @@ func cancel() -> void:
 	phase = Phase.IDLE
 	_route = PackedVector2Array()
 	reason = ""
+	_reroute_cooldown = 0.0
 
 
 ## 点到线段的投影（数据坐标）
@@ -149,6 +171,8 @@ func compute(pos: Vector2, yaw: float, speed: float, dt: float) -> Dictionary:
 		active = false
 		return {"throttle": 0.0, "steer": 0.0}
 
+	_reroute_cooldown = maxf(0.0, _reroute_cooldown - dt)
+
 	# 受困与等待计时
 	var moved := pos.distance_to(_last_pos)
 	_last_pos = pos
@@ -165,9 +189,14 @@ func compute(pos: Vector2, yaw: float, speed: float, dt: float) -> Dictionary:
 		reason = "stalled"
 	if _wait_timer > WAIT_TIMEOUT:
 		_wait_timer = 0.0
-		reason = "reroute"
-		# 绕行：以当前点重新规划（原版 findRoute(avoid)）
-		start(goal, pos)
+		if _reroute_cooldown > 0.0:
+			# 刚重规划过：先继续等，别每 3 秒就跑一次全图 Dijkstra
+			reason = "reroute-cooldown"
+		else:
+			_reroute_cooldown = REROUTE_COOLDOWN
+			reason = "reroute"
+			# 绕行：以当前点重新规划（原版 findRoute(avoid)）
+			start(goal, pos)
 
 	# 目标朝向
 	var target := _target_point(pos)

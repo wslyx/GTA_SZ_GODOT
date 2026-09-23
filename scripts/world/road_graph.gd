@@ -19,6 +19,23 @@ var _degree := PackedInt32Array()
 ## 原始边列表（建图时保留，供调试/统计）
 var raw_edges: Array = []
 
+## 连通分量。
+##
+## 实测 navigation.json 的 42829 个节点分属 **1102 个**连通分量，最大的
+## 35558 节点（83%）才是真正能开车到的路网，其余是小区/园区/公园内部的
+## 孤立小岛（几百个节点甚至更少）。只要起点或终点落在岛上，`route()` 就会
+## 返回空路线 —— 玩家看到的是"无法规划到该目的地的路线"，也就是"功能坏了"。
+## 建图时把分量算一次，route() 里把孤岛端吸附到主分量上最近的可达点。
+var _comp := PackedInt32Array()
+var _main_comp := -1
+var _main_count := 0
+
+## 节点网格索引（cell 128m）。route() 每次要查 2 次最近边，
+## 线性全扫是 O(N+E)=13 万次迭代，实测是规划耗时的大头。
+var _grid: Dictionary = {}
+const GRID_CELL := 128.0
+const GRID_MAX_RING := 24
+
 
 func build_from_navigation() -> bool:
 	CityData.load_navigation()
@@ -28,7 +45,11 @@ func build_from_navigation() -> bool:
 	var pairs: Array = CityData.nav_edges
 	raw_edges = pairs
 	_build_csr(pairs)
-	print("[RoadGraph] 使用 navigation.json：%d 节点 / %d 边" % [nodes.size(), pairs.size()])
+	_build_components()
+	_build_grid()
+	print("[RoadGraph] 使用 navigation.json：%d 节点 / %d 边 / 主分量 %d 节点（%.0f%%）"
+		% [nodes.size(), pairs.size(), _main_count,
+			float(_main_count) / maxf(1.0, float(nodes.size())) * 100.0])
 	return true
 
 
@@ -51,7 +72,10 @@ func build_from_roads(roads: Array) -> void:
 			prev = id
 	raw_edges = edge_pairs
 	_build_csr(edge_pairs)
-	print("[RoadGraph] 从 roads 现场构建：%d 节点 / %d 边" % [nodes.size(), edge_pairs.size()])
+	_build_components()
+	_build_grid()
+	print("[RoadGraph] 从 roads 现场构建：%d 节点 / %d 边 / 主分量 %d 节点"
+		% [nodes.size(), edge_pairs.size(), _main_count])
 
 
 func _build_csr(pairs: Array) -> void:
@@ -91,6 +115,80 @@ func _build_csr(pairs: Array) -> void:
 		_edge_to[ib] = a
 		_edge_len[ib] = d
 		cursor[b] += 1
+
+
+## 连通分量（迭代式 DFS，4 万节点不能递归）
+func _build_components() -> void:
+	var n := nodes.size()
+	_comp.resize(n)
+	_comp.fill(-1)
+	var stack := PackedInt32Array()
+	var sizes: Array = []
+	var cid := 0
+	for s in n:
+		if _comp[s] >= 0:
+			continue
+		_comp[s] = cid
+		stack.clear()
+		stack.append(s)
+		var cnt := 1
+		while not stack.is_empty():
+			var v: int = stack[stack.size() - 1]
+			stack.remove_at(stack.size() - 1)
+			for k in range(_edge_start[v], _edge_start[v + 1]):
+				var nx: int = _edge_to[k]
+				if _comp[nx] < 0:
+					_comp[nx] = cid
+					cnt += 1
+					stack.append(nx)
+		sizes.append(cnt)
+		cid += 1
+	_main_comp = -1
+	_main_count = 0
+	for i in sizes.size():
+		if sizes[i] > _main_count:
+			_main_count = sizes[i]
+			_main_comp = i
+
+
+func _cell_key(p: Vector2) -> Vector2i:
+	return Vector2i(int(floor(p.x / GRID_CELL)), int(floor(p.y / GRID_CELL)))
+
+
+func _build_grid() -> void:
+	_grid.clear()
+	for i in nodes.size():
+		var k := _cell_key(nodes[i])
+		var arr: PackedInt32Array = _grid.get(k, PackedInt32Array())
+		arr.append(i)
+		_grid[k] = arr
+
+
+## 主分量里离 p 最近的节点；没有主分量或找不到时返回 -1。
+## 从 p 所在格向外一圈圈扩（每圈只扫环，不重复扫内部），
+## 找到的距离 ≤ (已扫半径 − 1 格) 时即判定为全局最近。
+func nearest_main_node(p: Vector2) -> int:
+	if _grid.is_empty() or _main_comp < 0:
+		return -1
+	var c := _cell_key(p)
+	var best := -1
+	var best_d := INF
+	for r in range(0, GRID_MAX_RING + 1):
+		for dx in range(-r, r + 1):
+			for dz in range(-r, r + 1):
+				if maxi(absi(dx), absi(dz)) != r:
+					continue
+				var arr: PackedInt32Array = _grid.get(Vector2i(c.x + dx, c.y + dz), PackedInt32Array())
+				for i in arr:
+					if _comp[i] != _main_comp:
+						continue
+					var d := p.distance_to(nodes[i])
+					if d < best_d:
+						best_d = d
+						best = i
+		if best >= 0 and best_d <= maxf(0.0, float(r - 1) * GRID_CELL):
+			return best
+	return best
 
 
 func neighbors(i: int) -> Array:
@@ -151,7 +249,66 @@ func nearest_node_in_range(p: Vector2, min_d: float, max_d: float, require_degre
 
 
 ## 最近边：返回 {a, b, point, t, d, length}
+##
+## 默认走网格加速：从 p 所在格向外扩圈，只检查圈内节点的邻接边。
+## 判据与 `nearest_main_node` 相同（找到的距离 ≤ 已扫半径 − 1 格 → 全局最近）；
+## 扩到上限仍不满足就退回线性全扫，结果与纯扫描版**完全一致**。
 func nearest_edge(p: Vector2) -> Dictionary:
+	if not _grid.is_empty():
+		var fast := _nearest_edge_grid(p)
+		if not fast.is_empty():
+			return fast
+	return _nearest_edge_scan(p)
+
+
+func _nearest_edge_grid(p: Vector2) -> Dictionary:
+	var c := _cell_key(p)
+	var best: Dictionary = {}
+	var best_d := INF
+	for r in range(0, GRID_MAX_RING + 1):
+		# 扩到 3 格（384m）还一条边都没碰到，说明这个点在海面/山体上，
+		# 继续扩圈只会白烧 CPU —— 交给线性全扫（罕见路径，结果仍然正确）。
+		if r >= 3 and best_d == INF:
+			return {}
+		for dx in range(-r, r + 1):
+			for dz in range(-r, r + 1):
+				if maxi(absi(dx), absi(dz)) != r:
+					continue
+				var arr: PackedInt32Array = _grid.get(Vector2i(c.x + dx, c.y + dz), PackedInt32Array())
+				for i in arr:
+					for k in range(_edge_start[i], _edge_start[i + 1]):
+						# ⚠️ 这里**不能**像全扫版那样 `if j < i: continue`。
+						# 全扫版每个节点都会被遍历，每条边恰好在"小端"被算一次；
+						# 网格版只看候选节点的邻接，若另一端在候选集外，这条边
+						# 就只有在这一端展开时才可能被检查到 —— 跳过会漏边，
+						# 实测最多把最近边算错 30 m。重复算一次的代价远小于漏算。
+						var j: int = _edge_to[k]
+						var hit := _project_on_edge(p, i, j, _edge_len[k])
+						if float(hit["d"]) < best_d:
+							best_d = float(hit["d"])
+							best = hit
+		# 未扫到的格至少在某个轴上偏了 r+1 格，其中的点离 p 必 ≥ r×CELL；
+		# 再退一格留余量（长边可能横跨未扫区域）。
+		if best_d <= maxf(0.0, float(r - 1) * GRID_CELL):
+			return best
+	return {}
+
+
+## p 在边 (i, j) 上的投影
+func _project_on_edge(p: Vector2, i: int, j: int, length: float) -> Dictionary:
+	var a := nodes[i]
+	var b := nodes[j]
+	var dx := b.x - a.x
+	var dz := b.y - a.y
+	var t := 0.0
+	if length > 0.0:
+		t = clampf(((p.x - a.x) * dx + (p.y - a.y) * dz) / (length * length), 0.0, 1.0)
+	var point := Vector2(a.x + dx * t, a.y + dz * t)
+	return {"a": i, "b": j, "point": point, "t": t, "d": p.distance_to(point), "length": length}
+
+
+## 线性全扫版（原实现）：网格不可用或加速版拿不到确定解时兜底
+func _nearest_edge_scan(p: Vector2) -> Dictionary:
 	var best := {"a": 0, "b": 0, "point": Vector2.ZERO, "t": 0.0, "d": INF, "length": 0.0}
 	var n := nodes.size()
 	for i in n:
@@ -219,6 +376,28 @@ func route(a: Vector2, b: Vector2) -> PackedVector2Array:
 	var et: float = end["t"]
 	var elen: float = end["length"]
 
+	# 孤岛兜底：任一端所在的边不在主分量里，就把它整体挪到主分量上
+	# 最近的可达节点（t/length 归零，等价于"从该节点本身出发/到达"）。
+	# 不做这一步，1102 个分量里的小岛（占 17% 节点）会让 route() 直接返回
+	# 空路线 —— 玩家点了个地标却被告知无法规划。
+	if _comp.size() == nodes.size() and _main_comp >= 0:
+		if _comp[sa] != _main_comp and _comp[sb] != _main_comp:
+			var sn := nearest_main_node(a)
+			if sn >= 0:
+				sa = sn
+				sb = sn
+				sp = nodes[sn]
+				st = 0.0
+				slen = 0.0
+		if _comp[ea] != _main_comp and _comp[eb] != _main_comp:
+			var en := nearest_main_node(b)
+			if en >= 0:
+				ea = en
+				eb = en
+				ep = nodes[en]
+				et = 0.0
+				elen = 0.0
+
 	if sa == ea and sb == eb:
 		return dense([a, sp, ep, b])
 
@@ -239,6 +418,11 @@ func route(a: Vector2, b: Vector2) -> PackedVector2Array:
 	heap.push(sa, start_cost_a)
 	heap.push(sb, start_cost_b)
 
+	# 终点两端都出堆即可收工：一致代价搜索下"出堆即最终最短路"，
+	# 不必把 42829 个节点全部展开完（近距离路线能省掉大半时间）。
+	var end_a_done := false
+	var end_b_done := false
+
 	while not heap.is_empty():
 		var top := heap.pop()
 		var id: int = top[0]
@@ -248,6 +432,12 @@ func route(a: Vector2, b: Vector2) -> PackedVector2Array:
 		if d > dist[id]:
 			continue
 		visited[id] = 1
+		if id == ea:
+			end_a_done = true
+		if id == eb:
+			end_b_done = true
+		if end_a_done and end_b_done:
+			break
 		for k in range(_edge_start[id], _edge_start[id + 1]):
 			var nx: int = _edge_to[k]
 			var nd := d + _edge_len[k]
@@ -283,40 +473,67 @@ func stats() -> Dictionary:
 	return {"nodes": nodes.size(), "edges": raw_edges.size(), "csr": _edge_len.size()}
 
 
-## 最小二叉堆（元素为 [id, cost]）
+## 最小二叉堆（元素为 [id, cost]）。
+##
+## ⚠️ 存成 `Array[Array]` 时每次比较都要做两层 Variant 解引用（`_h[p][1]`），
+## 全城一次规划要推堆十万次以上，光这里就能吃掉几百毫秒。改成两个
+## 平行的 **类型化** 数组（PackedInt32Array / PackedFloat64Array）后索引是
+## 直接内存访问。容量按 2 倍扩容，避免每次 push 都 resize。
 class _MinHeap extends RefCounted:
-	var _h: Array = []
+	var _id := PackedInt32Array()
+	var _cost := PackedFloat64Array()
+	var _n := 0
 
 	func is_empty() -> bool:
-		return _h.is_empty()
+		return _n == 0
+
+	## ⚠️ 判断必须是 `_id.size() < cap`（容量**不够**才扩）。
+	## 曾经写成 `>=`：第一次 push 时 size=0 >= 1 为假 → 不扩容 →
+	## 往 size=0 的 Packed 数组里写下标 0 直接越界报错，Dijkstra 整个挂掉，
+	## 表现为点任何目的地都提示"无法规划到该目的地的路线"。
+	func _ensure(cap: int) -> void:
+		if _id.size() < cap:
+			var nc := maxi(64, cap * 2)
+			_id.resize(nc)
+			_cost.resize(nc)
 
 	func push(id: int, cost: float) -> void:
-		_h.append([id, cost])
-		var i := _h.size() - 1
+		_ensure(_n + 1)
+		var i := _n
+		_n += 1
+		_id[i] = id
+		_cost[i] = cost
 		while i > 0:
 			var p := (i - 1) >> 1
-			if _h[p][1] <= _h[i][1]:
+			if _cost[p] <= _cost[i]:
 				break
-			var t = _h[p]
-			_h[p] = _h[i]
-			_h[i] = t
+			var ti := _id[p]
+			var tc := _cost[p]
+			_id[p] = _id[i]
+			_cost[p] = _cost[i]
+			_id[i] = ti
+			_cost[i] = tc
 			i = p
 
 	func pop() -> Array:
-		var top: Array = _h[0]
-		var last: Array = _h.pop_back()
-		if not _h.is_empty():
-			_h[0] = last
+		var top_id: int = _id[0]
+		var top_cost: float = _cost[0]
+		_n -= 1
+		if _n > 0:
+			_id[0] = _id[_n]
+			_cost[0] = _cost[_n]
 			var i := 0
-			var size := _h.size()
-			while i * 2 + 1 < size:
+			while i * 2 + 1 < _n:
 				var c := i * 2 + 1
-				if c + 1 < size and _h[c + 1][1] < _h[c][1]:
+				if c + 1 < _n and _cost[c + 1] < _cost[c]:
 					c += 1
-				if _h[c][1] >= _h[i][1]:
+				if _cost[c] >= _cost[i]:
 					break
-				var t = _h[i]
-				_h[i] = _h[c]
-				_h[c] = t
+				var ti := _id[i]
+				var tc := _cost[i]
+				_id[i] = _id[c]
+				_cost[i] = _cost[c]
+				_id[c] = ti
+				_cost[c] = tc
 				i = c
-		return top
+		return [top_id, top_cost]
