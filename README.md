@@ -119,7 +119,10 @@ GTA_SZ_GODOT/
 │   ├── convert_glb.mjs           资产转换（meshopt/量化/texture-transform 剥离）
 │   ├── split_city_blocks.py      把 buildings.glb 按 640m 区块切成流式 GLB + manifest
 │   ├── verify_glb.py             转换后体检
-│   └── validate_project.py       静态体检（路径 / 括号 / class_name 引用）
+│   ├── validate_project.py       静态体检（路径 / 括号 / class_name 引用）
+│   ├── _shot.gd / _shot.tscn     截图探针：一次启动按 shot_plan.json 批量抓多组参数
+│   ├── compare_shots.py          原版截图 vs 复刻截图的像素级量化比对
+│   └── _inspect.gd               无头材质体检：dump 任意 GLB 的材质名/反照率/粗糙度
 ├── scripts/
 │   ├── utils/                    coordinate_util / data_loader / geom_util
 │   │                             glb_loader / spatial_hash
@@ -131,13 +134,13 @@ GTA_SZ_GODOT/
 │   │                             lighting_director、bay_water、weather_system、
 │   │                             scenery_system、sign_system、distant_system、
 │   │                             traffic_signals、traffic_system、
-│   │                             pedestrian_system、ebike_system
+│   │                             pedestrian_system、ebike_system、road_surface
 │   ├── vehicles/                 car_drive、tank_sim、flight_sim、city_walk、
 │   │                             observer、autopilot、chase_camera、vehicle_lights
 │   ├── life/                     rides、career_system、story_system
 │   └── ui/                       game_hud、map_ui、panels_ui
 ├── scenes/main.tscn              唯一场景，挂 MainGame
-└── shaders/                      sky / night_sky / water
+└── shaders/                      sky / night_sky / water / minimap
 ```
 
 ### autoload 单例
@@ -189,17 +192,25 @@ GTA_SZ_GODOT/
 
 以下是**确实与原版不同**或**尚未实现**的部分。列在这里而不是藏起来。
 
+> 2026-09-24 做过一轮「按原版截图一比一对齐」，路面 / 车道线 / 天空 / 环境光
+> 结构 / 林冠与对岸材质 / HUD 版式（含左下圆形雷达与右下圆形表盘）都已按原版
+> 源码逐项对齐，量化结果见 **[修复记录.md](修复记录.md) 第十三节**。
+> 下表是那一轮**之后**仍然存在的差异。
+
 ### 渲染表现上的近似
 
 | 项 | 原版 | 本版 | 影响 |
 |---|---|---|---|
+| 天空色调映射 | Babylon ACES（把 0.42~0.94 压到显示端 0.30~0.70） | Godot ACES + `sky_gain = 0.42` | 天空着色器是逐行译本，亮度差来自两家 ACES 的肩部差异，用增益标定；云的块感比原版略重 |
 | 水面反射 | 512 平面镜（`MirrorTexture`，refreshRate 3） | 环境天空反射（IBL）+ SSR | 建筑在水中的倒影不如原版清晰；天空倒影基本一致 |
 | 湿路面反射 | 512 平面镜（refreshRate 2，blurKernel 7） | 材质变暗 + 降粗糙度 | 雨天路面的镜面感弱于原版 |
 | 雾 | Babylon `FOGMODE_EXP2` | Godot 指数雾，密度 ×100 换算 | 衰减曲线形状相近但非数学等价 |
 | 局部照明 | 2 个池化 SpotLight + ~600 盏 OmniLight | 24 盏 OmniLight 池，按距离分配 | 远处路灯同时点亮数量少于原版 |
 | 招牌文字 | 自建 2048×1024 动态图集 + 单 mesh | `Label3D` 池（≤64），用 `SystemFont` 取系统中文字体 | 视觉等价；无系统中文字体时文字会缺字 |
-| 建筑材质 | 31 个 profile 的 PBR 参数表 | 直接使用 GLB 自带材质 | 立面质感差别最大的一项 |
+| 建筑材质 | 31 个 profile 的 PBR 参数表 | 直接使用 GLB 自带材质 | 立面质感差别最大的一项；实测建筑比原版亮约 1.7 倍 |
+| 逐材质环境光强度 | `material.environmentIntensity`（沥青 .55 / 林冠 .82） | 无 | `StandardMaterial3D` 没有这个属性；林冠因此比原版亮 |
 | 环境光遮蔽 | SSAO2 + 烘焙 `occlusion.png`（3399×1307） | 仅 SSAO | 街角接触阴影弱于原版 |
+| HUD 绝对尺寸 | 小地图直径 246px（来自更早的构建） | 265.7px（按当前源码 CSS） | 当前 `city-hud.ts` 的 CSS 常量与用户提供的那张截图所属构建不同，本版以源码为准 |
 
 ### 尚未实现
 

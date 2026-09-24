@@ -21,6 +21,39 @@ const TILE_PX := 256.0
 const MINIMAP_SCALE := 0.38
 const MAX_TILE_CACHE := 96
 
+## —— 圆形小地图（原版 drawCinematicMinimap / getMapTile）——
+## 逻辑输出 320 见方，source plane 1024 见方（原版 */
+const MINIMAP_SHADER := "res://shaders/minimap.gdshader"
+const MINIMAP_OUT := 320.0
+const PLANE_PX := 1024
+## 原版：source.setTransform(.75,0,0,.75,0,0)，即 768 画布承载 1024 空间
+const PLANE_SCALE := 0.75
+## 原版 plane 的投影原点：translate(512, 740)
+const PLANE_ORIGIN := Vector2(512.0, 740.0)
+## 原版 reach = 920 / MAP_SCALE
+const MINIMAP_REACH := 920.0 / MINIMAP_SCALE
+## 原版瓦片换算：TILE_PX / TILE_WORLD
+const TILE_SCALE := TILE_PX / TILE_WORLD
+## 玩家箭头在输出空间的锚点（原版 translate(160,208)）
+const ARROW_ANCHOR := Vector2(160.0, 208.0)
+
+## 原版 city-hud.ts 的 ROAD_ENGLISH（路名下方那行英文）
+const ROAD_ENGLISH := {
+	"滨海大道": "Binhai Blvd",
+	"深南大道": "Shennan Blvd",
+	"深南中路": "Shennan Middle Rd",
+	"深南东路": "Shennan East Rd",
+	"后海大道": "Houhai Blvd",
+	"后海滨路": "Houhaibin Rd",
+	"沙河西路": "Shahe West Rd",
+	"南海大道": "Nanhai Blvd",
+	"科苑南路": "Keyuan South Rd",
+	"科苑路": "Keyuan Rd",
+	"海德三道": "Haide 3rd Rd",
+	"福华三路": "Fuhua 3rd Rd",
+	"益田路": "Yitian Rd",
+}
+
 ## 大地图上点选地标命中半径（像素）
 const PICK_RADIUS := 26.0
 ## 按下-松开位移小于该值视为"点击"而不是拖动
@@ -47,6 +80,11 @@ var player = null
 
 var minimap: Control
 var minimap_holder: Control
+var minimap_overlay: Control
+var _plane_viewport: SubViewport
+var _plane_draw: Control
+var _plane_mat: ShaderMaterial
+var _road_label: Label
 var big_map: Control
 var big_map_visible := false
 ## 驾驶方式选择按钮（原版 .atlas-route-actions 里的两个按钮）
@@ -76,6 +114,33 @@ var _water_boxes: Array = []
 var _landmark_boxes: Array = []
 var _building_boxes: Array = []
 
+# --- 静态图层烘焙（小地图：水域 / 绿地 / 道路）-------------------------------
+##
+## **为什么必须烘**：水域 + 绿地 + 道路全是世界空间静态数据，但复刻版原先
+## 每 0.2s 就用 CanvasItem 命令重画一遍可视部分 —— 实测单次重绘 ~100ms
+## （2000+ 个多边形要在 CPU 上重新三角化、3000+ 条抗锯齿折线要重建几何）。
+## 实机双轮对照（tools/_perf.gd，vsync 开、相机静止于出生点，各 120 帧）：
+##
+##   │ 轮次            │ 帧均值   │ >50ms 长帧 │ >16.7ms 帧 │
+##   │ baseline        │ 17.97ms │     8      │     16     │
+##   │ no-minimap      │ 10.40ms │     0      │      1     │
+##   │ baseline2       │ 19.98ms │     9      │     20     │
+##
+## 也就是「40fps 左右」的观感**全部**来自这 100ms 周期卡顿（其余帧只要 10~14ms）。
+##
+## 原版本来就是缓存的：city-hud.ts 的 getMapTile() 把每块 512m 瓦片画一次进
+## 256px 离屏 canvas（LRU 96 块），之后只 drawImage。这里按同一思路做成
+## 「整城一张静态贴图 + 每次重绘一次 draw_texture」。
+const BAKE_MARGIN := 64.0     ## 贴图四周外扩像素（防边角要素被裁）
+
+var _map_tex: Texture2D = null
+var _map_vp: SubViewport = null
+var _map_painter: Control = null
+## 贴图像素 (0,0) 对应的数据坐标：x = 最左，y = 最上（= 最大 z）
+var _map_origin := Vector2.ZERO
+var _map_size := Vector2i.ZERO
+var _map_baked := false
+
 
 func setup(p_world: CityWorld, p_player) -> void:
 	world = p_world
@@ -88,6 +153,9 @@ func setup(p_world: CityWorld, p_player) -> void:
 	# 取 11：高于 HUD(10)，低于 PanelsUI(12)（手账/设置页/加载画面仍在其上）。
 	layer = 11
 	_build()
+	# 静态图层烘焙：一次性把水域/绿地/道路画进贴图（约 100ms）。
+	# 放在 setup 里 —— 此时主循环还在加载画面后面，玩家看不到这一下停顿。
+	_bake_static_map()
 
 
 func _build() -> void:
@@ -96,24 +164,63 @@ func _build() -> void:
 	for s in FONT_SIZES:
 		_font(s)
 
-	# 小地图需要裁剪：道路/水面等多边形顶点在方框外，不裁剪会画到方框外面。
-	# 注意 clip_contents 只裁剪**子控件**的绘制、不裁控件自己的 _draw，
-	# 所以结构必须是：holder（裁剪）→ minimap（实际绘制）。
+	# 圆形小地图（原版 #minimap：bottom 49px、left calc(--hud-edge − 10px)、
+	# 直径 = 表盘 × 0.865、border-radius 50%）。位置与尺寸由 HUD 通过
+	# set_minimap_rect() 下发，因为 --hud-edge / --hud-dial 都是 clamp(视口) 算出来的。
+	#
+	# Control 的 clip_contents 只能裁矩形，做不出 border-radius:50%，
+	# 所以地图内容画进一个 SubViewport（= 原版的 source plane），
+	# 再由 shaders/minimap.gdshader 做「透视压扁 + 圆形裁切 + 顶部雾霭」。
 	minimap_holder = Control.new()
-	minimap_holder.name = "minimap-clip"
-	minimap_holder.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	minimap_holder.position = Vector2(28, 96)
-	minimap_holder.size = Vector2(320, 320)
+	minimap_holder.name = "minimap"
 	minimap_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	minimap_holder.clip_contents = true
 	add_child(minimap_holder)
 
-	minimap = Control.new()
-	minimap.name = "minimap"
-	minimap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_plane_viewport = SubViewport.new()
+	_plane_viewport.size = Vector2i(PLANE_PX, PLANE_PX)
+	_plane_viewport.transparent_bg = true
+	_plane_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_plane_viewport.disable_3d = true
+	minimap_holder.add_child(_plane_viewport)
+
+	_plane_draw = Control.new()
+	_plane_draw.name = "minimap-plane"
+	_plane_draw.size = Vector2(PLANE_PX, PLANE_PX)
+	_plane_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plane_draw.draw.connect(_draw_minimap_plane)
+	_plane_viewport.add_child(_plane_draw)
+
+	minimap = TextureRect.new()
+	minimap.name = "minimap-display"
+	minimap.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	minimap.stretch_mode = TextureRect.STRETCH_SCALE
+	minimap.texture = _plane_viewport.get_texture()
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	minimap.draw.connect(_draw_minimap)
+	_plane_mat = ShaderMaterial.new()
+	if ResourceLoader.exists(MINIMAP_SHADER):
+		_plane_mat.shader = load(MINIMAP_SHADER)
+	else:
+		push_warning("[MapUI] 缺少着色器 %s" % MINIMAP_SHADER)
+	minimap.material = _plane_mat
 	minimap_holder.add_child(minimap)
+
+	minimap_overlay = Control.new()
+	minimap_overlay.name = "minimap-overlay"
+	minimap_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_overlay.draw.connect(_draw_minimap_overlay)
+	minimap_holder.add_child(minimap_overlay)
+
+	# .cinematic-road-label：top calc(100% + 12px)、居中、路名 + 分隔线 + 英文
+	_road_label = Label.new()
+	_road_label.add_theme_font_override("font", _font(12))
+	_road_label.add_theme_font_size_override("font_size", 13)
+	_road_label.add_theme_color_override("font_color", Color(0.949, 0.953, 0.925, 0.83))
+	_road_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_road_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.26))
+	_road_label.add_theme_constant_override("shadow_offset_y", 1)
+	_road_label.add_theme_constant_override("shadow_outline_size", 3)
+	_road_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_holder.add_child(_road_label)
 
 	big_map = Control.new()
 	big_map.name = "map-panel"
@@ -207,7 +314,8 @@ func hide_route_choice() -> void:
 ## 顺带把开销也降下来了：原来每次重绘都要重新枚举一遍系统字体。
 var _font_cache := {}
 ## `_draw_big_map()` 与路线按钮用到的全部字号，在 `_build()` 里一次性预热
-const FONT_SIZES := [14, 15, 16, 18, 20]
+## 小地图叠加层的字号（N 标记 10、路名 13）也要预热
+const FONT_SIZES := [10, 12, 13, 14, 15, 16, 18, 20]
 
 
 func _font(size: int) -> Font:
@@ -315,127 +423,271 @@ func _compute_bboxes() -> void:
 
 
 # ---------------------------------------------------------------------------
-# 小地图
+# 小地图（圆形）—— 逐项移植原版 drawCinematicMinimap + getMapTile
 # ---------------------------------------------------------------------------
 
-func _draw_minimap() -> void:
-	if world == null or player == null or not world.city_ready:
+## HUD 下发布局（原版是 CSS：#minimap bottom 49px / left edge−10px / 直径 = dial×.865）
+func set_minimap_rect(pos: Vector2, size: Vector2) -> void:
+	if minimap_holder == null:
 		return
-	var size := minimap.size
+	minimap_holder.position = pos
+	minimap_holder.size = size
+	# minf 而不是 min —— `min()` 的返回类型是 Variant，用 `:=` 推断会被
+	# 「Warning treated as error」直接判为编译失败。
+	var d := minf(size.x, size.y)
+	minimap.size = Vector2(d, d)
+	minimap.position = Vector2((size.x - d) * 0.5, 0)
+	minimap_overlay.size = Vector2(d, d)
+	minimap_overlay.position = minimap.position
+	# .cinematic-road-label { top: calc(100% + 12px); left: -5%; width: 110% }
+	_road_label.position = Vector2(-size.x * 0.05, d + 12.0)
+	_road_label.size = Vector2(size.x * 1.10, 20.0)
+
+
+## 原版 minimapTilt(speed, observer)
+func _minimap_tilt(speed: float, observer: bool) -> float:
+	if observer:
+		return 0.12
+	return 0.40 + minf(1.0, absf(speed) / 28.0) * 0.25
+
+
+## source plane：背景 → 水域 → 绿地 → 支路 → 主干道 → 路线。
+## 坐标一律相对玩家、按 MAP_SCALE 缩放，再套上 translate(512,740) + rotate(−yaw)。
+func _draw_minimap_plane() -> void:
+	if world == null or player == null or not world.city_ready:
+		_plane_draw.draw_rect(Rect2(Vector2.ZERO, Vector2(PLANE_PX, PLANE_PX)),
+			Color(0.106, 0.188, 0.216))
+		return
 	var pos: Vector2 = player.data_position()
-	var speed := absf(float(player.speed()))
+	var yaw: float = player.data_yaw()
 
-	# 透视压扁：观察模式最平，高速最扁
-	var target_tilt := 0.40 + minf(1.0, speed / 28.0) * 0.25
-	if player.is_observer():
-		target_tilt = 0.12
-	_tilt = lerpf(_tilt, target_tilt, 0.12)
+	# 原版：source.fillStyle='#1b3037'; fillRect(0,0,1024,1024)
+	_plane_draw.draw_rect(Rect2(Vector2.ZERO, Vector2(PLANE_PX, PLANE_PX)),
+		Color(0.106, 0.188, 0.216))
 
-	# 背景
-	minimap.draw_rect(Rect2(Vector2.ZERO, size), Color(0.03, 0.05, 0.07, 0.88))
-	var inner := Rect2(Vector2(6, 6), size - Vector2(12, 12))
-	minimap.draw_rect(inner, Color(0.07, 0.10, 0.13, 0.95))
+	# 只旋转、不缩放：把 0.75 的缩放留给 draw_set_transform 的 scale，
+	# 这样线宽也跟随缩放（与原版 canvas 变换一致）。
+	_plane_draw.draw_set_transform(PLANE_ORIGIN * PLANE_SCALE, -yaw,
+		Vector2(PLANE_SCALE, PLANE_SCALE))
 
-	# 裁剪到内框
-	var view := pos
-	var map_scale := MINIMAP_SCALE * 2.0
-	_compute_bboxes()
-	# 视野范围（数据坐标）：小地图只显示这么一小块，
-	# 之外的道路/绿地/水面全部跳过 —— 这是小地图最大的开销来源
-	var half := Vector2(size.x * 0.5 / map_scale, size.y * 0.5 / map_scale) + Vector2(80.0, 80.0)
-	var view_rect := Rect2(pos - half, half * 2.0)
+	# —— 静态图层：水域 + 绿地 + 道路，一次性烘焙好，这里只贴一次 ——
+	# 烘焙贴图按**平面单位**（1:1）生成，所以这里的 0.75 变换对位置与线宽
+	# 的作用与原先逐条 draw_polyline 完全一致。
+	if _map_tex != null:
+		_plane_draw.draw_texture(_map_tex, Vector2(
+			(_map_origin.x - pos.x) * MINIMAP_SCALE,
+			-(_map_origin.y - pos.y) * MINIMAP_SCALE))
+	else:
+		_draw_static_direct(pos)
 
-	# 水域
-	for wi in CityData.water.size():
-		if not (_water_boxes[wi] as Rect2).intersects(view_rect):
-			continue
-		var w: Dictionary = CityData.water[wi]
-		var rings: Array = w.get("rings", [])
-		if rings.is_empty():
-			continue
-		_fill_ring(rings[0], view, map_scale, size, Color(0.07, 0.15, 0.22, 0.95), _tilt)
-	# 绿地
-	for gi in CityData.green.size():
-		if not (_green_boxes[gi] as Rect2).intersects(view_rect):
-			continue
-		var g: Dictionary = CityData.green[gi]
-		var rings2: Array = g.get("rings", [])
-		if rings2.is_empty():
-			continue
-		_fill_ring(rings2[0], view, map_scale, size, Color(0.11, 0.20, 0.13, 0.95), _tilt)
-	# 道路
-	for ri in CityData.roads.size():
-		if not (_road_boxes[ri] as Rect2).intersects(view_rect):
-			continue
-		var r: Dictionary = CityData.roads[ri]
-		var pts: PackedVector2Array = r["points"]
-		if pts.size() < 2:
-			continue
-		var kind := str(r["kind"])
-		var col := Color(0.55, 0.58, 0.62)
-		var wdt := 1.0
-		match kind:
-			"motorway":
-				col = Color(0.80, 0.72, 0.45)
-				wdt = 3.0
-			"trunk", "primary":
-				col = Color(0.72, 0.68, 0.48)
-				wdt = 2.4
-			"secondary":
-				col = Color(0.62, 0.62, 0.58)
-				wdt = 1.8
-			"tertiary":
-				wdt = 1.4
-			_:
-				wdt = 0.9
-		var screen := PackedVector2Array()
-		for p in pts:
-			var s := map_to_screen(p, view, map_scale, size)
-			s.y = size.y * 0.5 + (s.y - size.y * 0.5) * _tilt
-			if s.x > -60.0 and s.x < size.x + 60.0 and s.y > -60.0 and s.y < size.y + 60.0:
-				screen.append(s)
-		if screen.size() >= 2:
-			minimap.draw_polyline(screen, col, wdt, true)
-
-	# 路线（双层描边，原版做法）。
-	# 颜色与大地图一致用**浅绿** —— 原版「自己开过去」的提示语就是
-	# "沿小地图上的浅绿路线行驶"（main.ts onManualRoute）。
+	# —— 路线：原版 #243e39 宽 7 → #99e0be 宽 4 ——
 	if player.has_route():
 		var route: PackedVector2Array = player.route_points()
-		var line := PackedVector2Array()
-		for p in route:
-			var s2 := map_to_screen(p, view, map_scale, size)
-			s2.y = size.y * 0.5 + (s2.y - size.y * 0.5) * _tilt
-			line.append(s2)
-		if line.size() >= 2:
-			minimap.draw_polyline(line, Color(0.10, 0.12, 0.14, 0.9), 6.0, true)
-			minimap.draw_polyline(line, Color(0.55, 0.95, 0.60), 3.0, true)
+		if route.size() >= 2:
+			var rl := PackedVector2Array()
+			for p in route:
+				rl.append(Vector2((p.x - pos.x) * MINIMAP_SCALE, -(p.y - pos.y) * MINIMAP_SCALE))
+			_plane_draw.draw_polyline(rl, Color(0.141, 0.243, 0.224), 5.25, true)
+			_plane_draw.draw_polyline(rl, Color(0.600, 0.878, 0.745), 3.0, true)
 
-	# 玩家箭头
-	var c := size * 0.5
-	var yaw: float = player.data_yaw()
-	var dir := Vector2(sin(yaw), -cos(yaw))
-	var perp := Vector2(-dir.y, dir.x)
-	var tri := PackedVector2Array([
-		c + dir * 11.0,
-		c - dir * 7.0 + perp * 6.0,
-		c - dir * 7.0 - perp * 6.0,
-	])
-	minimap.draw_colored_polygon(tri, Color(0.98, 0.90, 0.55))
-	minimap.draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[0]]),
-		Color(0.15, 0.16, 0.18), 1.5, true)
+	_plane_draw.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _fill_ring(ring: Array, view: Vector2, map_scale: float, size: Vector2, col: Color, tilt: float) -> void:
-	if ring.size() < 3:
+# ---------------------------------------------------------------------------
+# 静态图层：烘焙 + 兜底直绘
+# ---------------------------------------------------------------------------
+
+## 烘焙失败或尚未就绪时的兜底：老路径（带视野剔除的直绘）。
+## 只在 _map_tex 为空时用到，性能差但保证不会白屏。
+func _draw_static_direct(pos: Vector2) -> void:
+	_compute_bboxes()
+	var view_rect := Rect2(pos - Vector2(MINIMAP_REACH, MINIMAP_REACH),
+		Vector2(MINIMAP_REACH, MINIMAP_REACH) * 2.0)
+	_draw_water_green(_plane_draw, pos, view_rect)
+	_draw_roads(_plane_draw, pos, view_rect)
+
+
+## 把全城静态图层画进一张贴图。**只在 setup 时跑一次**（约 100ms，藏在加载画面后面）。
+##
+## 贴图分辨率取 1:1 平面分辨率（MINIMAP_SCALE px/m）：最左 6788m → 约 2580px，
+## 全城约 5160×1980，约 40MB 显存 —— 换来每次重绘只剩一次 blit。
+func _bake_static_map() -> void:
+	if _map_baked or world == null:
 		return
-	var poly := PackedVector2Array()
-	for p in ring:
-		var v := Vector2(float(p[0]), float(p[1]))
-		var s := map_to_screen(v, view, map_scale, size)
-		s.y = size.y * 0.5 + (s.y - size.y * 0.5) * tilt
-		poly.append(s)
-	minimap.draw_colored_polygon(poly, col)
+	_map_baked = true
+	var ext := CityData.extent
+	if ext.size.x <= 1.0 or ext.size.y <= 1.0:
+		return
+	var margin_world := BAKE_MARGIN / MINIMAP_SCALE
+	_map_origin = Vector2(ext.position.x - margin_world, ext.end.y + margin_world)
+	_map_size = Vector2i(
+		int(ceil(ext.size.x * MINIMAP_SCALE)) + int(BAKE_MARGIN) * 2,
+		int(ceil(ext.size.y * MINIMAP_SCALE)) + int(BAKE_MARGIN) * 2)
+	if _map_size.x < 16 or _map_size.y < 16:
+		return
+	_map_vp = SubViewport.new()
+	_map_vp.name = "minimap-bake"
+	_map_vp.size = _map_size
+	_map_vp.transparent_bg = false
+	_map_vp.disable_3d = true
+	_map_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_map_vp)
+	_map_painter = Control.new()
+	_map_painter.name = "minimap-bake-painter"
+	_map_painter.size = Vector2(_map_size)
+	_map_painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_painter.draw.connect(_draw_static_map)
+	_map_vp.add_child(_map_painter)
+	_map_tex = _map_vp.get_texture()
+	print("[MapUI] 小地图静态图层已烘焙：%dx%d（外扩 %.0fpx）" % [
+		_map_size.x, _map_size.y, BAKE_MARGIN])
+
+
+## 烘焙绘制：与实时路径用**同一套坐标公式与线宽**，只是中心固定为贴图原点、
+## yaw = 0，且不剔除（一次性画全城）。
+func _draw_static_map() -> void:
+	if _map_painter == null:
+		return
+	var pos := _map_origin
+	# 贴图底色 = plane 底色：transparent_bg=false 时视口会用项目的
+	# default_clear_color（蓝灰）清屏，必须先铺满底色，否则整张小地图会变蓝灰。
+	_map_painter.draw_rect(Rect2(Vector2.ZERO, Vector2(_map_size)),
+		Color(0.106, 0.188, 0.216))
+	_map_painter.draw_set_transform(PLANE_ORIGIN * PLANE_SCALE, 0.0,
+		Vector2(PLANE_SCALE, PLANE_SCALE))
+	# 不剔除：全城画一遍（bbox 在烘焙里没有意义）
+	_draw_water_green(_map_painter, pos, Rect2())
+	_draw_roads(_map_painter, pos, Rect2())
+	_map_painter.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## 水域 + 绿地（evenodd 挖洞）。view_rect 为空 Rect2 表示不剔除（烘焙路径）。
+func _draw_water_green(canvas: CanvasItem, pos: Vector2, view_rect: Rect2) -> void:
+	var skip := view_rect.size != Vector2.ZERO
+	for wi in CityData.water.size():
+		if skip and not (_water_boxes[wi] as Rect2).intersects(view_rect):
+			continue
+		var rings: Array = (CityData.water[wi] as Dictionary).get("rings", [])
+		_draw_polygon_rings(canvas, rings, pos, Color(0.596, 0.741, 0.792, 0.12))
+	for gi in CityData.green.size():
+		if skip and not (_green_boxes[gi] as Rect2).intersects(view_rect):
+			continue
+		var rings2: Array = (CityData.green[gi] as Dictionary).get("rings", [])
+		_draw_polygon_rings(canvas, rings2, pos, Color(0.588, 0.643, 0.443, 0.18))
+
+
+## 道路：先支路后主干道，各自「暗描边 + 亮芯」两层。
+func _draw_roads(canvas: CanvasItem, pos: Vector2, view_rect: Rect2) -> void:
+	var skip := view_rect.size != Vector2.ZERO
+	for pass_index in 2:
+		var major_pass := pass_index == 1
+		for ri in CityData.roads.size():
+			if skip and not (_road_boxes[ri] as Rect2).intersects(view_rect):
+				continue
+			var r: Dictionary = CityData.roads[ri]
+			if _is_major_road(str(r.get("kind", ""))) != major_pass:
+				continue
+			var pts: PackedVector2Array = r["points"]
+			if pts.size() < 2:
+				continue
+			var line := PackedVector2Array()
+			for p in pts:
+				line.append(Vector2((p.x - pos.x) * MINIMAP_SCALE, -(p.y - pos.y) * MINIMAP_SCALE))
+			if line.size() < 2:
+				continue
+			var rw := float(r.get("width", 8.0)) * TILE_SCALE * 0.7
+			# 原版在**瓦片空间**算宽度，随后瓦片被缩到 0.76 倍再画进 plane
+			var w := (maxf(3.2 if major_pass else 1.7, rw) + 1.8) * 0.76
+			canvas.draw_polyline(line,
+				Color(0.059, 0.078, 0.086, 0.66 if major_pass else 0.35), w, true)
+			canvas.draw_polyline(line,
+				Color(0.875, 0.882, 0.855, 0.83) if major_pass else Color(0.686, 0.714, 0.706, 0.57),
+				w - 1.37, true)
+
+
+## evenodd 挖洞：Godot 的 draw_colored_polygon 不支持多环带洞，
+## 所以外环填色后，把内环（洞）按 plane 底色再填一遍。
+func _draw_polygon_rings(canvas: CanvasItem, rings: Array, pos: Vector2, col: Color) -> void:
+	for i in rings.size():
+		var ring: Array = rings[i]
+		if ring.size() < 3:
+			continue
+		var poly := PackedVector2Array()
+		for p in ring:
+			poly.append(Vector2((float(p[0]) - pos.x) * MINIMAP_SCALE,
+				-(float(p[1]) - pos.y) * MINIMAP_SCALE))
+		if i == 0:
+			canvas.draw_colored_polygon(poly, col)
+		else:
+			canvas.draw_colored_polygon(poly, Color(0.106, 0.188, 0.216))
+
+
+func _is_major_road(kind: String) -> bool:
+	return kind == "trunk" or kind == "primary" or kind == "secondary"
+
+
+## 显示端叠加层（原版在圆形裁切与雾霭**之后**才画箭头，所以它不受透视压扁影响）
+func _draw_minimap_overlay() -> void:
+	if player == null:
+		return
+	var d := minimap_overlay.size.x
+	var k := d / MINIMAP_OUT
+	var c := ARROW_ANCHOR * k
+
+	# 车辆标记：moveTo(0,-13)→(9,10)→(0,6)→(-9,10)，填充 #7ee0c9、描边 #123037 宽 2.5
+	var tri := PackedVector2Array([
+		c + Vector2(0.0, -13.0) * k, c + Vector2(9.0, 10.0) * k,
+		c + Vector2(0.0, 6.0) * k, c + Vector2(-9.0, 10.0) * k,
+	])
+	minimap_overlay.draw_colored_polygon(tri, Color(0.494, 0.878, 0.788))
+	var outline := PackedVector2Array([tri[0], tri[1], tri[2], tri[3], tri[0]])
+	minimap_overlay.draw_polyline(outline, Color(0.071, 0.188, 0.216), 2.5 * k, true)
+	# 内高光：(0,-9)→(0,4)→(-5,6) 填充 #d6fff0
+	var inner := PackedVector2Array([
+		c + Vector2(0.0, -9.0) * k, c + Vector2(0.0, 4.0) * k, c + Vector2(-5.0, 6.0) * k,
+	])
+	minimap_overlay.draw_colored_polygon(inner, Color(0.839, 1.0, 0.941))
+
+	# 原版 .north：left = (50 − sin(yaw)·45)%，top = (50 − cos(yaw)·45)%
+	var yaw: float = player.data_yaw()
+	var nx := (0.5 - sin(yaw) * 0.45) * d
+	var ny := (0.5 - cos(yaw) * 0.45) * d
+	var f := _font(10)
+	var w := f.get_string_size("N", HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
+	minimap_overlay.draw_string(f, Vector2(nx - w.x * 0.5, ny + 4.0), "N",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.969, 0.973, 0.937))
+
+
+## 每帧推进：透视倾斜 → 更新着色器 uniform → 玩家箭头 → 路名标签
+func _update_minimap(delta: float) -> void:
+	if minimap_holder == null or not minimap_holder.visible:
+		return
+	var speed := absf(float(player.speed())) if player != null else 0.0
+	var observer: bool = player != null and player.is_observer()
+	# 原版对 tilt 做指数平滑（.22）：plane.tilt += (target − tilt) × .22
+	_tilt = lerpf(_tilt, _minimap_tilt(speed, observer), 22.0 * delta)
+	if _plane_mat != null:
+		_plane_mat.set_shader_parameter("tilt", _tilt)
+	_plane_timer -= delta
+	if _plane_timer <= 0.0:
+		_plane_timer = REDRAW_INTERVAL
+		_plane_draw.queue_redraw()
+	minimap_overlay.queue_redraw()
+	if _road_label != null and player != null and world != null:
+		var pos: Vector2 = player.data_position()
+		var near := world.collision.nearest(pos.x, pos.y)
+		# 原版 #road-name 取 display_name，缺失时退回 name。
+		# ⚠️ 不能写成 `road.get("display_name", road.get("name",""))` ——
+		# `get` 的默认值只在**键不存在**时生效；display_name 存在但为空串时
+		# 会直接返回空串，标签就一直是空的（实测踩过）。
+		var name := ""
+		if not near.is_empty():
+			var road: Dictionary = near["road"]
+			name = str(road.get("display_name", ""))
+			if name == "":
+				name = str(road.get("name", ""))
+		var en: String = ROAD_ENGLISH.get(name, "")
+		_road_label.text = name if en == "" else "%s   |   %s" % [name, en]
 
 
 # ---------------------------------------------------------------------------
@@ -738,17 +990,24 @@ func _draw_ring_big(ring: Array, col: Color) -> void:
 
 ## 小地图重绘节流。
 ##
-## `_draw_minimap` 每次要遍历全部 12202 条道路的每个顶点做坐标变换，
+## source plane 每次要遍历全部 12202 条道路的每个顶点做坐标变换，
 ## 60fps 下就是每秒数百万次运算 —— 必须节流，否则真机上画面直接卡死。
-const REDRAW_INTERVAL := 0.2
+## （透视倾斜的 uniform 仍然逐帧更新，只有几何重画受节流限制。）
+## 小地图重绘间隔。原来是 0.2s，而每次重绘要重画全部可视道路/多边形（≈100ms）。
+## 静态图层烘焙之后单次重绘只剩一次 blit + 一条路线，于是取回原版
+## city-hud.ts 的 HUD tick（0.12s），跟随更顺滑又不产生长帧。
+const REDRAW_INTERVAL := 0.12
 var _redraw_timer := 0.0
+var _plane_timer := 0.0
 
 
 func update_ui(delta: float) -> void:
+	# 小地图的透视倾斜是按帧做指数平滑的（原版 plane.tilt += (target−tilt)×.22），
+	# 所以这里不受下面的 10Hz 节流限制。
+	_update_minimap(delta)
 	_redraw_timer -= delta
 	if _redraw_timer > 0.0:
 		return
 	_redraw_timer = REDRAW_INTERVAL
-	minimap.queue_redraw()
 	if big_map_visible:
 		big_map.queue_redraw()

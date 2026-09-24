@@ -16,6 +16,21 @@
 
 const SKY_DIAMETER := 8000.0
 
+## 天空球的显示增益 —— 对**色调映射肩部差异**的实测补偿。
+##
+## 天空着色器输出 0.42~0.94 的线性色，直接吃进 Godot 的 ACES 后显示端几乎不衰减
+## （实测地平线朝日处 #fab493）；而原版 Babylon 的 ACES 在同一个 1.0 曝光下把这段
+## 压得很狠（原版截图同位置 #a8613b）。这不是天空着色器的问题 —— 着色器已经逐行
+## 照搬，差的是两家 ACES 肩部的压缩量。
+##
+## 标定方法：tools/compare_shots.py 逐档扫 sky_gain，比对截图天空中央列（y 0~305）
+## 的三段均值。0.40 时三段同时落位：
+##   y  0- 30  原版 #976451 / 复刻 #87504f
+##   y150-190  原版 #9f5c39 / 复刻 #a15c4c
+##   y270-305  原版 #a8613b / 复刻 #b16349
+## 取 0.42（略保守，避免暗部压过头）。
+const SKY_GAIN := 0.42
+
 ## HDR 环境贴图（Poly Haven，见 data/licenses/daylight-environment.md）
 const HDR := {
 	GameContent.LightMode.DAY: "res://data/city/environment/rustig-blue-sky-4k.hdr",
@@ -27,14 +42,16 @@ const HDR_ROTATION := {
 	GameContent.LightMode.SUNSET: 2.80,
 	GameContent.LightMode.NIGHT: 0.65,
 }
-## 环境反射强度（CINEMATIC_LOOK.environment）
-## 这份能量同时是 HDR 全景的背景亮度与 IBL 镜面反射强度。背景被程序化
-## 天空球挡住（玩家看到的是 mesh 不是 pano），真正起作用的是**反射**：
-## 原值（0.78/0.40/0.55）会让湿滑路面与玻璃幕墙把天空镜像得过亮
-## （实测白天 46% 像素过曝的一部分），按实测压低昼/夜两档。
+## 环境全景能量 = 原版 CINEMATIC_LOOK 的 `environment`（0.78 / 0.40 / 0.55）。
+##
+## 这个值现在同时是 **IBL 漫射辐照度** 与 **镜面反射强度**：LightingDirector 把
+## 环境光来源切到 SKY，HDR 全景既供给 ambient 也供给 reflection —— 对应原版
+## `scene.environmentTexture` + `scene.environmentIntensity` 的单一份能量。
+## （旧版这里被压到 0.45/0.32/0.55，是因为当时它只做反射，漫射另由放大 2.2 倍的
+## 半球光提供，两条路径的能量对不上，全图亮度是原版的两倍。）
 const ENV_INTENSITY := {
-	GameContent.LightMode.DAY: 0.45,
-	GameContent.LightMode.SUNSET: 0.32,
+	GameContent.LightMode.DAY: 0.78,
+	GameContent.LightMode.SUNSET: 0.40,
 	GameContent.LightMode.NIGHT: 0.55,
 }
 
@@ -100,28 +117,14 @@ func apply_mode(m: int) -> void:
 	if not _built:
 		return
 	var is_night := m == GameContent.LightMode.NIGHT
+	# 天空球只有 `night` / `sky_gain` 两个 uniform —— 原版 szSky 的 horizon / zenith
+	# 是写死在着色器里的常量，且按 `west`（是否朝阳）做方向混合，不接受外部覆盖。
 	if sky_material != null:
 		sky_material.set_shader_parameter("night", 1.0 if is_night else 0.0)
-		_apply_sky_params(sky_material, m)
+		sky_material.set_shader_parameter("sky_gain", SKY_GAIN)
 	if night_mesh_ref != null:
 		night_mesh_ref.visible = is_night
 	_apply_environment_hdr(m)
-
-
-func _apply_sky_params(mat: ShaderMaterial, m: int) -> void:
-	match m:
-		GameContent.LightMode.DAY:
-			mat.set_shader_parameter("horizon_color", Color(0.79, 0.79, 0.68))
-			mat.set_shader_parameter("zenith_color", Color(0.36, 0.54, 0.66))
-			mat.set_shader_parameter("sun_glow", 0.0)
-		GameContent.LightMode.SUNSET:
-			mat.set_shader_parameter("horizon_color", Color(0.86, 0.55, 0.36))
-			mat.set_shader_parameter("zenith_color", Color(0.20, 0.30, 0.52))
-			mat.set_shader_parameter("sun_glow", 1.0)
-		_:
-			mat.set_shader_parameter("horizon_color", Color(0.10, 0.13, 0.24))
-			mat.set_shader_parameter("zenith_color", Color(0.02, 0.03, 0.08))
-			mat.set_shader_parameter("sun_glow", 0.0)
 
 
 ## 环境反射（IBL）：把对应 HDR 装进 WorldEnvironment 的 Sky。

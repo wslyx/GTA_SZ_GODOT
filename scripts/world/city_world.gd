@@ -19,6 +19,8 @@ class_name CityWorld
 
 signal progress(text: String)
 signal built()
+## 致命失败（对应原版 city-loading 的 error 态）：加载画面据此切到「载入中断 + 重新载入」
+signal failed(reason: String)
 
 const BLOCK_SIZE := 640.0
 
@@ -72,6 +74,8 @@ var ebikes = null
 var facades = null
 ## 建筑区块动态流式（buildings.glb 切块后按 640m 区块加载/卸载）
 var chunk_streamer = null
+## 沥青路面标定（原版 applyCinematicRoad）
+var road_surface: RoadSurface = null
 
 var loader := GlbLoader.new()
 
@@ -117,6 +121,10 @@ func _ready() -> void:
 	add_child(chunk_streamer)
 	chunk_streamer.setup(self)
 
+	road_surface = RoadSurface.new()
+	road_surface.name = "RoadSurface"
+	add_child(road_surface)
+
 	loader.entry_loaded.connect(_on_entry_loaded)
 	loader.entry_failed.connect(func(p: String, r: String): stats_failed += 1)
 
@@ -138,6 +146,7 @@ func build() -> void:
 		_plan_water_sky,
 		_plan_distant,
 		_plan_scenery,
+		_plan_road_surface,
 		_plan_signs,
 		_plan_life,
 		_plan_finish,
@@ -250,6 +259,13 @@ func _step_label(i: int) -> String:
 # --- 步骤 0：数据 -----------------------------------------------------------
 func _plan_data() -> bool:
 	CityData.load_core()
+	# city.json 是整座城市的地基（路网、建筑环、地标）。它读不到时后续每一步都会
+	# 拿到空集合，与其在几十个系统里分别报错，不如在这里就停住并让加载画面报错。
+	if not CityData.is_loaded():
+		push_error("[CityWorld] city.json 载入失败，城市无法构建")
+		set_process(false)
+		failed.emit("城市数据载入失败：找不到或无法解析 city.json。")
+		return true
 	height_field.load_all()
 	collision.build()
 	# navigation.json 是预计算路网（42829 节点）；万一它没加载成功，
@@ -287,6 +303,21 @@ func _plan_terrain() -> bool:
 # --- 步骤 2：道路 -----------------------------------------------------------
 func _plan_roads() -> bool:
 	return _enqueue_step(["res://data/city/roads.glb"], roads_root, "roads")
+
+
+# --- 步骤 2.5：路面 / 车道线 / 林冠材质标定 ---------------------------------
+# 对应原版 init() 末尾的 `this.roadSurface = applyCinematicRoad(...)` 与
+# `applyLandscapeSurfaces`、`CityCanopy` 的材质统一处理（见 road_surface.gd）。
+# **必须放在 _plan_scenery 之后**：林冠是 MultiMeshInstance3D，只有植被建好
+# 才能扫到 canopy_* 材质。
+func _plan_road_surface() -> bool:
+	if road_surface == null:
+		return true
+	road_surface.setup(self)
+	road_surface.set_mode(GameState.light_mode)
+	road_surface.set_weather(GameState.rain)
+	road_surface.apply_now()
+	return true
 
 
 # --- 步骤 3：海岸 -----------------------------------------------------------

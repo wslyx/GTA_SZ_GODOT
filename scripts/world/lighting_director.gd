@@ -87,12 +87,16 @@ const LAMP_END_DISTANCE := 72.0
 const LAMP_LATERAL := 1.5
 
 ## —— 光照强度单位换算（实测标定）——
-## LOOK 表里的数值是 Babylon 的光照单位，直接搬进 Godot 后总入光量严重超标：
-## 实测白天 mean 亮度 0.79、46% 像素过曝（>0.95），路面接近纯白；
-## 黄昏路面被太阳镜面反射糊成一片白斑。按「反照率 0.75 的表面落在
-## ACES 输出 ~0.8」重新标定：太阳 ×0.55、半球环境 ×2.2（原 ×4）。
-const SUN_ENERGY_SCALE := 0.55
-const AMBIENT_ENERGY_SCALE := 2.2
+## 原版是 `HemisphericLight(hemi) + scene.environmentTexture(HDR 立方图)` 的**双通道**结构：
+## 半球光只是残余补光，主漫射来自 HDR 的球谐辐照度，同一份能量又提供镜面反射。
+##
+## 旧移植版把 environmentTexture 只接到 Sky 的**反射**上（环境漫射另走 ambient_light_color），
+## 于是必须把半球光放大 2.2 倍去补那块丢失的漫射 —— 实测全图平均亮度 0.548，
+## 是原版 0.275 的 **两倍**，>0.95 的过曝像素 7.0%（原版 0.2%）。
+## 现在改回原版的结构：环境光来源切到 SKY，HDR 全景同时供给漫射与反射
+## （能量 = 原版 environmentIntensity），半球光回到它的原始强度。
+const SUN_ENERGY_SCALE := 1.0
+const AMBIENT_ENERGY_SCALE := 1.0
 
 ## 池大小：原版是 2 个 SpotLight 轮转；Godot 里给多一点让近处路灯都能亮
 const LAMP_POOL := 24
@@ -154,7 +158,9 @@ func _create_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	# 环境光来源 = SKY：HDR 全景同时供给漫射辐照度与镜面反射，
+	# 对应原版 `scene.environmentTexture`（一份能量两条路径）。
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.fog_enabled = true
 	env.ssao_enabled = true
 	env.ssao_radius = 2.5
@@ -205,10 +211,12 @@ func apply_mode(m: int) -> void:
 	sun.light_color = look["sun_color"]
 	sun.light_energy = float(look["sun_energy"]) * SUN_ENERGY_SCALE
 
-	# 半球光 → Godot 的环境光（颜色取天空色，能量取半球强度 × 单位换算）
+	# 半球光 → Godot 的环境光。原版注释写明「半球光是残余补光，漫射主光来自
+	# HDR 辐照度」，所以这里把 sky_contribution 留在 1.0（全走 HDR），
+	# ambient_light_color/energy 只作为 HDR 缺失时的兜底。
 	env.ambient_light_color = look["hemi_sky"]
 	env.ambient_light_energy = float(look["hemi_energy"]) * AMBIENT_ENERGY_SCALE
-	env.ambient_light_sky_contribution = 0.0
+	env.ambient_light_sky_contribution = 1.0
 
 	# 雾
 	env.fog_enabled = true
@@ -241,6 +249,9 @@ func apply_mode(m: int) -> void:
 
 	if world != null and world.sky != null and world.sky.has_method("apply_mode"):
 		world.sky.apply_mode(m)
+	# 沥青路面的反照率/粗糙度也分档（原版 ROAD_LOOK，见 road_surface.gd）
+	if world != null and world.road_surface != null:
+		world.road_surface.set_mode(m)
 
 
 func cycle_mode() -> int:

@@ -134,6 +134,7 @@ func _build_world() -> void:
 	# 构建城市（各子系统的 setup 由 CityWorld 的步骤按原版顺序调用）
 	world.progress.connect(_on_progress)
 	world.built.connect(_on_built)
+	world.failed.connect(_on_failed)
 	world.build()
 
 const SKY_SCRIPT := preload("res://scripts/world/sky_system.gd")
@@ -163,6 +164,19 @@ func _load_vehicle_models() -> void:
 		_tank_model.visible = false
 	if _plane_model != null:
 		_plane_model.visible = false
+	# 主角车辆的车漆 / 玻璃 / 轮毂材质标定（原版 refineHeroVehicleMaterials）。
+	# 必须在实例化之后做：GLB 材质是共享资源，改的正是那些共享实例。
+	if _car_model != null:
+		_vehicle_materials = VehicleMaterials.new()
+		_vehicle_materials.apply(_car_model)
+		# 运动套件（尾翼 / 后扩散器 / 四出排气）—— 原版 createCitySportDetails。
+		# ⚠️ 这些零件**不在 car.glb 里**，是运行时程序化生成后挂到车根上的，
+		# 所以必须在材质标定之后、且挂在 _car_model 之下（随车移动）。
+		_sport_details = SportDetails.new()
+		_sport_details.apply(_car_model)
+
+var _vehicle_materials: VehicleMaterials = null
+var _sport_details: SportDetails = null
 
 func _load_glb(path: String, node_name: String) -> Node3D:
 	if not ResourceLoader.exists(path):
@@ -181,6 +195,11 @@ func _on_progress(text: String) -> void:
 	panels.set_loading_text(text)
 	panels.set_loading_progress(world.progress_ratio())
 
+
+## 致命失败 → 加载画面切到原版的 error 态（城市暂时没有载入 + 重新载入）
+func _on_failed(reason: String) -> void:
+	panels.fail_loading(reason)
+
 ## 城市构建完成后的收尾。
 ## 注意：各子系统（sky / lighting / water / weather / distant / scenery / signs /
 ## signals / traffic / pedestrians / ebikes / facades）的 setup 已经由 CityWorld
@@ -193,6 +212,9 @@ func _on_built() -> void:
 
 	hud.setup(world, self)
 	maps.setup(world, self)
+	# HUD 比 MapUI 先建，_build() 里那次排版问不到小地图尺寸。
+	# MapUI 就绪后补一次排版，否则圆形小地图停在 0×0 不显示。
+	hud.refresh_layout()
 	# 大地图点选地标 → 自动驾驶前往（原版 city-map.ts 的 onAutoDrive）
 	maps.destination_picked.connect(_on_destination_picked)
 	# 大地图上「自动驾驶前往 / 自己开过去」两个按钮

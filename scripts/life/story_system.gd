@@ -17,6 +17,12 @@ const TRIGGER_RADIUS := 28.0
 const TRIGGER_SPEED := 1.0
 const DEBUG_JUMP_DISTANCE := 45.0
 
+## 原版 city-story-content.ts 的 synopsis，逐字照搬。
+## 剧情未开始时，HUD 的故事卡（.story-entry）第三段显示的就是这句 —— 也就是
+## 出生点截图里能看到的那段话。
+const SYNOPSIS := "收工前，阿辉把滨海那单的保温袋交给你。先去科苑下班驿站让阿琳核销，"\
+	+ "再决定直接送滨海交接点，还是绕公园城市养护站把卡箍给老陈。"
+
 const STORY := {
 	"id": "bay-last-delivery",
 	"title": "最后一单",
@@ -168,6 +174,8 @@ func status() -> Dictionary:
 	var s := current_step()
 	return {
 		"title": STORY["title"],
+		"synopsis": SYNOPSIS,
+		"active": active,
 		"step": step_index,
 		"stepId": str(s.get("id", "")),
 		"completed": completed,

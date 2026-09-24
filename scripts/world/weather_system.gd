@@ -190,6 +190,9 @@ func set_raining(v: bool) -> void:
 	# 空跑一遍纯属浪费（初始 setup 传的是 false）
 	if raining or _wet_applied:
 		_apply_wet_materials()
+	# 沥青材质单独走原版 RAIN_ROAD_LOOK（反照率/粗糙度/镜面强度三档一起换）
+	if world != null and world.road_surface != null:
+		world.road_surface.set_weather(raining)
 	if world != null and world.lighting != null and world.lighting.has_method("apply_mode"):
 		# 雨压：重放当前光照模式
 		world.lighting.apply_mode(GameState.light_mode)
@@ -234,6 +237,10 @@ func _build_dry_cache() -> void:
 			if mat == null or mat is ShaderMaterial:
 				continue
 			if not (mat is StandardMaterial3D or mat is ORMMaterial3D):
+				continue
+			# asphalt 归 RoadSurface 管（它按原版 RAIN_ROAD_LOOK 整套换反照率/
+			# 粗糙度/镜面强度）。这里再插一手会出现两个系统抢同一份材质。
+			if mat.resource_name.begins_with("asphalt"):
 				continue
 			var rid := mat.get_instance_id()
 			if seen.has(rid):

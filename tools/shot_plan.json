@@ -1,0 +1,1 @@
+{ "warmup": 9.0, "gap": 1.5, "shots": [ { "name": "spawn", "env": { "tier": "medium" }, "dump_ui": true } ] }

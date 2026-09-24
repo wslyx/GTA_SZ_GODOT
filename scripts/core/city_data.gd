@@ -108,12 +108,47 @@ func load_core() -> void:
 	building_exclusions = be.get("excludedIds", [])
 
 	_apply_landmark_exclusions()
+	_append_life_sites()
 
 	_loaded = true
 	var ms := Time.get_ticks_msec() - t0
 	print("[CityData] 核心数据加载完成 %d ms：道路 %d / 建筑 %d / 绿地 %d / 水域 %d / 地标 %d"
 		% [ms, roads.size(), buildings.size(), green.size(), water.size(), landmarks.size()])
 	core_loaded.emit()
+
+
+## 把生活驿站并入地标表（原版 main.ts boot 里对 world.data.landmarks 的 push）。
+##
+## 为什么必须并进来：HUD 的片区名取"离车最近的地标"的 area，而三个驿站写的是
+## `生活驿站`。出生点离海湾生活驿站约 61m，是全场最近的地标 —— 不并进来，
+## 左上角品牌副标题就永远是别处的片区名，对不上原版起始画面的
+## 「深城纪 / 生活驿站 · 自由驾驶」。
+##
+## 字段照搬原版的 push：id 加 `life:` 前缀（不污染原版地标 id）、
+## height 4.34、excludeRadius 0，并带上 arrival / yaw 供寻路与落车点使用。
+func _append_life_sites() -> void:
+	var d = DataLoader.json_dict("/city/life-sites.json")
+	for s in d.get("sites", []):
+		if s is not Dictionary:
+			continue
+		var site: Dictionary = s
+		landmarks.append({
+			"id": "life:" + str(site.get("id", "")),
+			"name": str(site.get("name", "")),
+			"x": float(site.get("x", 0.0)),
+			"z": float(site.get("z", 0.0)),
+			"height": 4.34,
+			"area": "生活驿站",
+			"excludeRadius": 0.0,
+			"detailCollision": true,
+			"arrival": site.get("arrival", null),
+			"yaw": float(site.get("yaw", 0.0)),
+			"heading": float(site.get("heading", 0.0)),
+			"road": str(site.get("road", "")),
+			"lifeSite": true,
+		})
+	_landmarks_cache_built = false
+	_all_landmarks_cache = []
 
 
 func _build_roads(raw: Array) -> void:
