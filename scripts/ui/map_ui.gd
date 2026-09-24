@@ -178,7 +178,7 @@ func _build() -> void:
 	_plane_viewport = SubViewport.new()
 	_plane_viewport.size = Vector2i(PLANE_PX, PLANE_PX)
 	_plane_viewport.transparent_bg = true
-	_plane_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_plane_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_plane_viewport.disable_3d = true
 	minimap_holder.add_child(_plane_viewport)
 
@@ -1341,6 +1341,9 @@ func _update_minimap(delta: float) -> void:
 	if _plane_timer <= 0.0:
 		_plane_timer = REDRAW_INTERVAL
 		_plane_draw.queue_redraw()
+		# 平面内容只在这里变化：按需渲染一次，而不是每帧重栅 1024²
+		# （含路线折线；tilt 动画是显示侧的 shader uniform，不受影响）
+		_plane_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	minimap_overlay.queue_redraw()
 	if _road_label != null and player != null and world != null:
 		var pos: Vector2 = player.data_position()

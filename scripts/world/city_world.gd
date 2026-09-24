@@ -191,6 +191,7 @@ func _update_subsystems(delta: float) -> void:
 			sys.update_system(delta, focus)
 
 
+
 ## 构建进度 0–1，供加载条使用。
 ## 粗粒度（只算第几步）会导致 buildings.glb 这种 266MB 的大件加载时进度条
 ## 长时间一动不动，所以这里把「当前步骤内部」的进度也算进去。

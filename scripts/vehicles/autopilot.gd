@@ -54,6 +54,12 @@ var _wait_timer := 0.0
 var _stall_timer := 0.0
 var _last_pos := Vector2.ZERO
 var _reroute_cooldown := 0.0
+## 横向偏移评分的节流（10Hz）与帧间沿用值
+const OFFSET_INTERVAL := 0.1
+var _offset_timer := 0.0
+var _best_offset := 0.0
+var _last_others: Array = []
+var _rollout_car: CarDrive = null
 
 var world: CityWorld
 var graph: RoadGraph
@@ -203,25 +209,32 @@ func compute(pos: Vector2, yaw: float, speed: float, dt: float) -> Dictionary:
 	var desired_yaw := atan2(target.x - pos.x, target.y - pos.y)
 	var delta := wrapf(desired_yaw - yaw, -PI, PI)
 
-	# 三个横向偏移前滚，选最优
-	var best_offset: float = OFFSETS[1]
-	var best_score := -INF
-	var others: Array = traffic_positions.call() if traffic_positions.is_valid() else []
-	for off in OFFSETS:
-		var score := _rollout_score(pos, yaw, speed, delta, off, others)
-		if score > best_score:
-			best_score = score
-			best_offset = off
+	# 三个横向偏移前滚，选最优。
+	# ⚠️ 性能：单次评分 = 3 组 × 30 步物理推演 + 逐段路线距离 + 逐车测距，
+	# 在 GDScript 里一轮 ~7ms —— 原版 JS 逐帧跑没事，这里必须**按 10Hz 评分、
+	# 帧间沿用上次的横向偏移**。转向的主体是逐帧的 pure pursuit（delta），
+	# 偏移只是绕障微调，10Hz 完全够。
+	_offset_timer -= dt
+	if _offset_timer <= 0.0:
+		_offset_timer = OFFSET_INTERVAL
+		var others: Array = traffic_positions.call() if traffic_positions.is_valid() else []
+		_last_others = others
+		var best_score := -INF
+		for off in OFFSETS:
+			var score := _rollout_score(pos, yaw, speed, delta, off, others)
+			if score > best_score:
+				best_score = score
+				_best_offset = off
 
-	var steer_target := clampf(delta * 1.6 + best_offset * 0.05, -1.0, 1.0)
+	var steer_target := clampf(delta * 1.6 + _best_offset * 0.05, -1.0, 1.0)
 
 	# 限速：路型 + 宽度 + 转弯
 	var cruise := _cruise_speed(pos)
 	var turn_caution := 3.5 if absf(delta) > 0.35 else 6.0
 	var speed_limit := minf(cruise, turn_caution * cruise / 6.0)
 
-	# 前车跟车
-	for o in others:
+	# 前车跟车（用评分时缓存的同批车辆位置）
+	for o in _last_others:
 		var op: Vector2 = o
 		var d := pos.distance_to(op)
 		if d < OBSTACLE_RADIUS * 3.0:
@@ -270,7 +283,9 @@ func _cruise_speed(pos: Vector2) -> float:
 
 ## 对给定偏移做前滚，返回评分（越大越好）
 func _rollout_score(pos: Vector2, yaw: float, speed: float, delta: float, offset: float, others: Array) -> float:
-	var car := CarDrive.new()
+	if _rollout_car == null:
+		_rollout_car = CarDrive.new()
+	var car := _rollout_car
 	car.x = pos.x
 	car.z = pos.y
 	car.yaw = yaw

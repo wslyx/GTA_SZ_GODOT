@@ -174,6 +174,9 @@ func _process(delta: float) -> void:
 	if MODE == "walkshot":
 		_walkshot_tick(delta)
 		return
+	if MODE == "autoperf":
+		_autoperf_tick(delta)
+		return
 	if MODE == "pages":
 		_pages_tick(delta)
 		return
@@ -590,6 +593,162 @@ func _next_pg(wait: float, next: int) -> void:
 	_pg_t = 0.0
 
 
+## autoperf：自动驾驶掉帧归因。手动开车（对照）→ 自动驾驶 → 依次关掉
+## 小地图 / 路线叠层，各采样 ROUNDS_TIME 秒；全程同一条 2.7km 路线。
+const ROUNDS_TIME := 5.0
+const AUTOPERF_ROUNDS := [
+	{"name": "manual-W", "hold_w": true, "settle": 2.0},
+	{"name": "auto-baseline", "auto": true, "settle": 3.0},
+	{"name": "auto-no-minimap", "mods": {"minimap": false}, "settle": 1.0},
+	{"name": "auto-no-overlay", "mods": {"overlay": false}, "settle": 1.0},
+	{"name": "auto-baseline2", "mods": {}, "settle": 1.0},
+	{"name": "frozen-baseline", "frozen": true, "settle": 0.5},
+	{"name": "frozen-no-minimap", "frozen": true, "mods": {"minimap": false}, "settle": 0.5},
+	{"name": "frozen-no-route", "frozen": true, "clear": true, "settle": 0.5},
+	{"name": "frozen-baseline2", "frozen": true, "settle": 0.5},
+	{"name": "auto-no-audio", "mods": {"audio": false}, "settle": 1.0},
+	{"name": "auto-no-worldproc", "mods": {"worldproc": false}, "settle": 1.0},
+	{"name": "auto-no-hud", "mods": {"hud": false}, "settle": 1.0},
+]
+var _ap_round := -1
+var _ap_settle := 0.0
+var _autopilot_started := false
+var _pending_auto_click := false
+var _next_pg_wait := 0.0
+
+
+func _autoperf_tick(delta: float) -> void:
+	if not _session_ready():
+		return
+	if world == null:
+		world = main.get("world")
+		lighting = world.get("lighting")
+		_capture_orig()
+	# 打开引擎的渲染耗时测量（CPU=提交/绘制调用，GPU=帧渲染）
+	RenderingServer.viewport_set_measure_render_time(
+		get_viewport().get_viewport_rid(), true)
+	if _ap_round < 0:
+		_start_auto_round(0)
+		return
+	# 延迟点击「自动驾驶前往」：等地图排完版、路线规划完成
+	if _pending_auto_click:
+		_next_pg_wait -= delta
+		if _next_pg_wait <= 0.0:
+			_pending_auto_click = false
+			var mk = main.get("maps")
+			if mk._btn_auto != null:
+				mk._btn_auto.pressed.emit()
+			print("[perf] 已点 自动驾驶前往")
+	_ap_settle -= delta
+	if _ap_settle > 0.0:
+		return
+	# —— 采样 ——
+	var ms := delta * 1000.0
+	_frames += 1
+	_sum_ms += ms
+	if ms < _min_ms:
+		_min_ms = ms
+	if ms > _max_ms:
+		_max_ms = ms
+	_buckets[_bucket(ms)] = int(_buckets[_bucket(ms)]) + 1
+	_sum_fps += float(Engine.get_frames_per_second())
+	if ms > 16.7:
+		_slow_frames += 1
+	if ms > 50.0:
+		_stalls += 1
+	_sum_cpu += float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
+	_ws_t += delta
+	if _ws_t < ROUNDS_TIME:
+		return
+	_ws_t = 0.0
+	var rname := str(AUTOPERF_ROUNDS[_ap_round]["name"])
+	_summary_named(rname)
+	var cpu_mean := _sum_cpu / maxf(float(_frames), 1.0)
+	print("[autoperf]   全节点 _process 合计（TIME_PROCESS）%.2f ms/帧" % cpu_mean)
+	if rname == "auto-baseline":
+		var mk = main.get("maps")
+		var mh = mk.get("minimap_holder")
+		print("[perf] minimap visible=" + str(mh.visible) + " pos=" + str(mh.position)
+			+ " size=" + str(mh.size) + " children=" + str(mh.get_child_count())
+			+ " holder_in_tree=" + str(mh.is_inside_tree()))
+		_capture_shot("auto_drive_view")
+	var prev_hold: bool = AUTOPERF_ROUNDS[_ap_round].get("hold_w", false)
+	if prev_hold:
+		_press_key(KEY_W, false)
+	if _ap_round + 1 < AUTOPERF_ROUNDS.size():
+		_start_auto_round(_ap_round + 1)
+	else:
+		print("[perf] autoperf 完成")
+		get_tree().quit(0)
+
+
+func _start_auto_round(i: int) -> void:
+	_ap_round = i
+	var rd: Dictionary = AUTOPERF_ROUNDS[i]
+	var mods: Dictionary = rd.get("mods", {})
+	_reset()
+	_apply(mods)
+	_frames = 0
+	_sum_ms = 0.0
+	_min_ms = 1e9
+	_max_ms = 0.0
+	_slow_frames = 0
+	_slow_frames_33 = 0
+	_stalls = 0
+	_sum_fps = 0.0
+	_buckets = [0, 0, 0, 0, 0]
+	_ap_settle = float(rd.get("settle", 1.0))
+	if bool(rd.get("hold_w", false)):
+		_press_key(KEY_W, true)
+	main.set("paused", false)
+	if bool(rd.get("frozen", false)):
+		main.set("paused", true)
+	if bool(rd.get("clear", false)):
+		var ap2 = main.get("autopilot")
+		if ap2 != null:
+			ap2.cancel()
+		main.get("maps").clear_destination()
+	if mods.has("audio"):
+		var au = main.get("audio")
+		if au != null:
+			au.enabled = bool(mods["audio"])
+	if mods.has("worldproc"):
+		var wld = main.get("world")
+		if wld != null:
+			wld.set_process(bool(mods["worldproc"]))
+	if mods.has("hud"):
+		var hd = main.get("hud")
+		if hd != null:
+			hd.enabled = bool(mods["hud"])
+	if bool(rd.get("auto", false)) and not _autopilot_started:
+		_autopilot_started = true
+		_press_key(KEY_M, true)
+		_press_key(KEY_M, false)
+		var maps = main.get("maps")
+		maps._build_catalog()
+		for place in maps._catalog:
+			if str(place["name"]) == "世界之窗":
+				maps._select_place(place)
+				break
+		_pending_auto_click = true
+		_next_pg_wait = 1.0
+	print("")
+	print("[autoperf] ── 第 %d 轮「%s」采样 %.1fs（settle %.1fs）" % [i, str(rd["name"]), ROUNDS_TIME, _ap_settle])
+
+
+func _summary_named(rname: String) -> void:
+	var mean := _sum_ms / maxf(float(_frames), 1.0)
+	var fps_mean := _sum_fps / maxf(float(_frames), 1.0)
+	print("[autoperf] 「%s」：引擎FPS均值 %.1f  帧均值 %.2fms  最小 %.2f  最大 %.2f  >16.7ms %d  >50ms %d" % [
+		rname, fps_mean, mean, _min_ms, _max_ms, _slow_frames, _stalls])
+	print("[autoperf]   直方图 <16.7:%d  16.7-33:%d  33-60:%d  60-120:%d  >120:%d  (n=%d)" % [
+		_buckets[0], _buckets[1], _buckets[2], _buckets[3], _buckets[4], _frames])
+	var vr := get_viewport().get_viewport_rid()
+	print("[autoperf]   渲染耗时：CPU %.2fms  GPU %.2fms" % [
+		RenderingServer.viewport_get_measured_render_time_cpu(vr),
+		RenderingServer.viewport_get_measured_render_time_gpu(vr)])
+
+
 ## walkshot：下车步行链路的整链验证
 func _walkshot_tick(delta: float) -> void:
 	if not _session_ready():
@@ -742,6 +901,7 @@ func _capture_orig() -> void:
 	var maps = main.get("maps")
 	if maps != null:
 		_toggles.append({"node": maps.get("minimap_holder"), "visible": true, "key": "minimap"})
+		_toggles.append({"node": maps.get("minimap_overlay"), "visible": true, "key": "overlay"})
 	_toggles.append({"node": main.get("hud"), "visible": true, "key": "hud"})
 	# 路灯池：只把「采样时真的亮着」的灯登记进来，关掉/还原都只碰这些
 	var lamp_lit := 0
@@ -768,6 +928,15 @@ func _next_config() -> void:
 
 
 func _reset() -> void:
+	var au = main.get("audio")
+	if au != null:
+		au.enabled = true
+	var wld = main.get("world")
+	if wld != null:
+		wld.set_process(true)
+	var hd = main.get("hud")
+	if hd != null:
+		hd.enabled = true
 	var env: Environment = lighting.env_node.environment
 	env.ssao_enabled = _orig_ssao
 	env.glow_enabled = _orig_glow

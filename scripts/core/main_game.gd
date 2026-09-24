@@ -64,6 +64,7 @@ var _rider = null                   ## RIDER_SCRIPT 实例（untyped：全局类
 var _rider_yaw := 0.0               ## 角色 yaw 平滑跟随移动方向（原版 riderYaw）
 var _pending_level_up_dialogue := {}
 
+
 func _ready() -> void:
 	# ⚠️ 加载界面必须先于任何重活出现。
 	# PanelsUI._ready() 会在 add_child 的瞬间建好加载画面，但那一帧还没画到屏幕上；
@@ -125,6 +126,9 @@ func _build_world() -> void:
 	audio = ProceduralAudio.new()
 	audio.name = "ProceduralAudio"
 	add_child(audio)
+	# BGM 离线预渲染（~1.5s）：此时还在加载画面后面，玩家无感。
+	# 不预渲染的话，BGM 要在运行时逐样本合成 —— 实测是自动驾驶掉帧的元凶。
+	audio.prepare_bgm()
 
 	# UI
 	hud = GameHUD.new()

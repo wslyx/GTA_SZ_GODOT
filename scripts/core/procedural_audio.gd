@@ -16,7 +16,7 @@ class_name ProceduralAudio
 ## Godot 用 AudioStreamGenerator 做等价实现：每帧填充缓冲区，
 ## 电机/风噪声频率与包络照搬原版的数值，BGM 用同一套 72 BPM 音序。
 
-const SAMPLE_RATE := 44100.0
+const SAMPLE_RATE := 22050.0
 const BUFFER_LENGTH := 0.15
 
 ## 电机与噪声（原版数值）
@@ -35,6 +35,8 @@ const BGM_SCALE := [0, 3, 5, 7, 10]
 const BGM_ROOT_HZ := 220.0
 
 var player: AudioStreamPlayer
+var bgm_player: AudioStreamPlayer
+var bgm_stream: AudioStreamWAV
 var playback: AudioStreamGeneratorPlayback
 var enabled := true
 
@@ -69,12 +71,20 @@ func _ready() -> void:
 	player.volume_db = -6.0
 	add_child(player)
 
+	# 海湾晚风 · BGM：预渲染循环（见 prepare_bgm），独立播放器 —— 对应原版
+	# WebAudio 的 music 总线（city-audio.ts 的 this.music gain 节点）
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.volume_db = -80.0
+	add_child(bgm_player)
+
 
 func unlock() -> void:
 	if _unlocked or not enabled:
 		return
 	player.play()
 	playback = player.get_stream_playback()
+	if bgm_player != null and bgm_player.stream != null:
+		bgm_player.play()
 	_unlocked = playback != null
 
 
@@ -123,6 +133,8 @@ func _process(delta: float) -> void:
 	if not enabled:
 		if player.playing:
 			player.stop()
+		if bgm_player != null and bgm_player.playing:
+			bgm_player.stop()
 		return
 	if not _unlocked:
 		if Input.is_anything_pressed():
@@ -135,13 +147,19 @@ func _process(delta: float) -> void:
 	_explosion_env = maxf(0.0, _explosion_env - delta * 1.6)
 	_horn_env = maxf(0.0, _horn_env - delta * 2.2)
 
+	# BGM 音量 = music_volume × 静音（原版 applyPreferences 的 music 总线）
+	if bgm_player != null:
+		var mv := 0.0 if muted else clampf(music_volume, 0.0, 1.0)
+		bgm_player.volume_db = linear_to_db(maxf(mv, 0.0001))
+
+	var ev := 0.0 if muted else clampf(effects_volume, 0.0, 1.0)
 	var frames := playback.get_frames_available()
 	for i in frames:
 		# 只算一次采样再同时给左右声道。
 		# 之前写 Vector2(_sample(), _sample())：_sample() 内部会推进 _bgm_sample
 		# 与各个相位，调两次等于每帧推进两个采样点 —— BGM 速度翻倍（72→144 BPM），
 		# 而且左右声道取到的是两条互不相关的噪声，听感是散开的双声道而非同一声源。
-		var s := _sample()
+		var s := _sample() * ev
 		playback.push_frame(Vector2(s, s))
 
 
@@ -161,17 +179,61 @@ func _sample() -> float:
 	if slipping:
 		slip = _filter(2, n, SLIP_BANDPASS_HZ) * 0.14
 
-	# --- BGM ---
-	var bgm := _bgm() * 0.10
+	# --- BGM：已改为预渲染循环（prepare_bgm → bgm_player），不再逐样本合成 ---
 
 	# --- 一次性事件 ---
 	var boom := _noise() * _explosion_env * 0.5
 	var horn := sin(_bgm_phase * TAU * 2.0) * _horn_env * 0.12
 	_bgm_phase = fposmod(_bgm_phase + 320.0 / SAMPLE_RATE, 1.0)
 
-	return clampf(
-		(motor + tri + roll + wind + slip + boom + horn) * (0.0 if muted else effects_volume)
-		+ bgm * (0.0 if muted else music_volume), -1.0, 1.0)
+	return clampf(motor + tri + roll + wind + slip + boom + horn, -1.0, 1.0)
+
+
+## 把一整段《海湾晚风》循环离线渲染成 16-bit WAV，交给独立播放器循环播放。
+##
+## **为什么必须预渲染**：BGM 原本在 `_sample()` 里逐样本合成，而
+## AudioStreamGenerator 每帧要补上"实时消耗"的样本数 —— 帧率越低每帧补得越多，
+## 合成成本又推高帧时长，正反馈把自动驾驶的帧率钉死在 60~80
+## （实测 autoperf：关掉音频 12.1ms → 5.1ms）。原版把 BGM 交给 WebAudio 节点图
+## 实时合成，游戏线程零成本；Godot 没有节点图，等价做法就是**离线烘一段循环**。
+##
+## 成本：22050Hz × 53.3s ≈ 1.18M 样本，一次性 ~1.5s，在启动加载画面里完成。
+func prepare_bgm() -> void:
+	if bgm_stream != null:
+		return
+	var sr := int(SAMPLE_RATE)
+	var spb := maxi(1, sr * 60 / BGM_BPM)          ## 每拍样本数
+	var total := BGM_BARS * 4 * spb                ## 16 小节 × 4 拍
+	var data := PackedByteArray()
+	data.resize(total * 2)
+	for i in total:
+		var v: float = _bgm_note_at(i, spb)
+		data.encode_s16(i * 2, int(clampf(v, -1.0, 1.0) * 32000.0))
+	bgm_stream = AudioStreamWAV.new()
+	bgm_stream.format = AudioStreamWAV.FORMAT_16_BITS
+	bgm_stream.mix_rate = sr
+	bgm_stream.stereo = false
+	bgm_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	bgm_stream.loop_begin = 0
+	bgm_stream.loop_end = total
+	bgm_stream.data = data
+	if bgm_player != null:
+		bgm_player.stream = bgm_stream
+	print("[Audio] 海湾晚风 BGM 已预渲染：%d 样本（%.1fs 循环）" % [total, float(total) / float(sr)])
+
+
+## 与 _bgm() 同一套数学，但用**绝对样本下标**（不推进任何状态），
+## 便于离线渲染出无缝循环。
+func _bgm_note_at(i: int, spb: int) -> float:
+	var beat := float(i) / float(spb)
+	var note := int(beat) % BGM_SCALE.size()
+	var bar := int(beat / 4) % BGM_BARS
+	var octave := 1.0 + float(bar % 3) * 0.12
+	var semis: int = BGM_SCALE[note] + (12 if bar % 4 >= 2 else 0)
+	var freq := BGM_ROOT_HZ * octave * pow(2.0, float(semis) / 12.0)
+	var beat_pos := float(i % spb) / float(spb)
+	var env := exp(-beat_pos * 3.2) * 0.8
+	return sin(float(i) * TAU * freq / float(spb * 60 / BGM_BPM)) * env
 
 
 ## 《海湾晚风》：72 BPM，每拍换音，五声音阶游走
