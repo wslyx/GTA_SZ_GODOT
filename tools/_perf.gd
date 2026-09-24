@@ -42,7 +42,11 @@ extends Node
 ##   "mapshot" —— 按 M 打开大地图，等 1.5s 抓一张（验证烘焙改动没破坏大地图路径）
 ##   "walkshot" —— 下车链路验证：F 下车 → 截图（第三人称）→ 按住 W 走 → 截图 →
 ##               C 第一人称 → 截图 → C 回第三人称 → F 上车 → 截图
+##   "pages"  —— Esc 暂停页 / M 城市地图 两页截图，并点选一个地点看目的地面板
 const MODE := "matrix"
+var _pg_phase := 0
+var _pg_t := 0.0
+var _pg_wait := 0.0
 var _ws_phase := 0
 var _ws_t := 0.0
 var _ws_wait := 0.0
@@ -169,6 +173,9 @@ func _process(delta: float) -> void:
 		return
 	if MODE == "walkshot":
 		_walkshot_tick(delta)
+		return
+	if MODE == "pages":
+		_pages_tick(delta)
 		return
 	match phase:
 		Phase.BOOT:
@@ -467,6 +474,120 @@ func _round_summary() -> void:
 		_slow_frames, _slow_frames_33, _stalls])
 	print("[trace]   直方图 <16.7:%d  16.7-33:%d  33-60:%d  60-120:%d  >120:%d  (共 %d 帧)" % [
 		_buckets[0], _buckets[1], _buckets[2], _buckets[3], _buckets[4], _frames])
+
+
+## pages：Esc 暂停页 + M 城市地图 + 列表点选后的目的地面板
+func _pages_tick(delta: float) -> void:
+	if not _session_ready():
+		return
+	_pg_t += delta
+	if _pg_t < _pg_wait:
+		return
+	_pg_t = 0.0
+	match _pg_phase:
+		0:
+			_pg_wait = 1.0
+			_pg_phase = 1
+		1:
+			_press_key(KEY_ESCAPE, true)
+			_press_key(KEY_ESCAPE, false)
+			_next_pg(0.8, 2)
+		2:
+			_capture_shot("esc_pause")
+			_press_key(KEY_ESCAPE, true)
+			_press_key(KEY_ESCAPE, false)
+			_next_pg(0.5, 3)
+		3:
+			_press_key(KEY_M, true)
+			_press_key(KEY_M, false)
+			_next_pg(1.0, 4)
+		4:
+			_capture_shot("map_page")
+			# 侧栏不可见的排查：把外壳/画布/侧栏的实际矩形打出来
+			var maps2 = main.get("maps")
+			var shell_sz: Vector2 = maps2._shell.size
+			var canvas_sz: Vector2 = maps2._map_canvas.size
+			print("[perf] shell=" + str(shell_sz) + " canvas=" + str(canvas_sz)
+				+ " rows=" + str(maps2._place_list.get_child_count()))
+			_next_pg(0.3, 5)
+		5:
+			# 从侧栏目录点一个地点（世界之窗一带），走真实的选择链路
+			var maps = main.get("maps")
+			var picked := false
+			if maps != null:
+				maps._build_catalog()
+				for place in maps._catalog:
+					if str(place["name"]) == "世界之窗":
+						maps._select_place(place)
+						picked = true
+						break
+			print("[perf] 已点选侧栏地点 picked=%s" % picked)
+			_next_pg(1.2, 6)
+		6:
+			_capture_shot("map_selected")
+			# 点「自动驾驶前往 ↗」：地图应关闭、自动驾驶应接管
+			var maps3 = main.get("maps")
+			if maps3._btn_auto != null:
+				maps3._btn_auto.pressed.emit()
+			_next_pg(1.2, 7)
+		7:
+			var m1 = main.get("maps")
+			var ap = main.get("autopilot")
+			_capture_shot("map_autodrive")
+			print("[perf] 自动驾驶：map_visible=" + str(m1.big_map_visible)
+				+ " phase=" + str(ap.get("phase")) + " paused=" + str(main.get("paused")))
+			_next_pg(0.3, 8)
+		8:
+			# 再选一次目的地，点「俯瞰此处」：观景相机应落在目的地上空
+			_press_key(KEY_M, true)
+			_press_key(KEY_M, false)
+			_next_pg(0.6, 9)
+		9:
+			var maps4 = main.get("maps")
+			var picked2 := false
+			for place in maps4._catalog:
+				if str(place["name"]) == "欢乐海岸":
+					maps4._select_place(place)
+					picked2 = true
+					break
+			print("[perf] 已点选 欢乐海岸 picked=%s" % picked2)
+			_next_pg(1.2, 10)
+		10:
+			var maps5 = main.get("maps")
+			if maps5._btn_photo != null:
+				maps5._btn_photo.pressed.emit()
+			_next_pg(1.2, 11)
+		11:
+			var mode_v = main.get("mode")
+			var obs = main.get("observer")
+			_capture_shot("map_photo")
+			print("[perf] 俯瞰：mode=" + str(mode_v) + " obs_active=" + str(obs.get("active"))
+				+ " pos=" + str(obs.get("x")) + "," + str(obs.get("z")))
+			# 退出观景，再按一次 G 验证 G 观景本身的相机是否跟随
+			_press_key(KEY_G, true)
+			_press_key(KEY_G, false)
+			_next_pg(0.8, 12)
+		12:
+			_press_key(KEY_G, true)
+			_press_key(KEY_G, false)
+			_next_pg(1.2, 13)
+		13:
+			var cam = main.get("camera")
+			var cam_pos: Vector3 = cam.get("position")
+			var drv = main.get("car")
+			var ground_y: float = main.get("world").height_field.height_at(
+				float(drv.get("x")), float(drv.get("z")))
+			_capture_shot("g_observer")
+			print("[perf] G 观景：相机 y=" + str(cam_pos.y) + " / 车地面 y=" + str(ground_y)
+				+ "（相机应比地面高 ~60m）")
+			print("[perf] pages 完成")
+			get_tree().quit(0)
+
+
+func _next_pg(wait: float, next: int) -> void:
+	_pg_phase = next
+	_pg_wait = wait
+	_pg_t = 0.0
 
 
 ## walkshot：下车步行链路的整链验证

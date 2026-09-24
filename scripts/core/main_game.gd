@@ -231,6 +231,8 @@ func _on_built() -> void:
 	hud.refresh_layout()
 	# 大地图点选地标 → 自动驾驶前往（原版 city-map.ts 的 onAutoDrive）
 	maps.destination_picked.connect(_on_destination_picked)
+	maps.quick_travel_requested.connect(_on_map_quick_travel)
+	maps.photo_requested.connect(_on_map_photo)
 	# 大地图上「自动驾驶前往 / 自己开过去」两个按钮
 	maps.route_mode_chosen.connect(_on_route_mode_chosen)
 	# 大地图开/关：开图时丢掉相机拖拽状态（见 _on_big_map_toggled）
@@ -239,6 +241,11 @@ func _on_built() -> void:
 	panels.setup(world, self, career, story)
 	# 设置页的「帧率显示」行要操作 HUD
 	panels.hud = hud
+	# 暂停页的声音滑杆要操作程序化音频
+	panels.audio_player = audio
+	panels.resume_requested.connect(func():
+		paused = false
+		panels.show_pause(false))
 
 	# 出生点
 	var sp := CityData.spawn_pos
@@ -334,6 +341,8 @@ func _on_key(k: InputEventKey) -> void:
 				_exit_observer()
 			else:
 				paused = not paused
+				# 原版 #pause：歇一会儿。 + 继续驾驶 + 按键表 + 声音与音乐
+				panels.show_pause(paused)
 		KEY_F10:
 			# CS2 风格图像设置页：打开即暂停，关闭即恢复
 			panels.toggle_settings()
@@ -581,7 +590,10 @@ func _enter_observer() -> void:
 	autopilot.cancel()
 	maps.clear_destination()
 	_clear_pending()
-	paused = true
+	# ⚠️ 不能 paused = true：_update_modes 遇 paused 直接 return，_step_observer
+	# 不跑，观景相机就冻在切模式前的位置（原版 G 处理里 paused = world.aerial，
+	# 观景期间世界照常运转、相机由 _step_observer 每帧跟随）。
+	paused = false
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 	world.set_aerial(true)
@@ -1077,7 +1089,11 @@ func start_autopilot(target: Vector2) -> bool:
 ## 玩家**点按钮**才走哪条路（main.ts onAutoDrive / onManualRoute，两者都先
 ## selectDestination 再 openMap(false)）—— 也就是地图保持打开，点了按钮才关。
 ## 这里同构：规划出预览线 → 地图留在屏幕上等玩家点按钮。
+## 到达过的目的地（原版 visited 集合，地图侧栏「已发现」与「城市足迹」用）
+var _last_dest_name := ""
+
 func _on_destination_picked(pos: Vector2, dest_name: String) -> void:
+	_last_dest_name = dest_name
 	match mode:
 		Mode.TANK:
 			hud.toast("坦克使用手动驾驶，按 T 换回轿车再规划路线")
@@ -1164,6 +1180,9 @@ func _check_manual_arrival() -> void:
 	var dest: Vector2 = _pending_dest["pos"]
 	if Vector2(car.x, car.z).distance_to(dest) < MANUAL_ARRIVE_RADIUS:
 		hud.toast("已到达 %s" % _pending_dest["name"], 4.0)
+		if not GameState.visited_destinations.has(_last_dest_name):
+			GameState.visited_destinations.append(_last_dest_name)
+			hud.toast("城市足迹 +1 · %s" % _last_dest_name, 3.0)
 		maps.clear_destination()
 		_clear_pending()
 
@@ -1171,9 +1190,46 @@ func _check_manual_arrival() -> void:
 var _ap_arrived_toast := false
 var _ap_blocked_toast := false
 
+## 大地图「移动到附近道路」：把车挪到目的地附近的道路点（原版 quick-travel）
+func _on_map_quick_travel(pos: Vector2) -> void:
+	if mode != Mode.CAR:
+		return
+	var near: Dictionary = world.collision.nearest(pos.x, pos.y)
+	var yaw := car.yaw
+	if not near.is_empty():
+		yaw = float(near.get("yaw", yaw))
+	car.reset_to(pos.x, pos.y, yaw)
+	_flush_speed()
+	if maps.big_map_visible:
+		maps.toggle_big_map()
+	hud.toast("已移动到附近道路")
+
+
+## 大地图「俯瞰此处」：观景相机直接落在目的地上空（原版 photo-view）
+func _on_map_photo(pos: Vector2) -> void:
+	if maps.big_map_visible:
+		maps.toggle_big_map()
+	observer.begin(pos.x, world.height_field.height_at(pos.x, pos.y) + 60.0, pos.y, _camera_yaw)
+	observer.ground_height = func(x: float, z: float) -> float: return world.height_field.height_at(x, z)
+	observer.blocked = func(x: float, z: float) -> bool: return world.collision.blocked(x, z)
+	mode = Mode.OBSERVER
+	autopilot.cancel()
+	_clear_pending()
+	# ⚠️ 不能在这里 paused = true：_update_modes 遇 paused 直接 return，
+	# _step_observer 不跑、相机永远停在按按钮前的位置（原版观景也不暂停）。
+	paused = false
+	_flush_speed()
+	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
+	world.set_aerial(true)
+	hud.toast("俯瞰模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向")
+
+
+## 自动驾驶的阶段性提示（到达 / 受阻），每次启动只报一次
 func _autopilot_phase_toasts() -> void:
 	if autopilot.phase == Autopilot.Phase.ARRIVED and not _ap_arrived_toast:
 		_ap_arrived_toast = true
+		if _last_dest_name != "" and not GameState.visited_destinations.has(_last_dest_name):
+			GameState.visited_destinations.append(_last_dest_name)
 		maps.clear_destination()
 		hud.toast("已到达目的地 · 自动驾驶结束", 4.0)
 	elif autopilot.phase == Autopilot.Phase.BLOCKED and not _ap_blocked_toast:

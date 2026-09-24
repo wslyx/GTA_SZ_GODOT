@@ -15,6 +15,13 @@ var story: StorySystem
 var journal: Control
 var loading: Control
 var dialog: Control
+var pause_overlay: Control
+
+## 暂停页要操作的音频（main_game 注入）；untyped 避免循环引用
+var audio_player = null
+
+## 玩家点了「继续驾驶」
+signal resume_requested
 
 var journal_visible := false
 var dialog_active := false
@@ -74,6 +81,7 @@ func setup(p_world: CityWorld, p_player, p_career: CareerSystem, p_story: StoryS
 	story = p_story
 	layer = 12
 	_build()
+	_build_pause()
 
 
 func _font(size: int) -> Font:
@@ -837,6 +845,214 @@ func show_loading() -> void:
 	_title_tween.tween_property(_l_title, "modulate:a", 1.0, 1.2) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
+
+# ---------------------------------------------------------------------------
+# Esc 暂停页（原版 #pause + .controls + city-audio-controls）
+# ---------------------------------------------------------------------------
+
+var _pause_resume: Button
+var _audio_toggle: Button
+var _audio_state: Label
+var _slider_effects: HSlider
+var _slider_music: HSlider
+
+
+func _build_pause() -> void:
+	pause_overlay = Control.new()
+	pause_overlay.name = "pause"
+	pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.visible = false
+	add_child(pause_overlay)
+
+	# #pause{background:#09232988; backdrop-filter:blur(10px)}
+	var dim := ColorRect.new()
+	dim.color = Color(0.035, 0.137, 0.161, 0.53)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.add_child(dim)
+
+	# place-content:center 的那块内容
+	var center := VBoxContainer.new()
+	# 以屏幕中心为锚的手工盒：640×510
+	center.set_anchors_preset(Control.PRESET_CENTER)
+	center.offset_left = -320.0
+	center.offset_right = 320.0
+	center.offset_top = -255.0
+	center.offset_bottom = 255.0
+	center.add_theme_constant_override("separation", 0)
+	pause_overlay.add_child(center)
+
+	var title := _mk_label("歇一会儿。", _spaced(_font(36), 5.0), 36,
+		Color(0.941, 0.941, 0.894))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.custom_minimum_size = Vector2(640, 60)
+	center.add_child(title)
+
+	var gap0 := Control.new(); gap0.custom_minimum_size = Vector2(0, 26)
+	center.add_child(gap0)
+
+	_pause_resume = Button.new()
+	_pause_resume.text = "继续驾驶"
+	_pause_resume.focus_mode = Control.FOCUS_NONE
+	_pause_resume.custom_minimum_size = Vector2(120, 44)
+	_pause_resume.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var bsb := StyleBoxFlat.new()
+	bsb.bg_color = Color(0.145, 0.231, 0.229, 0.91)      ## #253b3ae8
+	bsb.border_color = Color(0.737, 0.804, 0.757, 0.22)  ## #bccdc237
+	bsb.set_border_width_all(1)
+	bsb.set_corner_radius_all(5)
+	bsb.content_margin_left = 17; bsb.content_margin_right = 17
+	bsb.content_margin_top = 11; bsb.content_margin_bottom = 11
+	_pause_resume.add_theme_stylebox_override("normal", bsb)
+	var hsb := bsb.duplicate(); hsb.bg_color = Color(0.275, 0.376, 0.341)
+	_pause_resume.add_theme_stylebox_override("hover", hsb)
+	_pause_resume.add_theme_stylebox_override("pressed", bsb)
+	_pause_resume.add_theme_font_override("font", _font(15))
+	_pause_resume.add_theme_font_size_override("font_size", 15)
+	_pause_resume.add_theme_color_override("font_color", Color(0.941, 0.945, 0.906))
+	_pause_resume.pressed.connect(func(): resume_requested.emit())
+	center.add_child(_pause_resume)
+
+	var gap1 := Control.new(); gap1.custom_minimum_size = Vector2(0, 34)
+	center.add_child(gap1)
+
+	# 原版 .controls：initUI 那排按键表，cinematic-hud 里移进 #pause
+	var controls := VBoxContainer.new()
+	controls.add_theme_constant_override("separation", 9)
+	var row1 := ["W S|油门 / 刹车", "A D|转向", "空格|手刹", "C|镜头", "L|日落 / 夜色 / 晴日"]
+	var row2 := ["F|上下车", "V|看车", "G|无人机", "K|显隐鼠标", "R|回到道路"]
+	for row in [row1, row2]:
+		var h := HBoxContainer.new()
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+		h.add_theme_constant_override("separation", 19)
+		for item in row:
+			var parts: PackedStringArray = str(item).split("|")
+			var chip := _kbd_chip(parts[0])
+			h.add_child(chip)
+			h.add_child(_mk_label(parts[1], _font(10), 10, Color(0.824, 0.875, 0.847)))
+		controls.add_child(h)
+	center.add_child(controls)
+
+	var gap2 := Control.new(); gap2.custom_minimum_size = Vector2(0, 22)
+	center.add_child(gap2)
+
+	# 原版 city-audio-controls：声音与音乐 + 两个滑杆 + 状态行
+	var audio := VBoxContainer.new()
+	audio.custom_minimum_size = Vector2(430, 0)
+	audio.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var a_head_pad := Control.new(); a_head_pad.custom_minimum_size = Vector2(0, 22)
+	audio.add_child(a_head_pad)
+	var a_head := HBoxContainer.new()
+	a_head.add_theme_constant_override("separation", 8)
+	var a_title := _mk_label("声音与音乐", _font(13), 13, Color(0.933, 0.941, 0.910))
+	a_title.add_theme_constant_override("line_spacing", 0)
+	a_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	a_head.add_child(a_title)
+	_audio_toggle = Button.new()
+	_audio_toggle.text = "静音"
+	_audio_toggle.focus_mode = Control.FOCUS_NONE
+	_audio_toggle.custom_minimum_size = Vector2(0, 30)
+	_asb(_audio_toggle)
+	_audio_toggle.add_theme_font_override("font", _font(13))
+	_audio_toggle.add_theme_font_size_override("font_size", 13)
+	_audio_toggle.add_theme_color_override("font_color", Color(0.824, 0.922, 0.855))
+	_audio_toggle.add_theme_color_override("font_hover_color", Color(0.824, 0.922, 0.855))
+	_audio_toggle.pressed.connect(_on_audio_toggle)
+	a_head.add_child(_audio_toggle)
+	audio.add_child(a_head)
+
+	_slider_effects = _mk_slider("车辆 / 环境", audio)
+	_slider_effects.value_changed.connect(func(v: float):
+		if audio_player != null:
+			audio_player.effects_volume = v / 100.0
+		_refresh_audio_controls())
+	_slider_music = _mk_slider("海湾晚风 · BGM", audio)
+	_slider_music.value_changed.connect(func(v: float):
+		if audio_player != null:
+			audio_player.music_volume = v / 100.0
+		_refresh_audio_controls())
+
+	var a_gap := Control.new(); a_gap.custom_minimum_size = Vector2(0, 12)
+	audio.add_child(a_gap)
+	_audio_state = _mk_label("原创氛围音乐 · 电驱 / 胎噪 / 风噪 · H 鸣笛",
+		_font(11), 11, Color(0.639, 0.675, 0.655))
+	audio.add_child(_audio_state)
+	center.add_child(audio)
+
+
+## 原版 .audio-heading button：细描边小按钮
+func _asb(b: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.827, 0.922, 0.859, 0.07)       ## #d3ebdb12
+	sb.border_color = Color(0.796, 0.863, 0.792, 0.27)   ## #cbdcca44
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(5)
+	sb.content_margin_left = 13; sb.content_margin_right = 13
+	sb.content_margin_top = 5; sb.content_margin_bottom = 5
+	b.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate(); hb.bg_color = Color(0.827, 0.922, 0.859, 0.16)
+	b.add_theme_stylebox_override("hover", hb)
+	b.add_theme_stylebox_override("pressed", sb)
+
+
+func _mk_slider(label_text: String, parent: VBoxContainer) -> HSlider:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	row.custom_minimum_size = Vector2(430, 0)
+	var l := _mk_label(label_text, _font(13), 13, Color(0.769, 0.788, 0.769))
+	l.custom_minimum_size = Vector2(150, 0)
+	row.add_child(l)
+	var s := HSlider.new()
+	s.min_value = 0; s.max_value = 100; s.step = 1
+	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	s.custom_minimum_size = Vector2(190, 20)
+	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(s)
+	var rpad := Control.new(); rpad.custom_minimum_size = Vector2(24, 0)
+	row.add_child(rpad)
+	parent.add_child(row)
+	return s
+
+
+func _kbd_chip(text: String) -> Control:
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0)
+	sb.border_color = Color(0.925, 0.961, 0.914, 0.29)   ## #ecf5e94a
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 5; sb.content_margin_right = 5
+	sb.content_margin_top = 2; sb.content_margin_bottom = 2
+	p.add_theme_stylebox_override("panel", sb)
+	var l := _mk_label(text, _font(11), 11, Color(0.875, 0.906, 0.851))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return p
+
+
+## 打开 / 关闭暂停页，并同步音频控件的状态
+func show_pause(value: bool) -> void:
+	if pause_overlay == null:
+		return
+	pause_overlay.visible = value
+	if value:
+		_refresh_audio_controls()
+
+
+func _refresh_audio_controls() -> void:
+	if audio_player == null:
+		return
+	_audio_toggle.text = "开启声音" if audio_player.muted else "静音"
+	_slider_effects.set_value_no_signal(float(audio_player.effects_volume) * 100.0)
+	_slider_music.set_value_no_signal(float(audio_player.music_volume) * 100.0)
+
+
+func _on_audio_toggle() -> void:
+	if audio_player == null:
+		return
+	audio_player.muted = not audio_player.muted
+	_refresh_audio_controls()
 
 # ---------------------------------------------------------------------------
 # 手账

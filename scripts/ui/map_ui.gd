@@ -88,7 +88,6 @@ var _road_label: Label
 var big_map: Control
 var big_map_visible := false
 ## 驾驶方式选择按钮（原版 .atlas-route-actions 里的两个按钮）
-var _choice_panel: Control
 var _btn_auto: Button
 var _btn_manual: Button
 var _choice_visible := false
@@ -227,11 +226,8 @@ func _build() -> void:
 	big_map.set_anchors_preset(Control.PRESET_FULL_RECT)
 	big_map.mouse_filter = Control.MOUSE_FILTER_STOP
 	big_map.visible = false
-	big_map.draw.connect(_draw_big_map)
-	big_map.gui_input.connect(_on_map_input)
 	add_child(big_map)
-
-	_build_route_choice()
+	_build_atlas_shell()
 
 
 ## 原版 city-map.ts:93 —— 选好地点后地图面板底部出现两个按钮：
@@ -239,35 +235,694 @@ func _build() -> void:
 ##   「自己开过去 →」  → onManualRoute
 ## 两个回调都会先 selectDestination 再 openMap(false)，也就是**按钮在地图里点，
 ## 点了才关地图**。这里照搬：按钮是 big_map 的子控件，点完由 main_game 关地图。
-func _build_route_choice() -> void:
-	_choice_panel = Control.new()
-	_choice_panel.name = "route-actions"
-	_choice_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	# -108 而不是更靠上：HUD 的 toast 在底部 -150 一带，别和它叠在一起
-	_choice_panel.position = Vector2(-232, -108)
-	_choice_panel.size = Vector2(464, 54)
-	_choice_panel.visible = false
-	big_map.add_child(_choice_panel)
+# ---------------------------------------------------------------------------
+# 城市地图页（原版 city-map.ts 的 .atlas-shell：页头 / 画布 / 侧栏 / 页脚）
+# ---------------------------------------------------------------------------
 
-	_btn_auto = _mk_choice_button("自动驾驶前往 ↗", Vector2(0, 0))
+signal quick_travel_requested(pos: Vector2)
+signal photo_requested(pos: Vector2)
+
+var _shell: Control
+var _map_canvas: Control
+var _map_search: LineEdit
+var _place_list: VBoxContainer
+var _results_label: Label
+var _dest_eyebrow: Label
+var _dest_name_label: Label
+var _dest_status: Label
+var _btn_travel: Button
+var _btn_photo: Button
+var _filter_buttons: Array = []
+var _discovered_check: CheckBox
+
+## 原版 MapCategory（city-map.ts:44 的 categoryNames）
+const FILTER_DEFS := [
+	["all", "全部"], ["landmark", "地标"], ["district", "片区"],
+	["park", "公园"], ["road", "道路"], ["place", "地点"],
+]
+const CATEGORY_NAMES := {
+	"landmark": "城市地标", "district": "城市片区", "park": "公园与海滨",
+	"place": "城市地点", "road": "道路",
+}
+const CATEGORY_ICONS := {"landmark": "◇", "district": "⌑", "park": "♧", "road": "⌁", "place": "◇"}
+## 原版 isPark：height===0 且名字命中 公园|湖|海滨|绿道
+const RE_PARK := "公园|湖|海滨|绿道"
+## 列表行数上限（原版 listLimit = 70）
+const LIST_LIMIT := 70
+
+var _filter_category := "all"
+var _search_query := ""
+var _discovered_only := false
+var _catalog: Array = []
+var _catalog_ready := false
+
+
+## 面板整体：背景 → atlas-shell（页头 104 / 内容 1fr+350 侧栏 / 页脚 39）
+func _build_atlas_shell() -> void:
+	var bg := ColorRect.new()
+	bg.name = "map-backdrop"
+	bg.color = Color(0.031, 0.098, 0.137, 0.91)          ## #081923e8
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	big_map.add_child(bg)
+
+	_shell = Control.new()
+	_shell.name = "atlas-shell"
+	big_map.add_child(_shell)
+	_layout_shell()
+
+	var panel := Panel.new()
+	panel.name = "atlas-bg"
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.078, 0.169, 0.212)             ## #142b36
+	sb.border_color = Color(0.718, 0.878, 0.925, 0.27)   ## #b7e0ec45
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(12)
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_shell.add_child(panel)
+
+	var v := VBoxContainer.new()
+	v.name = "atlas-rows"
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.add_theme_constant_override("separation", 0)
+	_shell.add_child(v)
+
+	# —— 页头（min-height 104，bg #172f3a）——
+	var header := HBoxContainer.new()
+	header.custom_minimum_size = Vector2(0, 104)
+	header.add_theme_constant_override("separation", 28)
+	var hp := StyleBoxFlat.new(); hp.bg_color = Color(0.090, 0.184, 0.227)  ## #172f3a
+	var hp_panel := PanelContainer.new(); hp_panel.add_theme_stylebox_override("panel", hp)
+	hp_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp_panel.add_child(header)
+	v.add_child(hp_panel)
+
+	var brand := VBoxContainer.new()
+	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	brand.alignment = BoxContainer.ALIGNMENT_CENTER
+	var brand_small := _label("SHENZHEN / OPEN ROADS", 9, Color(0.655, 0.780, 0.824))
+	brand_small.add_theme_constant_override("line_spacing", 7)
+	brand.add_child(brand_small)
+	brand.add_child(_label("城市地图", 29, Color(0.953, 0.957, 0.914)))
+	header.add_child(brand)
+
+	var search := PanelContainer.new()
+	var ssb := StyleBoxFlat.new()
+	ssb.bg_color = Color(0.043, 0.125, 0.176, 0.55)      ## #0b202d8c
+	ssb.border_color = Color(0.620, 0.784, 0.839, 0.30)  ## #9ec8d64d
+	ssb.set_border_width_all(1)
+	ssb.set_corner_radius_all(3)
+	ssb.content_margin_left = 13; ssb.content_margin_right = 13
+	search.add_theme_stylebox_override("panel", ssb)
+	search.custom_minimum_size = Vector2(470, 44)
+	search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var srow := HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 12)
+	search.add_child(srow)
+	var icon := _label("⌕", 17, Color(0.651, 0.788, 0.839))
+	srow.add_child(icon)
+	_map_search = LineEdit.new()
+	_map_search.placeholder_text = "搜索地标、片区或道路"
+	_map_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map_search.add_theme_font_override("font", _font(13))
+	_map_search.add_theme_font_size_override("font_size", 13)
+	_map_search.add_theme_color_override("font_color", Color(0.929, 0.969, 0.980))
+	_map_search.add_theme_color_override("font_placeholder_color", Color(0.620, 0.729, 0.776))
+	_map_search.add_theme_color_override("caret_color", Color(0.929, 0.969, 0.980))
+	_map_search.text_changed.connect(func(t: String):
+		_search_query = t.strip_edges()
+		_refresh_place_list())
+	srow.add_child(_map_search)
+	srow.add_child(_label("↵", 14, Color(0.635, 0.729, 0.765)))
+	header.add_child(search)
+
+	var close_btn := Button.new()
+	close_btn.text = "返回驾驶  M"
+	close_btn.flat = true
+	close_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	close_btn.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	close_btn.add_theme_font_override("font", _font(11))
+	close_btn.add_theme_font_size_override("font_size", 11)
+	close_btn.add_theme_color_override("font_color", Color(0.871, 0.929, 0.949))
+	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.pressed.connect(toggle_big_map)
+	header.add_child(close_btn)
+
+	# —— 内容区（画布 1fr + 侧栏 350）——
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 0)
+	v.add_child(body)
+
+	var wrap := Control.new()
+	wrap.name = "atlas-map-wrap"
+	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrap.clip_contents = true
+	var wrap_panel := Panel.new()
+	wrap_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var wp_sb := StyleBoxFlat.new(); wp_sb.bg_color = Color(0.141, 0.373, 0.455)  ## #245f74
+	wrap_panel.add_theme_stylebox_override("panel", wp_sb)
+	wrap_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(wrap_panel)
+	body.add_child(wrap)
+
+	_map_canvas = Control.new()
+	_map_canvas.name = "city-map"
+	_map_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map_canvas.draw.connect(_draw_big_map)
+	_map_canvas.gui_input.connect(_on_map_input)
+	wrap.add_child(_map_canvas)
+
+	# 左上：片区说明（原版 .atlas-map-caption left 24 top 21）
+	var caption := VBoxContainer.new()
+	caption.position = Vector2(24, 21)
+	caption.add_theme_constant_override("separation", 7)
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cap1 := _label("南山 · 福田 · 罗湖", 12, Color(0.847, 0.918, 0.945))
+	cap1.add_theme_constant_override("line_spacing", 0)
+	caption.add_child(cap1)
+	var cap2 := _label("街道与周边", 9, Color(0.718, 0.827, 0.871))
+	caption.add_child(cap2)
+	wrap.add_child(caption)
+
+	# 右上：视角工具（＋ / − / ⌖ / ↔，37×36）
+	var tools := VBoxContainer.new()
+	tools.add_theme_constant_override("separation", 0)
+	var t_panel := PanelContainer.new()
+	var t_sb := StyleBoxFlat.new()
+	t_sb.bg_color = Color(0.075, 0.180, 0.231, 0.93)     ## #132e3bee
+	t_sb.border_color = Color(0.686, 0.851, 0.910, 0.29) ## #afd9e84a
+	t_sb.set_border_width_all(1)
+	t_panel.add_theme_stylebox_override("panel", t_sb)
+	t_panel.add_child(tools)
+	t_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	t_panel.offset_left = -54.0
+	t_panel.offset_top = 17.0
+	t_panel.offset_right = -17.0
+	wrap.add_child(t_panel)
+	_add_tool_button(tools, "＋", func(): zoom_at(1.3, _map_canvas.size * 0.5, _map_canvas.size))
+	_add_tool_button(tools, "−", func(): zoom_at(1.0 / 1.3, _map_canvas.size * 0.5, _map_canvas.size))
+	_add_tool_separator(tools)
+	_add_tool_button(tools, "⌖", func():
+		if player != null:
+			big_view = player.data_position()
+			big_scale = 3.4
+			_map_canvas.queue_redraw(), "定位我的车辆")
+	_add_tool_button(tools, "↔", func():
+		big_view = CityData.extent.get_center()
+		big_scale = base_scale()
+		_map_canvas.queue_redraw(), "查看完整城市")
+
+	# 右下：指北针（↑ N）
+	var north := VBoxContainer.new()
+	north.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	north.offset_left = -60.0; north.offset_right = -28.0
+	north.offset_bottom = -64.0; north.offset_top = -104.0
+	north.alignment = BoxContainer.ALIGNMENT_END
+	north.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var up := _label("↑", 25, Color(0.812, 0.910, 0.937))
+	up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	north.add_child(up)
+	var nn := _label("N", 9, Color(0.812, 0.910, 0.937))
+	nn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	north.add_child(nn)
+	wrap.add_child(north)
+
+	# —— 侧栏（350px，bg #192f3b）——
+	var sidebar := VBoxContainer.new()
+	sidebar.name = "atlas-sidebar"
+	sidebar.custom_minimum_size = Vector2(350, 0)
+	body.add_child(sidebar)
+	var side_panel := Panel.new()
+	side_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var sp_sb := StyleBoxFlat.new()
+	sp_sb.bg_color = Color(0.098, 0.184, 0.231)          ## #192f3b
+	sp_sb.border_color = Color(0.714, 0.863, 0.918, 0.21)
+	sp_sb.border_width_left = 1
+	side_panel.add_theme_stylebox_override("panel", sp_sb)
+	side_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sidebar.add_child(side_panel)
+
+	var filters := GridContainer.new()
+	filters.columns = 3
+	filters.add_theme_constant_override("h_separation", 6)
+	filters.add_theme_constant_override("v_separation", 3)
+	var f_pad := Control.new()
+	f_pad.custom_minimum_size = Vector2(0, 18)
+	f_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sidebar.add_child(f_pad)
+	var f_holder := HBoxContainer.new()
+	f_holder.add_theme_constant_override("separation", 0)
+	var f_left := Control.new(); f_left.custom_minimum_size = Vector2(19, 0)
+	f_holder.add_child(f_left)
+	filters.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	f_holder.add_child(filters)
+	var f_right := Control.new(); f_right.custom_minimum_size = Vector2(19, 0)
+	f_holder.add_child(f_right)
+	sidebar.add_child(f_holder)
+	for f in FILTER_DEFS:
+		var fb := Button.new()
+		fb.text = str(f[1])
+		fb.focus_mode = Control.FOCUS_NONE
+		fb.add_theme_font_override("font", _font(12))
+		fb.add_theme_font_size_override("font_size", 12)
+		fb.add_theme_color_override("font_color", Color(0.706, 0.796, 0.835))
+		fb.custom_minimum_size = Vector2(0, 37)
+		fb.pressed.connect(func(): _set_filter(str(f[0])))
+		filters.add_child(fb)
+		_filter_buttons.append(fb)
+	_style_filter_buttons()
+
+	var heading := HBoxContainer.new()
+	heading.custom_minimum_size = Vector2(0, 42)
+	heading.add_theme_constant_override("separation", 8)
+	var h_pad := Control.new(); h_pad.custom_minimum_size = Vector2(23, 0)
+	heading.add_child(h_pad)
+	_results_label = _label("0 个地点", 11, Color(0.682, 0.788, 0.831))
+	_results_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(_results_label)
+	_discovered_check = CheckBox.new()
+	_discovered_check.text = "已发现"
+	_discovered_check.focus_mode = Control.FOCUS_NONE
+	_discovered_check.add_theme_font_override("font", _font(11))
+	_discovered_check.add_theme_font_size_override("font_size", 11)
+	_discovered_check.add_theme_color_override("font_color", Color(0.765, 0.847, 0.882))
+	_discovered_check.toggled.connect(func(on: bool):
+		_discovered_only = on
+		_refresh_place_list())
+	heading.add_child(_discovered_check)
+	var h_pad2 := Control.new(); h_pad2.custom_minimum_size = Vector2(23, 0)
+	heading.add_child(h_pad2)
+	sidebar.add_child(heading)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sidebar.add_child(scroll)
+	_place_list = VBoxContainer.new()
+	_place_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_place_list.add_theme_constant_override("separation", 4)
+	scroll.add_child(_place_list)
+
+	# —— 目的地面板（bg #1c3641）——
+	var dest := PanelContainer.new()
+	dest.name = "destination-actions"
+	var d_sb := StyleBoxFlat.new()
+	d_sb.bg_color = Color(0.110, 0.212, 0.255)           ## #1c3641
+	d_sb.border_color = Color(0.694, 0.851, 0.902, 0.27)
+	d_sb.border_width_top = 1
+	d_sb.content_margin_left = 23; d_sb.content_margin_right = 23
+	d_sb.content_margin_top = 20; d_sb.content_margin_bottom = 23
+	dest.add_theme_stylebox_override("panel", d_sb)
+	sidebar.add_child(dest)
+
+	var dv := VBoxContainer.new()
+	dv.add_theme_constant_override("separation", 0)
+	dest.add_child(dv)
+	var eyebrow := HBoxContainer.new()
+	eyebrow.add_theme_constant_override("separation", 8)
+	_dest_eyebrow = _label("下一站", 11, Color(0.631, 0.796, 0.843))
+	_dest_eyebrow.add_theme_constant_override("line_spacing", 0)
+	_dest_eyebrow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	eyebrow.add_child(_dest_eyebrow)
+	dv.add_child(eyebrow)
+	_dest_name_label = _label("开往你想去的地方", 21, Color(0.949, 0.965, 0.929))
+	_dest_name_label.add_theme_constant_override("line_spacing", 0)
+	dv.add_child(_dest_name_label)
+	var gap1 := Control.new(); gap1.custom_minimum_size = Vector2(0, 9); dv.add_child(gap1)
+	_dest_status = _label("点击地图任意位置，或从右侧列表中选择目的地。",
+		12, Color(0.773, 0.859, 0.894))
+	_dest_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dest_status.custom_minimum_size = Vector2(300, 0)
+	dv.add_child(_dest_status)
+	var gap2 := Control.new(); gap2.custom_minimum_size = Vector2(0, 17); dv.add_child(gap2)
+
+	# 路线按钮（原版 atlas-route-actions：自动驾驶高亮、自己开过去描边）
+	var route_box := VBoxContainer.new()
+	route_box.add_theme_constant_override("separation", 8)
+	dv.add_child(route_box)
+	_btn_auto = _mk_route_button("自动驾驶前往  ↗", true)
 	_btn_auto.pressed.connect(func(): _on_choice_pressed(true))
-	_btn_manual = _mk_choice_button("自己开过去 →", Vector2(240, 0))
+	route_box.add_child(_btn_auto)
+	_btn_manual = _mk_route_button("自己开过去  →", false)
 	_btn_manual.pressed.connect(func(): _on_choice_pressed(false))
+	route_box.add_child(_btn_manual)
+
+	var gap3 := Control.new(); gap3.custom_minimum_size = Vector2(0, 10); dv.add_child(gap3)
+	var travel := HBoxContainer.new()
+	travel.add_theme_constant_override("separation", 8)
+	dv.add_child(travel)
+	_btn_travel = _mk_travel_button("移动到附近道路", 1.25)
+	_btn_travel.pressed.connect(func():
+		if not _dest.is_empty():
+			quick_travel_requested.emit(_dest["pos"]))
+	travel.add_child(_btn_travel)
+	_btn_photo = _mk_travel_button("俯瞰此处", 1.0)
+	_btn_photo.pressed.connect(func():
+		if not _dest.is_empty():
+			photo_requested.emit(_dest["pos"]))
+	travel.add_child(_btn_photo)
+
+	# —— 页脚 ——
+	var footer := HBoxContainer.new()
+	footer.custom_minimum_size = Vector2(0, 39)
+	var ft_panel := PanelContainer.new()
+	var ft_sb := StyleBoxFlat.new()
+	ft_sb.bg_color = Color(0.078, 0.173, 0.216)          ## #142c37
+	ft_sb.border_color = Color(0.647, 0.820, 0.878, 0.18)
+	ft_sb.border_width_top = 1
+	ft_sb.content_margin_left = 25; ft_sb.content_margin_right = 25
+	ft_panel.add_theme_stylebox_override("panel", ft_sb)
+	ft_panel.add_child(footer)
+	v.add_child(ft_panel)
+	var hint := _label("滚轮缩放 · 拖拽浏览 · 点击选择目的地", 10, Color(0.678, 0.784, 0.831))
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(hint)
+	footer.add_child(_label("© OpenStreetMap contributors · ODbL · 游戏比例地图", 9, Color(0.620, 0.741, 0.796)))
 
 
-func _mk_choice_button(text: String, pos: Vector2) -> Button:
+## 工具条包一层 PanelContainer（边框 + 底色）
+## 外壳尺寸：内容区留 clamp(14,2vw,34) 的边距，上限 1850×1060，居中
+## （原版 #map-panel 的 padding + .atlas-shell 的 max-width/max-height）
+func _layout_shell() -> void:
+	if _shell == null:
+		return
+	var vw := get_viewport().get_visible_rect().size.x
+	var vh := get_viewport().get_visible_rect().size.y
+	var pad := clampf(vw * 0.02, 14.0, 34.0)
+	var sw := minf(1850.0, vw - pad * 2.0)
+	var sh := minf(1060.0, vh - pad * 2.0)
+	_shell.position = Vector2((vw - sw) * 0.5, (vh - sh) * 0.5)
+	_shell.size = Vector2(sw, sh)
+
+
+func tools_wrap(panel: PanelContainer, sb: StyleBoxFlat, tools: VBoxContainer) -> void:
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(tools)
+
+
+func _add_tool_button(tools: VBoxContainer, text: String, action: Callable, tip: String = "") -> void:
 	var b := Button.new()
 	b.text = text
-	b.size = Vector2(224, 54)
-	b.position = pos
-	# ⚠️ 不能让按钮拿到焦点：点完地图关闭后，焦点若还留在按钮上，
-	# 开车时按空格（手刹）/ 回车会被当成"再点一次按钮"。
+	b.custom_minimum_size = Vector2(37, 36)
 	b.focus_mode = Control.FOCUS_NONE
-	# 默认字体不含中文，必须显式指定（与 Label 用同一套字体）
-	b.add_theme_font_override("font", _font(20))
-	b.add_theme_font_size_override("font_size", 20)
-	_choice_panel.add_child(b)
+	b.add_theme_font_override("font", _font(22))
+	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_color_override("font_color", Color(0.871, 0.945, 0.969))
+	b.add_theme_color_override("font_hover_color", Color(0.945, 0.988, 1.0))
+	b.pressed.connect(action)
+	if tip != "":
+		b.tooltip_text = tip
+	tools.add_child(b)
+
+
+func _add_tool_separator(tools: VBoxContainer) -> void:
+	var sep := ColorRect.new()
+	sep.color = Color(0.655, 0.831, 0.890, 0.26)
+	sep.custom_minimum_size = Vector2(0, 1)
+	var pad := Control.new()
+	pad.custom_minimum_size = Vector2(21, 2)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tools.add_child(pad)
+	tools.add_child(sep)
+	var pad2 := Control.new()
+	pad2.custom_minimum_size = Vector2(21, 2)
+	pad2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tools.add_child(pad2)
+
+
+func _mk_route_button(text: String, highlighted: bool) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(0, 45)
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_override("font", _font(13))
+	b.add_theme_font_size_override("font_size", 13)
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(7)
+	sb.content_margin_left = 13; sb.content_margin_right = 13
+	sb.content_margin_top = 12; sb.content_margin_bottom = 12
+	if highlighted:
+		sb.bg_color = Color(0.608, 0.871, 0.918)         ## #9bdeea
+		sb.border_color = Color(0.608, 0.871, 0.918)
+		b.add_theme_color_override("font_color", Color(0.078, 0.208, 0.267))
+		b.add_theme_color_override("font_hover_color", Color(0.078, 0.208, 0.267))
+		b.add_theme_color_override("font_pressed_color", Color(0.078, 0.208, 0.267))
+	else:
+		sb.bg_color = Color(0.090, 0.204, 0.259)         ## #173442
+		sb.border_color = Color(0.592, 0.800, 0.851, 0.34)
+		b.add_theme_color_override("font_color", Color(0.855, 0.929, 0.953))
+		b.add_theme_color_override("font_hover_color", Color(0.855, 0.929, 0.953))
+		b.add_theme_color_override("font_pressed_color", Color(0.855, 0.929, 0.953))
+	b.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate(); hb.bg_color = Color(0.710, 0.925, 0.957) if highlighted \
+		else Color(0.545, 0.851, 0.922, 0.075)
+	b.add_theme_stylebox_override("hover", hb)
+	b.add_theme_stylebox_override("pressed", sb)
+	b.visible = false
 	return b
+
+
+func _mk_travel_button(text: String, expand: float) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(0, 45)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_stretch_ratio = expand
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_override("font", _font(12))
+	b.add_theme_font_size_override("font_size", 12)
+	b.add_theme_color_override("font_color", Color(0.922, 0.969, 0.976))
+	b.add_theme_color_override("font_hover_color", Color(0.922, 0.969, 0.976))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.157, 0.322, 0.380)             ## #285261
+	sb.border_color = Color(0.631, 0.851, 0.906, 0.47)   ## #a1d9e779
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(7)
+	sb.content_margin_top = 12; sb.content_margin_bottom = 12
+	b.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate(); hb.bg_color = Color(0.208, 0.412, 0.478)
+	b.add_theme_stylebox_override("hover", hb)
+	b.add_theme_stylebox_override("pressed", sb)
+	b.disabled = true
+	return b
+
+
+func _label(text: String, size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_override("font", _font(size))
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+# ---------------------------------------------------------------------------
+# 地点目录 / 侧栏列表 / 目的地面板
+# ---------------------------------------------------------------------------
+
+## 目录 = 全部地标 + 每个显示名一条道路（取最长折线的中点）。
+## 分类规则照搬原版 asCatalog/isPark：地标数据带 category 时用之，否则
+## height===0 且名字命中 公园|湖|海滨|绿道 → park，其余 → landmark。
+func _build_catalog() -> void:
+	if _catalog_ready:
+		return
+	_catalog_ready = true
+	_catalog.clear()
+	var re_park := RegEx.new()
+	re_park.compile(RE_PARK)
+	for lm in CityData.all_landmarks():
+		var id := str(lm.get("id", ""))
+		var name := str(lm.get("name", ""))
+		var category := "landmark"
+		var explicit := str(lm.get("category", ""))
+		if CATEGORY_NAMES.has(explicit):
+			category = explicit
+		elif float(lm.get("height", 0.0)) == 0.0 and re_park.search(name) != null:
+			category = "park"
+		var pos := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
+		var arr = lm.get("arrival", null)
+		if arr is Array and (arr as Array).size() >= 2:
+			pos = Vector2(float(arr[0]), float(arr[1]))
+		_catalog.append({
+			"id": id, "name": name, "pos": pos,
+			"area": str(lm.get("area", "")), "category": category,
+			"visited": GameState.visited_destinations.has(name),
+		})
+	# 道路：按显示名聚合，折线最长的那条作为代表（原版 roadByName）
+	var best := {}
+	for r in CityData.roads:
+		var rn := str(r.get("display_name", ""))
+		if rn == "":
+			continue
+		var pts: PackedVector2Array = r["points"]
+		if pts.size() < 2:
+			continue
+		var length := 0.0
+		for i in range(1, pts.size()):
+			length += pts[i].distance_to(pts[i - 1])
+		if length > float(best.get(rn, {"len": -1.0}).get("len", -1.0)):
+			best[rn] = {"len": length, "pos": pts[pts.size() / 2]}
+	for rn in best:
+		_catalog.append({
+			"id": "road:" + rn, "name": rn, "pos": best[rn]["pos"],
+			"area": "深圳 · 道路", "category": "road", "visited": false,
+		})
+
+
+func _set_filter(category: String) -> void:
+	_filter_category = category
+	_style_filter_buttons()
+	_refresh_place_list()
+
+
+## 过滤按钮的选中态（原版 aria-pressed 样式）
+func _style_filter_buttons() -> void:
+	for i in _filter_buttons.size():
+		var b: Button = _filter_buttons[i]
+		var pressed: bool = FILTER_DEFS[i][0] == _filter_category
+		if pressed:
+			b.add_theme_color_override("font_color", Color(0.788, 0.957, 0.988))
+			b.add_theme_color_override("font_hover_color", Color(0.788, 0.957, 0.988))
+		else:
+			b.add_theme_color_override("font_color", Color(0.706, 0.796, 0.835))
+			b.add_theme_color_override("font_hover_color", Color(0.706, 0.796, 0.835))
+
+
+## 侧栏列表：过滤（分类 / 搜索词 / 已发现）→ 按与玩家的距离排序 → 前 70 条
+func _refresh_place_list() -> void:
+	_build_catalog()
+	for c in _place_list.get_children():
+		_place_list.remove_child(c)
+		c.queue_free()
+	var pos: Vector2 = player.data_position() if player != null else CityData.spawn_pos
+	var rows: Array = []
+	for place in _catalog:
+		if _filter_category != "all" and str(place["category"]) != _filter_category:
+			continue
+		# 原版：全部 且无搜索词时不列道路（道路只作为搜索结果出现）
+		if _filter_category == "all" and _search_query == "" and str(place["category"]) == "road":
+			continue
+		if _discovered_only and not GameState.visited_destinations.has(str(place["name"])):
+			continue
+		if _search_query != "" and not str(place["name"]).contains(_search_query) \
+				and not str(place["area"]).contains(_search_query):
+			continue
+		rows.append(place)
+	rows.sort_custom(func(a, b): return (Vector2(a["pos"]) - pos).length() \
+		< (Vector2(b["pos"]) - pos).length())
+	if _results_label != null:
+		_results_label.text = "%d 个地点" % rows.size()
+	for i in mini(rows.size(), LIST_LIMIT):
+		_place_list.add_child(_make_place_row(rows[i], pos))
+	if rows.size() == 0:
+		var empty := _label("没有匹配的地点。换个关键词，或切换上方的分类。",
+			12, Color(0.706, 0.804, 0.843))
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.custom_minimum_size = Vector2(300, 0)
+		var pad := Control.new(); pad.custom_minimum_size = Vector2(0, 30)
+		_place_list.add_child(pad)
+		_place_list.add_child(empty)
+
+
+## 一行地点：图标 + 名称/分类 + 距离（原版 .atlas-place）
+func _make_place_row(place: Dictionary, from: Vector2) -> Button:
+	var row := Button.new()
+	row.custom_minimum_size = Vector2(0, 66)
+	row.focus_mode = Control.FOCUS_NONE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.071, 0.169, 0.216, 0.12)      ## #122b371f
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 11; sb.content_margin_right = 11
+	sb.content_margin_top = 12; sb.content_margin_bottom = 12
+	row.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate(); hb.bg_color = Color(0.502, 0.812, 0.894, 0.075)
+	hb.border_color = Color(0.620, 0.839, 0.890, 0.20); hb.set_border_width_all(1)
+	row.add_theme_stylebox_override("hover", hb)
+	var pb := sb.duplicate(); pb.bg_color = Color(0.502, 0.820, 0.886, 0.125)
+	pb.border_color = Color(0.576, 0.867, 0.922, 0.45); pb.set_border_width_all(1)
+	row.add_theme_stylebox_override("pressed", pb)
+	row.add_theme_constant_override("h_separation", 11)
+
+	var category := str(place["category"])
+	var hrow := HBoxContainer.new()
+	hrow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hrow.add_theme_constant_override("separation", 11)
+	row.add_child(hrow)
+	var icon := _label(str(CATEGORY_ICONS.get(category, "◇")), 21, Color(0.643, 0.808, 0.855))
+	icon.custom_minimum_size = Vector2(32, 32)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var isb := StyleBoxFlat.new()
+	isb.bg_color = Color(0.518, 0.808, 0.902, 0.067)
+	isb.border_color = Color(0.549, 0.745, 0.808, 0.21)
+	isb.set_border_width_all(1)
+	isb.set_corner_radius_all(8)
+	icon.add_theme_stylebox_override("normal", isb)
+	hrow.add_child(icon)
+
+	var copy := VBoxContainer.new()
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	copy.add_theme_constant_override("separation", 5)
+	var name_l := _label(str(place["name"]), 13, Color(0.929, 0.957, 0.965))
+	name_l.add_theme_constant_override("line_spacing", 0)
+	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	copy.add_child(name_l)
+	var small_txt := str(CATEGORY_NAMES.get(category, ""))
+	if bool(place["visited"]):
+		small_txt += " · 已发现"
+	copy.add_child(_label(small_txt, 11, Color(0.651, 0.757, 0.804)))
+	hrow.add_child(copy)
+
+	var dist := (Vector2(place["pos"]) - from).length()
+	var dist_l := _label("%.1f km" % (dist / 1000.0), 11, Color(0.714, 0.808, 0.847))
+	dist_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hrow.add_child(dist_l)
+
+	row.pressed.connect(func(): _select_place(place))
+	return row
+
+
+## 列表点选 = 选中目的地 + 地图聚焦（原版 focusAt，district 2.1 其余 3.4）
+func _select_place(place: Dictionary) -> void:
+	_emit_destination(place["pos"], place["name"])
+	big_view = place["pos"]
+	big_scale = 2.1 if str(place["category"]) == "district" else 3.4
+	_map_canvas.queue_redraw()
+	_refresh_destination_panel()
+
+
+## 目的地面板：eyebrow / 名称 / 状态 / 两个出行按钮的可用性
+func _refresh_destination_panel() -> void:
+	if _dest_eyebrow == null:
+		return
+	if _dest.is_empty():
+		_dest_eyebrow.text = "下一站"
+		_dest_name_label.text = "开往你想去的地方"
+		_dest_status.text = "点击地图任意位置，或从右侧列表中选择目的地。"
+		_btn_travel.disabled = true
+		_btn_photo.disabled = true
+		return
+	var name := str(_dest.get("name", ""))
+	var category := "landmark"
+	for place in _catalog:
+		if str(place["name"]) == name:
+			category = str(place["category"])
+			break
+	_dest_eyebrow.text = "下一站 · " + str(CATEGORY_NAMES.get(category, "城市地标"))
+	if GameState.visited_destinations.has(name):
+		_dest_eyebrow.text += "　已发现"
+	_dest_name_label.text = name
+	_dest_status.text = "规划完成后选择驾驶方式；也可以直接移动到目的地附近。"
+	_btn_travel.disabled = player == null or player.mode != 0   ## Mode.CAR
+	_btn_photo.disabled = false
 
 
 func _on_choice_pressed(auto: bool) -> void:
@@ -279,16 +934,22 @@ func _on_choice_pressed(auto: bool) -> void:
 func show_route_choice(dest_name: String) -> void:
 	_choice_visible = true
 	_choice_name = dest_name
-	if _choice_panel != null:
-		_choice_panel.visible = true
-	big_map.queue_redraw()
+	if _btn_auto != null:
+		_btn_auto.visible = true
+	if _btn_manual != null:
+		_btn_manual.visible = true
+	_refresh_destination_panel()
+	_map_canvas.queue_redraw()
 
 
 func hide_route_choice() -> void:
 	_choice_visible = false
 	_choice_name = ""
-	if _choice_panel != null:
-		_choice_panel.visible = false
+	if _btn_auto != null:
+		_btn_auto.visible = false
+	if _btn_manual != null:
+		_btn_manual.visible = false
+	_refresh_destination_panel()
 
 
 ## 字号 → 字体缓存。
@@ -315,7 +976,7 @@ func hide_route_choice() -> void:
 var _font_cache := {}
 ## `_draw_big_map()` 与路线按钮用到的全部字号，在 `_build()` 里一次性预热
 ## 小地图叠加层的字号（N 标记 10、路名 13）也要预热
-const FONT_SIZES := [10, 12, 13, 14, 15, 16, 18, 20]
+const FONT_SIZES := [9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 21, 22, 25, 29]
 
 
 func _font(size: int) -> Font:
@@ -378,9 +1039,17 @@ func zoom_at(factor: float, screen_point: Vector2, size: Vector2) -> void:
 ## 让 extent 宽度大致铺满屏幕的缩放。按**实际窗口宽度**算，
 ## 不能写死 900 —— 在 1920/2560 宽的窗口上会缩得过小，看不出全城轮廓。
 func base_scale() -> float:
-	var vw := 900.0 if big_map == null else maxf(big_map.size.x, 240.0)
-	var w := CityData.extent.size.x * 1.2
-	return maxf(0.02, vw / maxf(w, 1.0))
+	# 打开地图的那一帧控件还没排完版，live size 会是 0 —— 按外壳公式推期望尺寸
+	var sz := _map_canvas.size
+	if sz.x < 100.0:
+		var vw := get_viewport().get_visible_rect().size.x
+		var vh := get_viewport().get_visible_rect().size.y
+		var pad := clampf(vw * 0.02, 14.0, 34.0)
+		sz = Vector2(minf(1850.0, vw - pad * 2.0) - 350.0,
+			minf(1060.0, vh - pad * 2.0) - 104.0 - 39.0)
+	var fit_w := sz.x / maxf(CityData.extent.size.x, 1.0)
+	var fit_h := sz.y / maxf(CityData.extent.size.y, 1.0)
+	return maxf(0.02, minf(fit_w, fit_h))
 
 
 static func _bbox_of(pts) -> Rect2:
@@ -701,15 +1370,14 @@ func toggle_big_map() -> void:
 	big_map_visible = not big_map_visible
 	big_map.visible = big_map_visible
 	if big_map_visible:
+		_layout_shell()
 		big_view = player.data_position() if player != null else CityData.spawn_pos
 		big_scale = base_scale()
-		# 已经选好目的地但还没选驾驶方式时，重开地图要把两个按钮带回来
-		if _choice_panel != null:
-			_choice_panel.visible = _choice_visible
-		big_map.queue_redraw()
-	elif _choice_panel != null:
-		# 关地图只是收起按钮，目的地本身仍然有效（原版 selected 也保留）
-		_choice_panel.visible = false
+		_build_catalog()
+		_refresh_place_list()
+		_refresh_destination_panel()
+		_map_canvas.queue_redraw()
+	# 关地图只是收起按钮，目的地本身仍然有效（原版 selected 也保留）
 	big_map_toggled.emit(big_map_visible)
 
 
@@ -725,15 +1393,15 @@ func toggle_big_map() -> void:
 ## 事件统一 accept_event()，让大地图成为鼠标的绝对屏障。）
 func _on_map_input(event: InputEvent) -> void:
 	if event is InputEventMouse:
-		big_map.accept_event()
+		_map_canvas.accept_event()
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
-			zoom_at(1.15, mb.position, big_map.size)
-			big_map.queue_redraw()
+			zoom_at(1.15, mb.position, _map_canvas.size)
+			_map_canvas.queue_redraw()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
-			zoom_at(1.0 / 1.15, mb.position, big_map.size)
-			big_map.queue_redraw()
+			zoom_at(1.0 / 1.15, mb.position, _map_canvas.size)
+			_map_canvas.queue_redraw()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
 			_dragging = mb.pressed
 			if mb.pressed:
@@ -750,7 +1418,7 @@ func _on_map_input(event: InputEvent) -> void:
 		var delta := mm.position - _drag_last
 		_drag_last = mm.position
 		big_view += Vector2(-delta.x / big_scale, delta.y / big_scale)
-		big_map.queue_redraw()
+		_map_canvas.queue_redraw()
 
 
 ## 在屏幕坐标附近找最近的地标；命中则记录目的地并广播。
@@ -767,7 +1435,7 @@ func _pick_destination(s: Vector2) -> void:
 	var best_d := PICK_RADIUS
 	for lm in CityData.all_landmarks():
 		var p := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
-		var sp := map_to_screen(p, big_view, big_scale, big_map.size)
+		var sp := map_to_screen(p, big_view, big_scale, _map_canvas.size)
 		var d := sp.distance_to(s)
 		if d < best_d:
 			best_d = d
@@ -798,7 +1466,7 @@ func _pick_destination(s: Vector2) -> void:
 func _snap_to_road(s: Vector2) -> Dictionary:
 	if world == null or world.graph == null or world.graph.nodes.is_empty():
 		return {}
-	var m := screen_to_map(s, big_view, big_scale, big_map.size)
+	var m := screen_to_map(s, big_view, big_scale, _map_canvas.size)
 	var near: Dictionary = world.graph.nearest_edge(m)
 	if near.is_empty():
 		return {}
@@ -821,7 +1489,7 @@ func _emit_destination(pos: Vector2, dest_name: String) -> void:
 	# 按钮先收起来：要等 main_game 规划成功（show_route_choice）后再出现，
 	# 否则会短暂显示一个"规划失败"的目的地也能点的状态
 	hide_route_choice()
-	big_map.queue_redraw()
+	_map_canvas.queue_redraw()
 	destination_picked.emit(pos, dest_name)
 
 
@@ -829,13 +1497,13 @@ func _emit_destination(pos: Vector2, dest_name: String) -> void:
 func clear_destination() -> void:
 	if not _dest.is_empty():
 		_dest = {}
-		big_map.queue_redraw()
+		_map_canvas.queue_redraw()
 	hide_route_choice()
 
 
 func _draw_big_map() -> void:
-	var size := big_map.size
-	big_map.draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.05, 0.92))
+	var size := _map_canvas.size
+	_map_canvas.draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.05, 0.92))
 
 	# 海域底色：整个 extent
 	var ext := CityData.extent
@@ -845,7 +1513,7 @@ func _draw_big_map() -> void:
 		map_to_screen(ext.end, big_view, big_scale, size),
 		map_to_screen(Vector2(ext.position.x, ext.end.y), big_view, big_scale, size),
 	])
-	big_map.draw_colored_polygon(corners, Color(0.05, 0.11, 0.16))
+	_map_canvas.draw_colored_polygon(corners, Color(0.05, 0.11, 0.16))
 
 	# 陆地
 	for ring in CityData.land_rings:
@@ -901,7 +1569,7 @@ func _draw_big_map() -> void:
 		for p in pts:
 			line.append(map_to_screen(p, big_view, big_scale, size))
 		if line.size() >= 2:
-			big_map.draw_polyline(line, col, wdt, true)
+			_map_canvas.draw_polyline(line, col, wdt, true)
 
 	# 地标：圆点**始终**绘制（只有几十个，开销可忽略，也是点选目的地的靶心）；
 	# 名称只在 zoom ≥ 1.1 时画，否则全城视图下几十个中文标签会糊成一片。
@@ -911,9 +1579,9 @@ func _draw_big_map() -> void:
 		var s := map_to_screen(p, big_view, big_scale, size)
 		if s.x < 0.0 or s.y < 0.0 or s.x > size.x or s.y > size.y:
 			continue
-		big_map.draw_circle(s, 4.0, Color(0.95, 0.82, 0.45))
+		_map_canvas.draw_circle(s, 4.0, Color(0.95, 0.82, 0.45))
 		if big_scale >= 1.1:
-			big_map.draw_string(font, s + Vector2(8, 5), str(lm.get("name", "")),
+			_map_canvas.draw_string(font, s + Vector2(8, 5), str(lm.get("name", "")),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.96, 0.94, 0.88))
 
 	# 自动驾驶路线（浅绿，双层描边；原版 onAutoDrive 后大地图同样绘制）
@@ -923,23 +1591,23 @@ func _draw_big_map() -> void:
 			var rline := PackedVector2Array()
 			for p in route:
 				rline.append(map_to_screen(p, big_view, big_scale, size))
-			big_map.draw_polyline(rline, Color(0.10, 0.12, 0.14, 0.85), 6.0, true)
-			big_map.draw_polyline(rline, Color(0.55, 0.95, 0.60), 3.0, true)
+			_map_canvas.draw_polyline(rline, Color(0.10, 0.12, 0.14, 0.85), 6.0, true)
+			_map_canvas.draw_polyline(rline, Color(0.55, 0.95, 0.60), 3.0, true)
 
 	# 目的地标记（金色圆点 + 名字）
 	if not _dest.is_empty():
 		var dpos: Vector2 = _dest["pos"]
 		var ds := map_to_screen(dpos, big_view, big_scale, size)
-		big_map.draw_circle(ds, 7.0, Color(0.98, 0.80, 0.35))
-		big_map.draw_arc(ds, 12.0, 0.0, TAU, 28, Color(0.98, 0.80, 0.35), 2.0, true)
-		big_map.draw_string(_font(15), ds + Vector2(14, 5), str(_dest.get("name", "")),
+		_map_canvas.draw_circle(ds, 7.0, Color(0.98, 0.80, 0.35))
+		_map_canvas.draw_arc(ds, 12.0, 0.0, TAU, 28, Color(0.98, 0.80, 0.35), 2.0, true)
+		_map_canvas.draw_string(_font(15), ds + Vector2(14, 5), str(_dest.get("name", "")),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.98, 0.90, 0.70))
 
 	# 玩家
 	if player != null:
 		var ps := map_to_screen(player.data_position(), big_view, big_scale, size)
-		big_map.draw_circle(ps, 6.0, Color(0.98, 0.35, 0.25))
-		big_map.draw_arc(ps, 9.0, 0.0, TAU, 24, Color(0.98, 0.90, 0.60), 2.0, true)
+		_map_canvas.draw_circle(ps, 6.0, Color(0.98, 0.35, 0.25))
+		_map_canvas.draw_arc(ps, 9.0, 0.0, TAU, 24, Color(0.98, 0.90, 0.60), 2.0, true)
 
 	# 待选驾驶方式：按钮上方给出路线概览（原版 #destination-status：
 	# "沿道路约 3.2 公里 · 抵达目的地周边" / "目的地就在附近"）
@@ -955,7 +1623,7 @@ func _draw_big_map() -> void:
 			info += " · 目的地就在附近"
 		var info_font := _font(18)
 		var w := info_font.get_string_size(info, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		big_map.draw_string(info_font, Vector2(size.x * 0.5 - w * 0.5, size.y - 128), info,
+		_map_canvas.draw_string(info_font, Vector2(size.x * 0.5 - w * 0.5, size.y - 128), info,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.92, 0.88, 0.70))
 
 	# 比例尺：固定画 100 像素长的横杠，标注它代表的**米数** = 100 / big_scale。
@@ -963,11 +1631,11 @@ func _draw_big_map() -> void:
 	var bar_px := 100.0
 	var bar_m := bar_px / maxf(big_scale, 0.0001)
 	var font2 := _font(14)
-	big_map.draw_line(Vector2(40, size.y - 40), Vector2(40 + bar_px, size.y - 40),
+	_map_canvas.draw_line(Vector2(40, size.y - 40), Vector2(40 + bar_px, size.y - 40),
 		Color(0.90, 0.92, 0.94), 2.0, true)
-	big_map.draw_string(font2, Vector2(40, size.y - 50), _scale_label(bar_m),
+	_map_canvas.draw_string(font2, Vector2(40, size.y - 50), _scale_label(bar_m),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.90, 0.92, 0.94))
-	big_map.draw_string(font2, Vector2(40, size.y - 20),
+	_map_canvas.draw_string(font2, Vector2(40, size.y - 20),
 		"M 关闭 · 滚轮缩放 · 拖动平移 · 点击地标或任意道路 = 规划路线 · 缩放 %.2f" % big_scale,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.80, 0.85, 0.90))
 
@@ -984,8 +1652,8 @@ func _draw_ring_big(ring: Array, col: Color) -> void:
 		return
 	var poly := PackedVector2Array()
 	for p in ring:
-		poly.append(map_to_screen(Vector2(float(p[0]), float(p[1])), big_view, big_scale, big_map.size))
-	big_map.draw_colored_polygon(poly, col)
+		poly.append(map_to_screen(Vector2(float(p[0]), float(p[1])), big_view, big_scale, _map_canvas.size))
+	_map_canvas.draw_colored_polygon(poly, col)
 
 
 ## 小地图重绘节流。
@@ -1010,4 +1678,4 @@ func update_ui(delta: float) -> void:
 		return
 	_redraw_timer = REDRAW_INTERVAL
 	if big_map_visible:
-		big_map.queue_redraw()
+		_map_canvas.queue_redraw()

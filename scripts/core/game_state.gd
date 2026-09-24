@@ -41,6 +41,7 @@ var light_mode: int = GameContent.LightMode.SUNSET
 var rain := false
 var graphics_tier := "medium"  ## low | medium | high
 var completed_rides: Array[String] = []
+var visited_destinations: Array[String] = []   ## 城市足迹：到过的目的地名
 var audio_enabled := true
 var paused := false
 

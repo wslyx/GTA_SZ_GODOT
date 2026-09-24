@@ -53,6 +53,12 @@ var _explosion_env := 0.0
 var _horn_env := 0.0
 var _unlocked := false
 
+## 播放偏好（原版 city-audio.ts 的 AudioPreferences，暂停页可调）：
+##   effects = 车辆 / 环境音量，music = 海湾晚风 · BGM 音量
+var effects_volume := 0.6
+var music_volume := 0.4
+var muted := false
+
 
 func _ready() -> void:
 	player = AudioStreamPlayer.new()
@@ -163,7 +169,9 @@ func _sample() -> float:
 	var horn := sin(_bgm_phase * TAU * 2.0) * _horn_env * 0.12
 	_bgm_phase = fposmod(_bgm_phase + 320.0 / SAMPLE_RATE, 1.0)
 
-	return clampf(motor + tri + roll + wind + slip + bgm + boom + horn, -1.0, 1.0)
+	return clampf(
+		(motor + tri + roll + wind + slip + boom + horn) * (0.0 if muted else effects_volume)
+		+ bgm * (0.0 if muted else music_volume), -1.0, 1.0)
 
 
 ## 《海湾晚风》：72 BPM，每拍换音，五声音阶游走
