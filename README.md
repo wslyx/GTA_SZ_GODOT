@@ -238,9 +238,10 @@ GTA_SZ_GODOT/
   `world.ts` 客户端，`main.ts` 并未引用它。本版把它的**状态模型与数值**完整搬进了
   `GameState` + `GameContent`（`start_work` / `sort_parcel` / `advance_checkpoint` /
   `payout` / `buy` / `meet` / `next_day` 与校验规则全部照搬），但**没有做那套街区场景与 UI**。
-- **地标候选的地面片过滤**：原版会丢弃候选地标里 `_water` 平板与扁平的 `_park` 平板
-  （避免正射视角下出现"发亮的蓝薄片"）。本版保留了这个判断所需的 `isCandidateGroundSlab`
-  等价逻辑，但简化了包围盒计算 —— 极端情况下可能有少量平板残留。
+- **地标候选的地面片过滤**：原版 `isCandidateGroundSlab` 会丢弃候选地标里全部 `_water` 平板
+  与 park 类候选的扁平 `_park` 平板（跨度 < 1.5 m），避免"发亮的蓝薄片"盖住路面
+  （深圳湾公园那块 874×235 m 曾压住滨海大道辅路，车身下缘被切在轮子高度）。
+  本版按原版判据一比一实现于 `CityWorld._is_candidate_ground_slab`。
 
 ---
 

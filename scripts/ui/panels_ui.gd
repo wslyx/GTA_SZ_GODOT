@@ -502,7 +502,12 @@ func _layout_loading() -> void:
 		return
 	var vw := get_viewport().get_visible_rect().size.x
 	var vh := get_viewport().get_visible_rect().size.y
-	_lr.size = Vector2(vw, vh)
+	# `_lr` 是 full rect 锚点，且它的父节点是 CanvasLayer 而非 Control —— 锚点直接对
+	# viewport 可见矩形求解，尺寸已经等于 (vw, vh) 且随窗口自动跟随。
+	# 这里**不能**再写 `_lr.size = Vector2(vw, vh)`：对左右/上下锚点不相等的控件
+	# 直接赋 size，Godot 会报
+	#   "Nodes with non-equal opposite anchors will have their size overridden after _ready()"
+	# 并在布局时把它覆盖回去（等于白设）。子控件不是锚点定位，用的仍是下面的 vw/vh。
 
 	var ui := _ui_font()
 	var serif := _serif_font()

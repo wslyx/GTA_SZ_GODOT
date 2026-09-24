@@ -35,6 +35,18 @@ const SHADOW_RADIUS_AERIAL := 1650.0
 const FACADE_SHOW := 700.0
 const FACADE_QUEUE := 1050.0
 
+## 候选地标的「地面平板」判据（原版 landmark-details.ts 的 isCandidateGroundSlab）。
+##
+## 候选块模型把公园画成 `_park` / `_water` 平板（深圳湾公园 874×235 m、人才公园
+## 414×351 m、红树林 1123×126 m …），它们只高出地面 0～0.8 m、无视地形起伏、
+## 也不走海面着色器，平视/正射下就是一张发亮的蓝片把路面盖住（实测深圳湾公园那块
+## 正好压住滨海大道辅路，车身下缘被切在轮子高度）。原版运行时**全部丢弃**：
+##   - 任何候选 `_water` 平板；
+##   - `candidateKind === 'park'` 且高度跨度 < 1.5 m 的 `_park` 平板
+##     （笔架山那块跨度 49 m，是真地形，必须保留）。
+const CANDIDATE_SLAB_RE := "^landmark_(.+)_(water|park)$"
+const CANDIDATE_PARK_SLAB_MAX_SPAN := 1.5
+
 # --- 地基服务 ---------------------------------------------------------------
 var height_field: HeightField
 var collision: CityCollision
@@ -56,6 +68,8 @@ var chunks_root: Node3D
 var blocks: Array = []
 var landmark_nodes: Array = []
 var _chunk_index: Dictionary = {}  ## "i_j" → Node3D
+## 候选地标 id（下划线形式）→ candidateKind，判据 isCandidateGroundSlab 用
+var _candidate_kinds: Dictionary = {}
 
 # --- 子系统（由 main_game 注入）---------------------------------------------
 # 注意：`facades` 曾经漏掉声明，导致 _plan_facades / on_quality_changed 里
@@ -541,10 +555,24 @@ func _index_building_chunks() -> void:
 	print("[CityWorld] 分块索引：%d 个" % blocks.size())
 
 
+## 从 landmark-detail / landmark-candidates 里解析 `detail_block_i_j_` 分块名。
+##
+## `detail == false`（候选地标）时，还要先过一道 isCandidateGroundSlab 闸门：
+## 候选模型里的 `_water` / 扁平 `_park` 平板不属于地标本体，留着重则盖住路面
+## （原版是 `m.dispose(false,false)` 直接销毁，见 city-world.ts 的候选装载循环）。
 func _collect_landmark_chunks(root: Node3D, detail: bool) -> void:
 	var re := RegEx.new()
 	re.compile("detail_block_(-?\\d+)_(-?\\d+)_")
+	var slab_re := RegEx.new()
+	if not detail:
+		slab_re.compile(CANDIDATE_SLAB_RE)
+		_ensure_candidate_kinds()
+	var slabs := 0
 	for mi in GlbLoader.meshes_of(root):
+		if not detail and _is_candidate_ground_slab(mi, slab_re):
+			mi.queue_free()
+			slabs += 1
+			continue
 		var m := re.search(mi.name)
 		if m != null:
 			var i := int(m.get_string(1))
@@ -556,6 +584,37 @@ func _collect_landmark_chunks(root: Node3D, detail: bool) -> void:
 			})
 		else:
 			landmark_nodes.append(mi)
+	if slabs > 0:
+		print("[CityWorld] 候选地标：丢弃地面平板 %d 个" % slabs)
+
+
+## 原版 isCandidateGroundSlab()：候选地标的 `_water` 平板一律丢；`_park` 平板
+## 只在它属于 park 类候选、且世界高度跨度 < 1.5 m（即"平板"而非地形）时丢。
+func _is_candidate_ground_slab(mi: MeshInstance3D, re: RegEx) -> bool:
+	var m := re.search(mi.name)
+	if m == null:
+		return false
+	if m.get_string(2) == "water":
+		return true
+	if str(_candidate_kinds.get(m.get_string(1), "")) != "park":
+		return false
+	# 跨度取世界空间包围盒高度（原版用 boundingBox.maximumWorld − minimumWorld）。
+	# 用 Mesh 资源自己的 AABB（确定是网格本地空间）再乘实例的世界变换，
+	# 不依赖 MeshInstance3D.get_aabb() 的坐标空间约定。
+	if mi.mesh == null:
+		return false
+	var box := mi.global_transform * mi.mesh.get_aabb()
+	return box.size.y < CANDIDATE_PARK_SLAB_MAX_SPAN
+
+
+## 候选地标 id → candidateKind。原版是
+## `manifest.landmarks.find(l => l.id.replace(/-/g,'_') === match[1])`，
+## 这里预先摊平成字典，避免每个平板都线性扫 37 条。
+func _ensure_candidate_kinds() -> void:
+	if not _candidate_kinds.is_empty():
+		return
+	for lm in CityData.landmark_candidates.get("landmarks", []):
+		_candidate_kinds[str(lm.get("id", "")).replace("-", "_")] = str(lm.get("candidateKind", ""))
 
 
 ## 按 replacedMeshPrefixes 把被地标替换掉的旧网格从场景中移除
