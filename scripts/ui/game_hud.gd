@@ -117,6 +117,34 @@ const INV_DISTANCE_LIMIT := 300.0
 const STORY_ENTRY_PAD := Vector2(14.0, 11.0)
 const STORY_HUD_PAD := Vector2(15.0, 14.0)
 
+## 原版 city-quicktips.ts 的 QUICK 表（四模式，键位/说明逐字照搬）
+const QUICK_TIPS := {
+	"driving": [
+		{"key": "WASD", "label": "驾驶"}, {"key": "T", "label": "坦克"},
+		{"key": "空格", "label": "手刹"}, {"key": "C", "label": "镜头"},
+		{"key": "F", "label": "下车"}, {"key": "G", "label": "观景"},
+		{"key": "Y", "label": "雨天"},
+	],
+	"walking": [
+		{"key": "WASD", "label": "行走"}, {"key": "滚轮", "label": "远近"},
+		{"key": "C", "label": "人称"}, {"key": "Shift", "label": "跑步"},
+		{"key": "拖动", "label": "看向"}, {"key": "F", "label": "上车"},
+		{"key": "E", "label": "互动"},
+	],
+	"observer": [
+		{"key": "WASD", "label": "平移"}, {"key": "Q E", "label": "升降"},
+		{"key": "拖动", "label": "环绕"}, {"key": "B", "label": "飞机"},
+		{"key": "G / F", "label": "返回"}, {"key": "滚轮", "label": "远近"},
+	],
+	"tank": [
+		{"key": "WASD", "label": "驾驶"}, {"key": "Q E", "label": "炮塔"},
+		{"key": "空格", "label": "开炮"}, {"key": "T", "label": "轿车"},
+		{"key": "F", "label": "下车"}, {"key": "C", "label": "镜头"},
+	],
+}
+## 原版 LABELS：左端的模式名（carView 时是「看车」，本版未做看车镜头）
+const QUICK_LABELS := {"driving": "驾驶", "walking": "步行", "observer": "观景", "tank": "坦克"}
+
 var world: CityWorld
 var player = null
 var enabled := true
@@ -161,6 +189,7 @@ var _show_fps := false
 var _dial_scale := Vector2.ONE
 var _tip_mode := "driving"
 var _tip_items: Array = []
+var _tip_mode_txt := "驾驶"
 var _tip_boxes: Array = []
 
 const AREA_CACHE_RADIUS := 150.0
@@ -481,16 +510,9 @@ func _build_quicktips() -> void:
 	_quicktips.draw.connect(_draw_quicktips)
 	_root.add_child(_quicktips)
 
-	# 原版 QUICK['driving']，secondary 标记只影响窄屏（≤1200px 隐藏），这里全显示
-	_tip_items = [
-		{"key": "WASD", "label": "驾驶"},
-		{"key": "T", "label": "坦克"},
-		{"key": "空格", "label": "手刹"},
-		{"key": "C", "label": "镜头"},
-		{"key": "F", "label": "下车"},
-		{"key": "G", "label": "观景"},
-		{"key": "Y", "label": "雨天"},
-	]
+	# 原版 city-quicktips.ts 的 QUICK 表（四模式），secondary 的窄屏隐藏项这里全显示。
+	# 注意：条目随模式切换，_tip_boxes 只建「最大条目数」个，多余的保持隐藏。
+	_tip_items = QUICK_TIPS[_tip_mode]
 	for it in _tip_items:
 		var b := _kbd(str(it["key"]), _f_tip, 9, TIP_KBD_EDGE, TIP_KBD_TEXT, Vector2(4, 1), 2)
 		b.visible = false
@@ -499,6 +521,9 @@ func _build_quicktips() -> void:
 	var q := _kbd("?", _f_tip, 9, TIP_KBD_EDGE, TIP_KBD_TEXT, Vector2(4, 1), 2)
 	q.visible = false
 	_quicktips.add_child(q)
+	# ⚠️ 必须入列：_draw_quicktips 把 _tip_boxes 的**最后一个**当「? 操作」切换钮。
+	# 之前漏了这句，导致切换钮一直显示最后一个条目的键位（驾驶模式显示 [Y]）。
+	_tip_boxes.append(q)
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +639,25 @@ func update_hud(delta: float) -> void:
 	var area := _area_name(pos)
 	# 原版：subtitle = `${areaLabel} · ${mode}`，mode 取 自由驾驶 / 沿途导航 / 步行探索 …
 	_subtitle.text = "%s · %s" % [area if area != "" else "深圳湾", _mode_word()]
+	# 原版 city-quicktips.ts:183 的模式切换：driving/walking/observer/tank，
+	# 飞行中整个快捷条隐藏（quickTips.update({hidden: !!world.flight?.active})）
+	var tip_mode := "driving"
+	if player.mode == MainGame.Mode.AIRCRAFT or player.is_observer():
+		tip_mode = "observer"
+	elif player.mode == MainGame.Mode.WALKING:
+		tip_mode = "walking"
+	elif player.mode == MainGame.Mode.TANK:
+		tip_mode = "tank"
+	var flying: bool = player.mode == MainGame.Mode.AIRCRAFT
+	if _quicktips.visible == flying:
+		_quicktips.visible = not flying
+	if tip_mode != _tip_mode:
+		_tip_mode = tip_mode
+		_tip_mode_txt = str(QUICK_LABELS[tip_mode])
+		_tip_items = QUICK_TIPS[tip_mode]
+		_apply_tip_boxes()
+		_quicktips.queue_redraw()
+
 	_refresh_story()
 	_refresh_invitation()
 	# 卡片高度由内容决定，低对比度的左侧强调线跟着它同步
@@ -805,6 +849,22 @@ func _draw_arc_path(from_deg: float, to_deg: float, radius: float, color: Color,
 # 快捷键条（city-quicktips.css）
 # ---------------------------------------------------------------------------
 
+## 模式切换时更新键位小方块的文字（_tip_boxes 只建了最大条目数个，
+## 末尾那个是「? 操作」常驻块，不能覆盖）
+func _apply_tip_boxes() -> void:
+	var total := _tip_boxes.size()
+	var q_index := total - 1
+	for i in total:
+		if i == q_index:
+			continue
+		var box: PanelContainer = _tip_boxes[i]
+		if i < _tip_items.size():
+			(box.get_child(0) as Label).text = str(_tip_items[i]["key"])
+			box.visible = true
+		else:
+			box.visible = false
+
+
 func _draw_quicktips() -> void:
 	if _tip_boxes.is_empty():
 		return
@@ -813,7 +873,7 @@ func _draw_quicktips() -> void:
 	var gap := 17.0        ## .city-quicktips ul { gap: 17px }
 	var item_gap := 5.0    ## .city-quicktips li { gap: 5px }
 	var line_h := 30.0     ## .city-quicktips-line { min-height: 30px }
-	var mode_txt := "驾驶"  ## LABELS['driving']
+	var mode_txt := _tip_mode_txt  ## 原版 LABELS[mode]，随模式切换
 
 	# ---- 量宽 ----
 	var mode_w := _f_dial_label.get_string_size(mode_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, mode_size).x

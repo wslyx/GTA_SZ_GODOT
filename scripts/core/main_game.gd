@@ -56,6 +56,12 @@ var _walk_first_person := false
 var _car_model: Node3D
 var _tank_model: Node3D
 var _plane_model: Node3D
+## 步行时的角色本体（原版 city-rider.ts）。
+## ⚠️ 用 preload 而不是全局类名 Rider：新增脚本的 class_name 要等编辑器
+## 重扫一次才会进全局类缓存，运行时直接跑会报 "Could not find type Rider"。
+const RIDER_SCRIPT := preload("res://scripts/vehicles/rider.gd")
+var _rider = null                   ## RIDER_SCRIPT 实例（untyped：全局类名未注册）
+var _rider_yaw := 0.0               ## 角色 yaw 平滑跟随移动方向（原版 riderYaw）
 var _pending_level_up_dialogue := {}
 
 func _ready() -> void:
@@ -164,6 +170,14 @@ func _load_vehicle_models() -> void:
 		_tank_model.visible = false
 	if _plane_model != null:
 		_plane_model.visible = false
+	# 步行角色（原版 city-rider.ts 的久岐忍）。原版是按 F 下车时才异步加载
+	# （提示"正在准备步行角色"）；这里文件在本地，直接在加载画面后面同步预载，
+	# 首次按 F 不卡顿，12MB 模型的实例化成本也藏进了启动加载。
+	_rider = RIDER_SCRIPT.new()
+	_rider.name = "PlayerRider"
+	add_child(_rider)
+	_rider.setup()
+	_rider.visible = false
 	# 主角车辆的车漆 / 玻璃 / 轮毂材质标定（原版 refineHeroVehicleMaterials）。
 	# 必须在实例化之后做：GLB 材质是共享资源，改的正是那些共享实例。
 	if _car_model != null:
@@ -327,6 +341,7 @@ func _on_key(k: InputEventKey) -> void:
 		KEY_C:
 			if mode == Mode.WALKING:
 				_walk_first_person = not _walk_first_person
+				hud.toast("步行 · 第一人称" if _walk_first_person else "步行 · 第三人称")
 			else:
 				camera.next_view()
 		KEY_F:
@@ -517,8 +532,10 @@ func _toggle_vehicle_entry() -> void:
 		maps.clear_destination()
 		_clear_pending()
 		_walk_first_person = false
+		# 原版 riderYaw = walk.yaw：模型先朝向下车时的视线方向，走起来再转向移动方向
+		_rider_yaw = walk.yaw
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
-		hud.toast("步行：W/A/S/D 走，Shift 跑，C 换人称")
+		hud.toast("%s · WASD 行走 / Shift 跑步 / 拖动环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
 	elif mode == Mode.WALKING:
 		var v2 := _vehicle_state()
 		if not walk.can_enter(v2, 5.0, WALK_EXIT_OFFSET):
@@ -538,7 +555,9 @@ func _toggle_vehicle_entry() -> void:
 				_car_model.visible = true
 			camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 		walk.active = false
-		hud.toast("上车")
+		if _rider != null:
+			_rider.set_enabled(false)
+		hud.toast("已上车 · C 切换驾驶镜头")
 
 func _vehicle_state() -> Dictionary:
 	if mode == Mode.TANK:
@@ -771,6 +790,7 @@ func _step_tank(dt: float) -> void:
 	lights.place(_tank_model.global_transform if _tank_model != null else camera.global_transform)
 
 func _step_walk(dt: float) -> void:
+	var before := Vector2(walk.x, walk.z)
 	walk.step({
 		"forward": Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP),
 		"back": Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN),
@@ -782,12 +802,27 @@ func _step_walk(dt: float) -> void:
 		"up_arrow": Input.is_key_pressed(KEY_UP),
 		"down_arrow": Input.is_key_pressed(KEY_DOWN),
 	}, dt)
+	# 角色 yaw 平滑转向**移动方向**（原版 riderYaw，速率 exp(−dt·16)）；
+	# 视线方向是 walk.yaw，由相机单独处理
+	if walk.moving:
+		var target := atan2(walk.x - before.x, walk.z - before.y)
+		var delta := atan2(sin(target - _rider_yaw), cos(target - _rider_yaw))
+		_rider_yaw += delta * (1.0 - exp(-dt * 16.0))
 	var eye := walk.eye()
 	walk_eye_world = CoordinateUtil.to_world(eye["x"], eye["z"], eye["y"])
 	camera.walk_eye = walk_eye_world
 	camera.yaw = walk.yaw
 	camera.look_pitch = walk.pitch
 	camera.follow_walk(dt, walk.camera_distance, _walk_first_person)
+	# 角色本体：第三人称显示、第一人称隐藏（原版 setEnabled(walk.active && !firstPerson)）
+	if _rider != null:
+		_rider.set_enabled(mode == Mode.WALKING and not _walk_first_person)
+		var ground := world.height_field.height_at(walk.x, walk.z)
+		_rider.set_pose(
+			CoordinateUtil.to_world(walk.x, walk.z, ground).x,
+			ground,
+			CoordinateUtil.to_world(walk.x, walk.z, ground).z,
+			_rider_yaw, 0.0 if paused else walk.speed, dt)
 
 var walk_eye_world := Vector3.ZERO
 

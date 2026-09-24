@@ -40,7 +40,12 @@ extends Node
 ##   "drive"  —— 真开起来量：合成按住 W（必要时转向），跑 DRIVE_FRAMES 帧。
 ##               静止不动测不出流式加载/小地图平移带来的卡顿，而用户是开着车玩的。
 ##   "mapshot" —— 按 M 打开大地图，等 1.5s 抓一张（验证烘焙改动没破坏大地图路径）
+##   "walkshot" —— 下车链路验证：F 下车 → 截图（第三人称）→ 按住 W 走 → 截图 →
+##               C 第一人称 → 截图 → C 回第三人称 → F 上车 → 截图
 const MODE := "matrix"
+var _ws_phase := 0
+var _ws_t := 0.0
+var _ws_wait := 0.0
 var _map_phase := 0
 const DRIVE_FRAMES := 600
 
@@ -162,6 +167,9 @@ func _process(delta: float) -> void:
 	if MODE == "mapshot":
 		_mapshot_tick(delta)
 		return
+	if MODE == "walkshot":
+		_walkshot_tick(delta)
+		return
 	match phase:
 		Phase.BOOT:
 			_tick_boot(delta)
@@ -209,6 +217,13 @@ func _process(delta: float) -> void:
 			pass
 
 
+## 就绪判断：不要写 bool(main.get(...)) —— 主场景脚本万一加载失败，
+## get() 返回 null，bool(null) 在运行时会报 "Nonexistent 'bool' constructor"
+func _session_ready() -> bool:
+	var v = main.get("session_ready") if main != null else false
+	return v == true
+
+
 ## loadshot：按启动时刻抓图（不进入状态机、不等 session_ready）
 func _loadshot_tick(delta: float) -> void:
 	_boot_time += delta
@@ -236,7 +251,7 @@ func _capture_shot(shot_name: String) -> void:
 func _tick_boot(delta: float) -> void:
 	if main == null:
 		return
-	if not bool(main.get("session_ready")):
+	if not _session_ready():
 		return
 	world = main.get("world")
 	if world == null:
@@ -454,9 +469,70 @@ func _round_summary() -> void:
 		_buckets[0], _buckets[1], _buckets[2], _buckets[3], _buckets[4], _frames])
 
 
+## walkshot：下车步行链路的整链验证
+func _walkshot_tick(delta: float) -> void:
+	if not _session_ready():
+		return
+	_ws_t += delta
+	if _ws_t < _ws_wait:
+		return
+	_ws_t = 0.0
+	match _ws_phase:
+		0:
+			# 等 1s 让加载画面淡出结束，再开始按 F
+			_ws_wait = 1.0
+			_ws_phase = 1
+		1:
+			_press_key(KEY_F, true)
+			_press_key(KEY_F, false)
+			print("[perf] 已按 F 下车")
+			_next_ws(1.4)
+		2:
+			_capture_shot("walk_3rd_idle")
+			_next_ws(0.3)
+		3:
+			_press_key(KEY_W, true)
+			print("[perf] 按住 W 行走")
+			_next_ws(2.2)
+		4:
+			_capture_shot("walk_3rd_walk")
+			# 隔 1.6s 再抓一张：走路动画若没循环，两帧腿部姿态会完全一样
+			_next_ws(1.6)
+		5:
+			_capture_shot("walk_3rd_walk2")
+			_next_ws(0.2)
+		6:
+			_press_key(KEY_C, true)
+			_press_key(KEY_C, false)
+			_next_ws(1.0)
+		7:
+			_capture_shot("walk_1st")
+			_press_key(KEY_W, false)
+			_next_ws(0.3)
+		8:
+			_press_key(KEY_C, true)
+			_press_key(KEY_C, false)
+			_next_ws(0.8)
+		9:
+			_capture_shot("walk_3rd_back")
+			_press_key(KEY_F, true)
+			_press_key(KEY_F, false)
+			_next_ws(1.2)
+		10:
+			_capture_shot("walk_back_in_car")
+			print("[perf] walkshot 完成")
+			get_tree().quit(0)
+
+
+func _next_ws(wait: float) -> void:
+	_ws_phase += 1
+	_ws_wait = wait
+	_ws_t = 0.0
+
+
 ## mapshot：ready → 按 M → 1.5s 后抓图 → 再按 M 退出
 func _mapshot_tick(delta: float) -> void:
-	if not bool(main.get("session_ready")):
+	if not _session_ready():
 		return
 	phase_t += delta
 	match _map_phase:
