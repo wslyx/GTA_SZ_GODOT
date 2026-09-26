@@ -31,6 +31,8 @@ const EXPOSURE_STEPS := [0.7, 0.85, 1.0, 1.15, 1.3]
 ## 原版 PROFILE 表
 ## shadows：0 关 / 1 低（1024, 2-split）/ 2 高（2048, 4-split）
 ## lamps：夜间路灯池数量；tree_budget：林冠重建实例预算
+## far_trees / aerial_trees / tree_radius / aerial_tree_radius / meadow_clumps：
+##   种植层（`world/landscape_layer.gd`）的预算与半径，取原版 city-graphics-quality.ts 同名字段
 const PROFILES := {
 	"low": {
 		"max_pixels": Vector2i(1600, 900),
@@ -44,9 +46,16 @@ const PROFILES := {
 		"lens_effects": false,
 		"detail_scale": 0.5,
 		"near_trees": 18,
+		"far_trees": 160,
+		"aerial_trees": 600,
+		"tree_radius": 360.0,
+		"aerial_tree_radius": 1000.0,
 		"canopy_full": 20,
+		"meadow_clumps": 512,
 		"lamps": 8,
 		"tree_budget": 4000,
+		"ssr": false,
+		"ssr_steps": 0,
 	},
 	"medium": {
 		"max_pixels": Vector2i(1920, 1080),
@@ -60,9 +69,16 @@ const PROFILES := {
 		"lens_effects": false,
 		"detail_scale": 0.75,
 		"near_trees": 36,
+		"far_trees": 200,
+		"aerial_trees": 900,
+		"tree_radius": 440.0,
+		"aerial_tree_radius": 1200.0,
 		"canopy_full": 36,
+		"meadow_clumps": 1024,
 		"lamps": 24,
 		"tree_budget": 9000,
+		"ssr": true,
+		"ssr_steps": 24,
 	},
 	"high": {
 		"max_pixels": Vector2i(1920, 1080),
@@ -76,9 +92,16 @@ const PROFILES := {
 		"lens_effects": true,
 		"detail_scale": 1.0,
 		"near_trees": 48,
+		"far_trees": 220,
+		"aerial_trees": 1200,
+		"tree_radius": 440.0,
+		"aerial_tree_radius": 1200.0,
 		"canopy_full": 56,
+		"meadow_clumps": 1024,
 		"lamps": 24,
 		"tree_budget": 16000,
+		"ssr": true,
+		"ssr_steps": 48,
 	},
 }
 

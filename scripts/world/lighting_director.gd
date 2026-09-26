@@ -101,6 +101,20 @@ const AMBIENT_ENERGY_SCALE := 1.0
 ## 池大小：原版是 2 个 SpotLight 轮转；Godot 里给多一点让近处路灯都能亮
 const LAMP_POOL := 24
 
+# ---------------------------------------------------------------------------
+# 公园高杆灯（原版 city-public-lighting.ts:44-45）
+# ---------------------------------------------------------------------------
+## 只摆焦点 950m 内的公园灯位（原版 `Math.hypot(p.x-x,p.z-z)<950`）
+const PARK_POLE_RADIUS := 950.0
+## 灯头自发光：夜里 (.76,.84,1)×2.1，黄昏 ×.45，白天 0
+const PARK_LAMP_COLOR := Color(0.76, 0.84, 1.0)
+const PARK_NIGHT_GAIN := 2.1
+const PARK_DUSK_GAIN := 0.45
+## 高杆灯的摆放与公共照明场共用同一个 256m 格重算节拍（原版 update 里的
+## `cx===state.x&&cz===state.z` 提前返回同时挡掉了两者）
+const PARK_POLE_CELL := 256.0
+const POLE_GLB := "res://data/city/park-floodlight.glb"
+
 var world: CityWorld
 var sun: DirectionalLight3D
 var env_node: WorldEnvironment
@@ -115,6 +129,18 @@ var _lamp_pool: Array = []
 var _scan_timer := 0.0
 var _built := false
 var lamp_lit := false
+
+## --- 公园高杆灯 --------------------------------------------------------------
+## 灯位（数据坐标）
+var _park_lights: Array = []
+## 每个源 mesh 一个 MultiMeshInstance3D：{mm, local}。local 是 mesh 在 GLB 里的
+## 本地变换（含节点 translation/scale），摆放时右乘进去 —— 原版是
+## bakeTransformIntoVertices() 把节点变换烘焙进顶点，这里用等价做法避免改网格。
+var _pole_nodes: Array = []
+## 参与「灯头自发光」的材质（原版 `/^lamp/.test(m.name)`）
+var _pole_mats: Array = []
+## 上一次摆放所在的高杆灯格（256m）
+var _pole_cell := Vector2i(1 << 30, 1 << 30)
 ## 阴影绘制距离随街面/高空切换（原版 SHADOW_ORTHO_NORMAL 260 / AERIAL 1050）
 const SHADOW_DIST_STREET := 260.0
 const SHADOW_DIST_AERIAL := 1050.0
@@ -144,6 +170,7 @@ func setup(p_world: CityWorld) -> void:
 	_create_sun()
 	_load_lamps()
 	_create_lamp_pool()
+	_load_park_poles()
 	_built = true
 	apply_mode(mode)
 
@@ -167,6 +194,10 @@ func _create_environment() -> void:
 	env.ssao_intensity = 0.65
 	env.ssao_detail = 0.1
 	env.glow_enabled = true
+	# 屏幕空间反射：原版水面/湿路是 512 平面镜；Godot 没有内建平面镜，
+	# 但 SSR 是**免费能开**的那一半（此前 README 写"IBL + SSR"，实际一直没开）。
+	# 默认关，由画质档 set_quality 打开；平面镜路线见差异清单 §10.1。
+	env.ssr_enabled = false
 	env_node.environment = env
 	add_child(env_node)
 
@@ -246,6 +277,8 @@ func apply_mode(m: int) -> void:
 	lamp_lit = m != GameContent.LightMode.DAY
 	for l in _lamp_pool:
 		l.visible = lamp_lit
+	# 公园高杆灯灯头（夜里 2.1 / 黄昏 .45 / 白天 0）
+	_apply_pole_emissive()
 
 	if world != null and world.sky != null and world.sky.has_method("apply_mode"):
 		world.sky.apply_mode(m)
@@ -269,6 +302,14 @@ func set_quality(p: Dictionary) -> void:
 	_active_lamps = clampi(lamps, 0, LAMP_POOL)
 	var env := env_node.environment
 	env.ssao_enabled = bool(p.get("ao", true))
+	# —— 屏幕空间反射（低档关，中/高档开）——
+	# 步数越高越贵；这是本档位里唯一"开了就可能掉帧"的一项，故跟画质档走。
+	env.ssr_enabled = bool(p.get("ssr", false))
+	if env.ssr_enabled:
+		env.ssr_max_steps = maxi(8, int(p.get("ssr_steps", 24)))
+		env.ssr_fade_in = 15.0
+		env.ssr_fade_out = 2.0
+		env.ssr_depth_tolerance = 0.2
 	# Bloom：显式开关（设置页）优先，回退到档位的 bloom_scale
 	if p.has("bloom"):
 		env.glow_enabled = bool(p["bloom"])
@@ -316,7 +357,7 @@ func _load_lamps() -> void:
 		var lx := x - dx * LAMP_LATERAL
 		var lz := z - dz * LAMP_LATERAL
 		_lamps.append({"pos": CoordinateUtil.to_world(lx, lz, LAMP_ROAD_HEIGHT), "height": LAMP_ROAD_HEIGHT})
-	# 公园灯（coastal/infrastructure.json）
+	# 公园灯（coastal/infrastructure.json）—— 灯位与高杆模型共用这份数据
 	for e in CityData.coastal_infrastructure.get("parkLights", []):
 		var h := float(e.get("height", 12.0))
 		_lamps.append({
@@ -348,6 +389,117 @@ func _create_lamp_pool() -> void:
 		l.visible = false
 		add_child(l)
 		_lamp_pool.append(l)
+
+
+# ---------------------------------------------------------------------------
+# 公园高杆灯灯杆
+# ---------------------------------------------------------------------------
+
+## 原版 createPublicLighting() 的灯杆部分：把模板 mesh 的节点变换烘焙掉，
+## 之后只按世界位置摆 thin instance。这里等价地保留每个 mesh 的本地变换，
+## 摆放时左乘世界平移 —— 结果相同，且不用改 GLB 的网格资源。
+func _load_park_poles() -> void:
+	_park_lights.clear()
+	for e in CityData.coastal_infrastructure.get("parkLights", []):
+		_park_lights.append({
+			"x": float(e.get("x", 0.0)),
+			"z": float(e.get("z", 0.0)),
+			"height": float(e.get("height", 12.0)),
+		})
+	if not ResourceLoader.exists(POLE_GLB):
+		push_warning("[LightingDirector] 缺少公园高杆灯模型 %s" % POLE_GLB)
+		return
+	var scene := load(POLE_GLB) as PackedScene
+	if scene == null:
+		return
+	var inst := scene.instantiate()
+	var mats := {}
+	for mi in GlbLoader.meshes_of(inst):
+		if mi.mesh == null or mi.mesh.get_surface_count() == 0:
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mi.mesh
+		var node := MultiMeshInstance3D.new()
+		node.multimesh = mm
+		node.name = "park-pole-%d" % _pole_nodes.size()
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		add_child(node)
+		_pole_nodes.append({"mm": mm, "local": _relative_transform(inst, mi)})
+		# 灯头自发光材质（原版 `/^lamp/.test(m.name)`）
+		for s in mi.mesh.get_surface_count():
+			var mat: Material = mi.mesh.surface_get_material(s)
+			if mat is StandardMaterial3D and str(mat.resource_name).begins_with("lamp"):
+				mats[mat.get_instance_id()] = mat
+	inst.queue_free()
+	for k in mats:
+		_pole_mats.append(mats[k])
+	print("[LightingDirector] 公园高杆灯：灯位 %d 个 / 灯杆 mesh %d 个 / 自发光材质 %d 个"
+		% [_park_lights.size(), _pole_nodes.size(), _pole_mats.size()])
+
+
+## 某个节点相对指定祖先的变换。GLB 根下通常只有一层，但不假设这一点：
+## 从 n 往上叠到 root 为止（root 自己不计入）。
+static func _relative_transform(root: Node, n: Node3D) -> Transform3D:
+	var xf := n.transform
+	var p: Node = n.get_parent()
+	while p != null and p != root:
+		if p is Node3D:
+			xf = (p as Node3D).transform * xf
+		p = p.get_parent()
+	return xf
+
+
+## 摆放焦点 950m 内的灯杆。原版只在 256m 格变化时重摆（update 里的提前返回）。
+func _assign_poles(focus: Vector3) -> void:
+	if _pole_nodes.is_empty():
+		return
+	var fx := focus.x
+	var fz := -focus.z
+	var cell := Vector2i(int(floor(fx / PARK_POLE_CELL)), int(floor(fz / PARK_POLE_CELL)))
+	if cell == _pole_cell:
+		return
+	_pole_cell = cell
+	var placements: Array = []
+	for p in _park_lights:
+		var dx := float(p["x"]) - fx
+		var dz := float(p["z"]) - fz
+		if sqrt(dx * dx + dz * dz) > PARK_POLE_RADIUS:
+			continue
+		# 原版 `Matrix.Translation(p.x, heightAt(p.x,p.z), p.z)`：杆底贴地
+		var g := world.ground_height(float(p["x"]), -float(p["z"]))
+		placements.append(CoordinateUtil.to_world(float(p["x"]), float(p["z"]), g))
+	for entry in _pole_nodes:
+		var mm: MultiMesh = entry["mm"]
+		var local: Transform3D = entry["local"]
+		var n := placements.size()
+		mm.instance_count = n
+		mm.visible_instance_count = n
+		for i in n:
+			# ⚠️ 显式标注 Vector3：`placements[i]` 取出来是 Variant，
+			# 直接写 `Transform3D(placements[i], Basis.IDENTITY)` 会因为
+			# 参数类型不匹配而报 "No constructor of Transform3D matches"。
+			# 本项目统一用 Transform3D(Basis, origin) 这个参数顺序。
+			var pos: Vector3 = placements[i]
+			mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, pos) * local)
+
+
+## 灯头自发光随光照档切换（原版 setNight / setMode）
+func _apply_pole_emissive() -> void:
+	if _pole_mats.is_empty():
+		return
+	var gain := 0.0
+	if mode == GameContent.LightMode.NIGHT:
+		gain = PARK_NIGHT_GAIN
+	elif mode == GameContent.LightMode.SUNSET:
+		gain = PARK_DUSK_GAIN
+	for m in _pole_mats:
+		var sm := m as StandardMaterial3D
+		if sm == null:
+			continue
+		sm.emission_enabled = gain > 0.0
+		sm.emission = PARK_LAMP_COLOR
+		sm.emission_energy_multiplier = gain
 
 
 ## 把池中灯位分配给离焦点最近的若干个灯位（原版每 0.4s 扫一次）
@@ -382,6 +534,8 @@ func update_system(delta: float, focus: Vector3) -> void:
 		_scan_timer = 0.4
 		_assign_lamps(focus)
 		_apply_shadow_distance()
+	# 高杆灯杆：只在 256m 格变化时重摆（内部自带格判断）
+	_assign_poles(focus)
 	# 太阳跟随视野中心，保证阴影贴图覆盖玩家附近（原版 sun.position = p - dir*800）
 	if sun != null:
 		var look: Dictionary = LOOK.get(mode, LOOK[GameContent.LightMode.SUNSET])
@@ -397,5 +551,8 @@ func diagnostics() -> Dictionary:
 		"lamps": _lamps.size(),
 		"lampPool": _lamp_pool.size(),
 		"lampLit": lamp_lit,
+		"parkLights": _park_lights.size(),
+		"parkPoleMeshes": _pole_nodes.size(),
+		"parkPoleMaterials": _pole_mats.size(),
 		"sunEnergy": sun.light_energy if sun != null else 0.0,
 	}

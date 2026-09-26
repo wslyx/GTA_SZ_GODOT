@@ -201,35 +201,45 @@ GTA_SZ_GODOT/
 
 | 项 | 原版 | 本版 | 影响 |
 |---|---|---|---|
-| 天空色调映射 | Babylon ACES（把 0.42~0.94 压到显示端 0.30~0.70） | Godot ACES + `sky_gain = 0.42` | 天空着色器是逐行译本，亮度差来自两家 ACES 的肩部差异，用增益标定；云的块感比原版略重 |
-| 水面反射 | 512 平面镜（`MirrorTexture`，refreshRate 3） | 环境天空反射（IBL）+ SSR | 建筑在水中的倒影不如原版清晰；天空倒影基本一致 |
-| 湿路面反射 | 512 平面镜（refreshRate 2，blurKernel 7） | 材质变暗 + 降粗糙度 | 雨天路面的镜面感弱于原版 |
+| 天空色调映射 | Babylon ACES（把 0.42~0.94 压到显示端 0.30~0.70） | Godot ACES + `sky_gain = 0.42` | 天空着色器是逐行译本，亮度差来自两家 ACES 的肩部差异，用增益标定。**日落档**仍与原版有结构差异：原版日落露的是摄影 HDR 天空（`BackgroundMaterial` + `primaryColor .20`），程序化 `szSky` 在原版里只是兜底；本版用标定过的程序化天空，见 修复记录 第二十一节 |
+| 云的块感 | 原版地平线附近同样是硬边（`uv` 的屏幕导数爆掉） | **已修**：`fbm_lod` 按像素足迹逐倍频降级 | 足迹小的近处与原版逐位相同；地平线附近的块状硬边消失 |
+| 白天天空 | 白天用**照片级 HDR** 立方图（天空与反射共用一个 HDR） | **已改**：白天隐藏程序化球、直接显示 Environment 的 HDR 全景 | 此前白天和日落共用同一份程序化天空（`night` uniform 都是 0），白天看起来像日落 |
+| 水面反射 | 512 平面镜（`MirrorTexture`，refreshRate 3） | 环境天空反射（IBL）+ **SSR（已按画质档打开：低档关、中档 24 步、高档 48 步）** | 建筑在水中的倒影不如原版清晰；天空倒影基本一致。平面镜方案与代价见 差异清单 §10.1 |
+| 湿路面反射 | 512 平面镜（refreshRate 2，blurKernel 7） | 材质变暗 + 降粗糙度 + SSR（同上） | 雨天路面的镜面感弱于原版 |
 | 雾 | Babylon `FOGMODE_EXP2` | Godot 指数雾，密度 ×100 换算 | 衰减曲线形状相近但非数学等价 |
-| 局部照明 | 2 个池化 SpotLight + ~600 盏 OmniLight | 24 盏 OmniLight 池，按距离分配 | 远处路灯同时点亮数量少于原版 |
 | 招牌文字 | 自建 2048×1024 动态图集 + 单 mesh | `Label3D` 池（≤64），用 `SystemFont` 取系统中文字体 | 视觉等价；无系统中文字体时文字会缺字 |
-| 建筑材质 | 31 个 profile 的 PBR 参数表 | 直接使用 GLB 自带材质 | 立面质感差别最大的一项；实测建筑比原版亮约 1.7 倍 |
-| 逐材质环境光强度 | `material.environmentIntensity`（沥青 .55 / 林冠 .82） | 无 | `StandardMaterial3D` 没有这个属性；林冠因此比原版亮 |
-| 环境光遮蔽 | SSAO2 + 烘焙 `occlusion.png`（3399×1307） | 仅 SSAO | 街角接触阴影弱于原版 |
+| 建筑材质 | 31 个 profile 的 PBR 参数表 | 28 个 profile 已按材质角色套用（`world/architecture_materials.gd`） | 颜色/粗糙度/金属度/贴图/窗光已对齐；**唯一差的是 `profile.environment`**（Godot 的 `StandardMaterial3D` 没有 environmentIntensity），所以建筑整体仍比原版亮 |
+| 逐材质环境光强度 | `material.environmentIntensity`（沥青 .55 / 林冠 .82 / 建筑 .96 基准，profile 0.85–1.08） | **已按 shader 的 `AO` 复刻**（沥青 .55 / 草地 .75 / 屋顶 .96 / 建筑 profile 各自的值） | 实测生效值：地面 `沥青 0.55 / 草地 0.75`，建筑 `[0.85, 0.96, 1.04, 1.05, 1.08]` |
+| 夜间地面漫射增益 | `finalDiffuse *= 1.12` | 用 `ALBEDO × 1.12` 近似（夜里） | `DIFFUSE_LIGHT` 在 `fragment()` 不存在，`light()` 又是**全权接管**；偏差是环境光也一起被放大 12%，夜间以环境光+路灯为主，观感差异很小 |
 | HUD 绝对尺寸 | 小地图直径 246px（来自更早的构建） | 265.7px（按当前源码 CSS） | 当前 `city-hud.ts` 的 CSS 常量与用户提供的那张截图所属构建不同，本版以源码为准 |
+
+> 2026-09-26 补齐（原「已知差异」里的条目已不成立）：
+> **公共照明场 clipmap**（原先只有 24 盏 OmniLight，夜里远处路面全黑）、
+> **烘焙 AO**（原先只跑 SSAO，没有城市级的街角/树下接触阴影）、
+> **公园高杆灯灯杆**、**植被细节层随焦点重建**、**种植层 7933 棵树 + 开放植被**、
+> **草地分层材质与草叶层**、**运行时路名生成**、**电摩骑手实体**、
+> **屋顶设备（停机坪 / 设备房 / 冷却塔 / 水箱 / 天线 / 光伏 / 天窗 / 通风管）**、
+> **屋顶表面 finish（8 种）**、**植被夜间地面补光**、**建筑立面材质（28 profile + 窗光 +
+> 逐材质环境光强度）**、**行人被撞倒地（解析扫掠 + 刚体）**、**夜间漫射增益**、
+> **SSR**、**观察模式信标（光柱 + 落点解算 + 收藏）**。
+> 逐条对照与证据见 [修复记录.md](修复记录.md) 第二十节。
 
 ### 尚未实现
 
+> ⚠️ 口径：本节只写**玩家能感知的差异**。模块与脚本的映射以
+> [复刻对照表.md](复刻对照表.md) 为准 —— 两处若不一致，以对照表为准。
+
 | 原版模块 | 说明 |
 |---|---|
-| `city-facade-diversity.ts` | 立面多样性（同一建筑的窗格/阳台差异化） |
-| `city-rooftops.ts`、`city-roof-surface.ts` | 屋顶装置与屋顶表面材质 |
-| `city-architecture-materials.ts` | 31 个建筑材质 profile |
-| `city-ambient-occlusion.ts` | 烘焙 AO 的应用（`data/city/ambient/occlusion.png` 已迁移但未接入着色器） |
-| `city-meadow.ts` | 草地细节（`grassland-v2/meadow.json` 已迁移未接入） |
-| `city-roadside-planting.ts` | 路边种植的完整布点规则（间距/否决项/密度） |
+| `city-facade-diversity.ts` | 立面多样性（同一建筑的窗格/阳台差异化）——"整条街看起来像复制粘贴" |
+| `city-landmark-lighting.ts` | 腾讯滨海大厦玻璃幕墙的逐窗格亮灯（需要按拓扑重建面板 + 自定义顶点属性） |
+| `city-roadside-planting.ts` 的完整布点规则 | 街具与部分细节已布点；完整的间距 / 否决项 / 密度规则未做 |
 | `city-bamboo-cafe.ts`、`city-bamboo-corridor.ts`、`city-cafe-characters.ts` | 月白咖啡馆、竹廊、咖啡厅角色 |
 | `city-local-characters.ts`、`city-character-hud.ts` | 原版 MMD 步行角色与角色 HUD（本版步行用 `pedestrian.glb`） |
-| `pedestrian-impact.ts` | 行人被撞倒地（airborne → sliding → recovering） |
-| `city-observer-beacons.ts`、`city-observer-destination.ts` | 观察信标与观察目标 |
+| `city-observer-beacons.ts`、`city-observer-destination.ts`、`city-observer-beacon-state.ts` | 观察信标：**3D 光柱 + 落点解算 + 收藏持久化已实现**；原版那套 DOM 面板（切换按钮 / 名称输入框 / 收藏列表）未做，移植版用长按左键 + `I`/`O`/`U` 代替 |
 | `city-cinematic.ts`、`trailer*.ts`、`aerial-film*.ts`、`combat-lab*.ts` | 宣传片管线、空中摄制、战斗实验室（原版专属非核心功能） |
 | `city-graphics-quality.ts` 的档位切换重建 | 档位参数已实现并套用，但"切档时重建阴影/镜面/SSAO"未逐一落实 |
 | `city-cockpit.ts` 的舱内模型 | 只实现司机位第一人称相机，无仪表盘 / 方向盘 / 内舱几何 |
-| `city-vehicle-finish.ts`、`city-vehicle-materials.ts` | 车漆 PBR 独立调优 |
 | `city-map-geometry.ts` 的完整标注避让 | 实现了标注门限与绘制，未实现 64px 网格的碰撞避让排布 |
 
 ### 结构性说明

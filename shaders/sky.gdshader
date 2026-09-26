@@ -32,6 +32,15 @@ shader_type spatial;
 // 从「背阳紫 + 朝阳橙」的双色结构退化成一整片均匀的粉橙色 —— 实测天顶行
 // 均值 #c88b87，原版是 #976451。所以这里回到逐行照搬，不再自创参数。
 //
+// ⚠️ 两处**有意**偏离原版源码：
+//
+// 1) 云的采样用 `fbm_lod(uv, pixel)` 而不是原版的 `fbm(uv)`。原版在地平线附近
+//    会出现明显的块状硬边 —— 因为 `uv = p.xz / max(.14, p.y + .08) * 2.0`
+//    在 p.y 趋近 0 时屏幕导数爆掉，高倍频噪声被欠采样。`fbm_lod` 按像素足迹
+//    逐倍频降级，且在足迹小的近处与原版**逐位相同**（见该函数的注释）。
+//    README 第七节把这条记为"云的块感比原版略重"，本轮修的就是它。
+// 2) `sd` 的方向常量做了一次坐标符号修正（下方说明）。
+//
 // 深度：保留 depth_draw_never（天空球不写深度）+ 开启深度测试。
 // 天空只落在「还没有任何东西」的像素上，远处山体（>4000m）也能压在天空之上。
 // sd 的方向常量做了**一次坐标符号修正**（其余逐字照搬）：
@@ -67,12 +76,25 @@ float noise(vec2 p) {
 	           mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-float fbm(vec2 p) {
+// 逐倍频抗锯齿的 fbm（本轮新增，见文件头"云的块感"一节）。
+//   pixel = 一个像素在 uv 空间里的足迹；
+//   某一倍频的格距已经小于足迹时，再采样只会得到一块块硬边 —— 直接停掉它。
+//
+// ⚠️ 停掉的时候**必须用该倍频的均值 0.5 顶上**，不能简单地跳过：
+//   跳过会让云在足迹大的地方整体变淡（丢掉的是正值），遮罩阈值 .40/.66 就跟着漂；
+//   用均值顶替则「均值与幅度都守恒」，而且 pixel 很小时五个倍频全都采样
+//   —— 此时结果与原来**逐位相同**，近处的云一点没动。
+float fbm_lod(vec2 p, float pixel) {
 	float f = 0.0;
 	float a = 0.5;
 	for (int i = 0; i < 5; i++) {
-		f += noise(p) * a;
+		if (pixel > 1.0) {
+			f += 0.5 * a;
+		} else {
+			f += noise(p) * a;
+		}
 		p = p * 2.03 + 17.0;
+		pixel *= 2.03;
 		a *= 0.5;
 	}
 	return f;
@@ -96,8 +118,13 @@ void fragment() {
 
 	vec2 uv = p.xz / max(0.14, p.y + 0.08) * 2.0;
 	uv.x *= 0.52;
-	float cloud = fbm(uv + fbm(uv * 0.4) * 1.6);
-	float stripe = noise(vec2(uv.x * 0.8, uv.y * 4.0)) * 0.13;
+	// 一个像素在 uv 空间里的足迹。地平线附近 `p.y + .08` 会趋近 0，
+	// 这个值随之爆掉 —— 那正是"云的块感"最重的地方。
+	float pixel = max(length(dFdx(uv)), length(dFdy(uv)));
+	float cloud = fbm_lod(uv + fbm_lod(uv * 0.4, pixel * 0.4) * 1.6, pixel);
+	// stripe 是纯高频（uv.y × 4），足迹大时同样退化成噪点，按同一尺度淡出
+	float stripe = noise(vec2(uv.x * 0.8, uv.y * 4.0)) * 0.13
+		* (1.0 - smoothstep(0.25, 1.2, pixel));
 	float mask = smoothstep(0.40, 0.66, cloud + stripe)
 		* smoothstep(0.01, 0.12, p.y)
 		* (1.0 - smoothstep(0.55, 0.99, p.y));

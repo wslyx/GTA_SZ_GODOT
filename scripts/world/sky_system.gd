@@ -11,10 +11,17 @@
 ##     夜晚 rooftop-night-2k，各自带一个绕 Y 的旋转角。
 ##
 ## Godot 对应做法：
-##   程序化天空仍用手写着色器（szSky 的 GLSL 逐行搬成 .gdshader），
-##   挂在直径 8000 的球上；HDR 环境反射交给 Sky 的 PanoramaSkyMaterial。
+##   程序化天空仍用手写着色器（szSky 的 GLSL 逐行搬成 .gdshader）。
+##   ⚠️ 2026-09-26 起改成 **Godot 的 Sky 着色器**（`shaders/sky_sky.gdshader`），
+##   不再是 8000 直径的球体网格。原因见那个着色器的头部：Sky 是"方向 → 颜色"的函数，
+##   不需要几何体，辐照度立方图只在参数变化时重渲，而且能用半分辨率子通道把云的
+##   fbm 成本降到 1/4。球体网格只作为**拿不到 sky 着色器时的兜底**保留。
 
 const SKY_DIAMETER := 8000.0
+## Sky 着色器（三档天空合一个；原版是同一个天空球换三份材质）
+const SKY_SHADER := "res://shaders/sky_sky.gdshader"
+## 夜空着色器（与日落/白天同一个 Sky 资源，按模式换材质）
+const NIGHT_SKY_SHADER := "res://shaders/night_sky_sky.gdshader"
 
 ## 天空球的显示增益 —— 对**色调映射肩部差异**的实测补偿。
 ##
@@ -63,18 +70,51 @@ var night_material: ShaderMaterial
 var mode: int = GameContent.LightMode.SUNSET
 var _built := false
 var _hdr_cache: Dictionary = {}
-## 复用的 Sky / PanoramaSkyMaterial（见 _apply_environment_hdr）
+## 复用的 Sky / 材质（见 _apply_environment_hdr）
 var _sky_cache: Sky = null
 var _pano_cache: PanoramaSkyMaterial = null
+## 主路径：Sky + sky 着色器
+var _sky_shader_mat: ShaderMaterial = null
+## 夜空材质（同一个 Sky，按模式换）
+var _night_mat: ShaderMaterial = null
+var _use_sky_shader := false
 
 
 func setup(p_world: CityWorld) -> void:
 	world = p_world
-	_build_procedural_sky()
+	_build_sky()
 	_built = true
 	apply_mode(mode)
 
 
+## 优先建 Sky + sky 着色器；拿不到着色器才退回球体网格。
+func _build_sky() -> void:
+	_sky_cache = Sky.new()
+	_sky_cache.radiance_size = Sky.RADIANCE_SIZE_512
+	# AUTOMATIC 让引擎自己决定何时重渲立方图：本着色器不用 TIME / POSITION，
+	# 所以立方图基本是静态的（官方文档列的重渲触发条件见 sky_sky.gdshader 头部）。
+	_sky_cache.process_mode = Sky.PROCESS_MODE_AUTOMATIC
+	if ResourceLoader.exists(SKY_SHADER) and ResourceLoader.exists(NIGHT_SKY_SHADER):
+		var sh := load(SKY_SHADER) as Shader
+		var nsh := load(NIGHT_SKY_SHADER) as Shader
+		if sh != null and nsh != null:
+			_sky_shader_mat = ShaderMaterial.new()
+			_sky_shader_mat.shader = sh
+			_night_mat = ShaderMaterial.new()
+			_night_mat.shader = nsh
+			_use_sky_shader = true
+	if _use_sky_shader:
+		# 原版就是"同一个天空球换三份材质"：日落 / 白天 / 夜晚
+		_sky_cache.sky_material = _sky_shader_mat
+		print("[SkySystem] 使用 Sky 着色器（半分辨率云 + 立方图缓存）")
+		return
+	push_warning("[SkySystem] 缺少 %s，退回球体网格天空" % SKY_SHADER)
+	_pano_cache = PanoramaSkyMaterial.new()
+	_sky_cache.sky_material = _pano_cache
+	_build_procedural_sky()
+
+
+## 兜底路径：两个 8000 直径的球（改造前的实现）
 func _build_procedural_sky() -> void:
 	var sphere := SphereMesh.new()
 	sphere.radius = SKY_DIAMETER * 0.5
@@ -111,27 +151,57 @@ func _make_material(path: String) -> ShaderMaterial:
 	return mat
 
 
-## 切换光照模式：昼夜天空球互换 + 环境反射贴图换 HDR
+## 切换光照模式：按原版的三份天空材质切换（**同一个球，不是两个球叠着画**）
+##
+## 原版 city-cinematic.ts:280 是一行三元：
+##   sky.material = night ? nightSky : (day && 白天 HDR 就绪) ? daylightMaterial : skyMaterial
+## 也就是：夜晚 = 星空材质；白天 = 白天 HDR；其余（日落）= 摄影日落天空。
+## 程序化 szSky 在原版里只是**兜底**（HDR 还没解码完或失败时才露脸）。
+##
+## ⚠️ 本移植此前做成两个**重叠**的球、只切换夜球的 visible —— 程序化球一直可见，
+## 两个球都带 depth_draw_never（都不写深度），同一半径下谁最后画谁赢，属于未定义行为。
+## 现在改成同一时刻只留一个球：
+##   白天 → 隐藏程序化球，让 Environment 的 HDR 全景直接当天空
+##          （原版白天的天空与反射也是"共用一个 HDR 立方图"）
+##   日落 → 程序化 szSky（原版这里是摄影 HDR + primaryColor .20，见 README 已知差异）
+##   夜晚 → 夜空球
 func apply_mode(m: int) -> void:
 	mode = m
 	if not _built:
 		return
 	var is_night := m == GameContent.LightMode.NIGHT
+	var is_day := m == GameContent.LightMode.DAY
+	if _use_sky_shader and _sky_shader_mat != null and _night_mat != null:
+		# 一个 Sky 着色器吃 sky_mode：0 日落 / 1 白天 / 2 夜晚
+		# （原版是同一个天空球换三份材质，见 sky_sky.gdshader 头部）
+		var sm := 2.0 if is_night else (1.0 if is_day else 0.0)
+		_sky_shader_mat.set_shader_parameter("sky_mode", sm)
+		_sky_shader_mat.set_shader_parameter("sky_gain", SKY_GAIN)
+		# 夜空换成独立材质（同一个 Sky）—— 原版 `sky.material = night ? nightSky : …`
+		_sky_cache.sky_material = _night_mat if is_night else _sky_shader_mat
+		_apply_environment_hdr(m)
+		return
+	# —— 兜底：球体网格路径 ——
 	# 天空球只有 `night` / `sky_gain` 两个 uniform —— 原版 szSky 的 horizon / zenith
 	# 是写死在着色器里的常量，且按 `west`（是否朝阳）做方向混合，不接受外部覆盖。
 	if sky_material != null:
 		sky_material.set_shader_parameter("night", 1.0 if is_night else 0.0)
 		sky_material.set_shader_parameter("sky_gain", SKY_GAIN)
+	if sky_mesh != null:
+		sky_mesh.visible = not is_night and not is_day
 	if night_mesh_ref != null:
 		night_mesh_ref.visible = is_night
 	_apply_environment_hdr(m)
 
 
-## 环境反射（IBL）：把对应 HDR 装进 WorldEnvironment 的 Sky。
+## 环境反射与背景（IBL）：把对应 HDR 装进 WorldEnvironment 的 Sky。
 ##
-## 只让 Sky 负责**背景与反射**，环境漫射仍由 LightingDirector 的
-## AMBIENT_SOURCE_COLOR（半球光等效）主导 —— 这样才与原版
-## "HemisphericLight + environmentTexture" 的双通道结构对应。
+## 这一层同时是**天空可见背景**与**镜面反射来源**，对应原版「天空与反射共用一个
+## HDR 立方图」的结构；能量就是原版的 `scene.environmentIntensity`（.78/.40/.55）。
+##
+## ⚠️ 关键：**IBL 的数值一点没变**。Sky 着色器里走 `AT_CUBEMAP_PASS` 的那一路
+## 只输出 `HDR × base_energy`，与改造前 `PanoramaSkyMaterial.energy_multiplier`
+## 的输出完全一致 —— 所以那份精心标定的光照不需要重做。
 func _apply_environment_hdr(m: int, env: Environment = null) -> void:
 	var environment := env if env != null else _environment()
 	if environment == null:
@@ -144,19 +214,22 @@ func _apply_environment_hdr(m: int, env: Environment = null) -> void:
 	if tex == null:
 		tex = load(path)
 		_hdr_cache[path] = tex
-	# Sky / PanoramaSkyMaterial 只建一次并复用。
+	var energy := float(ENV_INTENSITY.get(m, 0.5))
+	if _use_sky_shader and _sky_shader_mat != null and _night_mat != null:
+		# 两个材质都吃同一份 HDR（白天/日落/夜晚各自的 IBL 数值不变）
+		_sky_shader_mat.set_shader_parameter("base_sky", tex)
+		_sky_shader_mat.set_shader_parameter("base_energy", energy)
+		_night_mat.set_shader_parameter("base_sky", tex)
+		_night_mat.set_shader_parameter("base_energy", energy)
+	else:
+		_pano_cache.panorama = tex
+		_pano_cache.energy_multiplier = energy
+	# Sky / 材质只建一次并复用。
 	# 之前每次切模式或切雨都 new 一对再赋给 environment.sky —— 换掉 Sky 对象会
 	# 让引擎重算 IBL 辐照度立方体贴图，而 set_raining()/apply_mode() 会频繁调用这里。
-	if _sky_cache == null:
-		_sky_cache = Sky.new()
-		_pano_cache = PanoramaSkyMaterial.new()
-		_sky_cache.sky_material = _pano_cache
-		_sky_cache.radiance_size = Sky.RADIANCE_SIZE_512
-	_pano_cache.panorama = tex
-	_pano_cache.energy_multiplier = float(ENV_INTENSITY.get(m, 0.5))
 	environment.sky = _sky_cache
 	environment.background_mode = Environment.BG_SKY
-	# 刻意不改 ambient_light_source：半球光颜色由 LightingDirector 维护
+	# 刻意不改 ambient_light_source：它由 LightingDirector 维护（当前是 SKY）
 
 
 func _environment() -> Environment:
@@ -165,7 +238,8 @@ func _environment() -> Environment:
 	return null
 
 
-## 天空球跟随相机（保持永远在无限远）
+## 天空球跟随相机（保持永远在无限远）。
+## ⚠️ 走 Sky 着色器时**没有球**：Sky 本身就是无限远的，这里只剩兜底路径要用。
 func follow(cam_pos: Vector3) -> void:
 	if sky_mesh != null:
 		sky_mesh.global_position = cam_pos

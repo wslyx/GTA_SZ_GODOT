@@ -90,6 +90,22 @@ var facades = null
 var chunk_streamer = null
 ## 沥青路面标定（原版 applyCinematicRoad）
 var road_surface: RoadSurface = null
+## 地面材质注入（公共照明场 clipmap + 烘焙 AO + 草地分层）
+##
+## ⚠️ 与 main_game.gd 对 Rider 的处理同理：新增脚本的 `class_name` 要等编辑器
+## 重扫一次才会进全局类缓存，直接写 `var ground_field: GroundField` 会在运行时
+## 报 "Could not find type GroundField"。所以这里用 preload + 无类型变量。
+const GROUND_FIELD_SCRIPT := preload("res://scripts/world/ground_field.gd")
+var ground_field = null
+## 屋顶设备层（停机坪 / 设备房 / 冷却塔 / 水箱 / 天线 / 光伏 / 天窗 / 通风管）
+const ROOFTOP_SCRIPT := preload("res://scripts/world/rooftop_layer.gd")
+var rooftop_layer = null
+## 建筑立面材质（原版 city-architecture-materials.ts 的 28 个 profile）
+const ARCH_MATERIALS_SCRIPT := preload("res://scripts/world/architecture_materials.gd")
+var arch_materials = null
+## 观察模式信标（原版 city-observer-beacons.ts 的 3D 部分 + 落点解算）
+const BEACONS_SCRIPT := preload("res://scripts/world/observer_beacons.gd")
+var beacons = null
 
 var loader := GlbLoader.new()
 
@@ -106,6 +122,14 @@ var _step := 0
 var _cull_timer := 0.0
 ## 地标步骤内部有 3 段装载，用它算步骤内进度
 var _landmark_stage := 0
+## 地面材质注入是否已跑过（_plan_ground_field 只做一次）
+var _ground_field_done := false
+## 屋顶设备层是否已装载（_plan_rooftops 只做一次）
+var _rooftops_done := false
+## 建筑立面材质是否已套用（_plan_arch_materials 只做一次）
+var _arch_materials_done := false
+## 观察信标是否已建立（_plan_beacons 只做一次）
+var _beacons_done := false
 var stats_loaded := 0
 var stats_failed := 0
 var last_failure := ""
@@ -139,6 +163,29 @@ func _ready() -> void:
 	road_surface.name = "RoadSurface"
 	add_child(road_surface)
 
+	# 地面材质注入层。必须在 road_surface 之后创建并接管：
+	# road_surface 先按原版把 asphalt / roadline / 对岸 标定好，本层再把这些
+	# 参数抄进自己的着色器（之后每 0.25s 回抄一次，昼夜/干湿切换仍由前者决定）。
+	ground_field = GROUND_FIELD_SCRIPT.new()
+	ground_field.name = "GroundField"
+	add_child(ground_field)
+
+	# 屋顶设备层。挂在场景根部：它的实例是 MultiMesh，不参与区块剔除。
+	rooftop_layer = ROOFTOP_SCRIPT.new()
+	rooftop_layer.name = "RooftopLayer"
+	add_child(rooftop_layer)
+
+	# 建筑立面材质。放在 ground_field 之后建，让屋顶的 surface override 先挂上，
+	# 本层扫描时就能跳过它们（见 architecture_materials.gd 的说明）。
+	arch_materials = ARCH_MATERIALS_SCRIPT.new()
+	arch_materials.name = "ArchMaterials"
+	add_child(arch_materials)
+
+	# 观察模式信标：3 件光柱网格 + 落点解算，只在观察模式下工作
+	beacons = BEACONS_SCRIPT.new()
+	beacons.name = "ObserverBeacons"
+	add_child(beacons)
+
 	loader.entry_loaded.connect(_on_entry_loaded)
 	loader.entry_failed.connect(func(p: String, r: String): stats_failed += 1)
 
@@ -161,6 +208,10 @@ func build() -> void:
 		_plan_distant,
 		_plan_scenery,
 		_plan_road_surface,
+		_plan_ground_field,
+		_plan_rooftops,
+		_plan_arch_materials,
+		_plan_beacons,
 		_plan_signs,
 		_plan_life,
 		_plan_finish,
@@ -200,7 +251,7 @@ func _process(delta: float) -> void:
 
 
 func _update_subsystems(delta: float) -> void:
-	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, signs]:
+	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, signs, ground_field, rooftop_layer, arch_materials]:
 		if sys != null and sys.has_method("update_system"):
 			sys.update_system(delta, focus)
 
@@ -265,9 +316,13 @@ func _step_label(i: int) -> String:
 		8: return "正在注满深圳湾"
 		9: return "正在展开深圳山脊"
 		10: return "正在种植榕树、木棉与樟树林冠"
-		11: return "正在点亮城市招牌"
-		12: return "正在放入车流、行人与电摩"
-		13: return "准备出发"
+		11: return "正在标定沥青路面"
+		12: return "正在点亮城市照明与环境遮蔽"
+		13: return "正在装配屋顶设备与停机坪"
+		14: return "正在套用建筑立面材质"
+		15: return "正在点亮观察信标"
+		16: return "正在放入车流、行人与电摩"
+		17: return "准备出发"
 	return "加载中"
 
 
@@ -478,7 +533,49 @@ func _plan_scenery() -> bool:
 	return true
 
 
-# --- 步骤 10：招牌与街具 ----------------------------------------------------
+# --- 步骤 12：地面材质注入 ----------------------------------------------
+## 公共照明场 clipmap + 烘焙 AO + 草地分层。必须在 _plan_road_surface **之后**：
+## 本层接管路面材质时要把 road_surface 标定好的反照率/粗糙度抄进自己的着色器。
+func _plan_ground_field() -> bool:
+	if ground_field == null or _ground_field_done:
+		return true
+	ground_field.setup(self)
+	_ground_field_done = true
+	return true
+
+
+# --- 步骤 13：屋顶设备 ------------------------------------------------------
+## 停机坪 / 设备房 / 冷却塔 / 水箱 / 天线 / 光伏 / 天窗 / 通风管。
+## 数据是离线生成的 7.7 万条实例，这里只做半径 + 预算筛选与分帧写入。
+func _plan_rooftops() -> bool:
+	if rooftop_layer == null or _rooftops_done:
+		return true
+	rooftop_layer.setup(self)
+	_rooftops_done = true
+	return true
+
+
+# --- 步骤 14：建筑立面材质 --------------------------------------------------
+## 28 个 profile 按材质角色套到普通楼体与地标上（原版 city-architecture-materials.ts）。
+func _plan_arch_materials() -> bool:
+	if arch_materials == null or _arch_materials_done:
+		return true
+	arch_materials.setup(self)
+	_arch_materials_done = true
+	return true
+
+
+# --- 步骤 15：观察模式信标 --------------------------------------------------
+## 需要碰撞索引与高度场，所以放在两者的宿主（CityWorld）里建。
+func _plan_beacons() -> bool:
+	if beacons == null or _beacons_done:
+		return true
+	beacons.setup(self)
+	_beacons_done = true
+	return true
+
+
+# --- 步骤 16：招牌与街具 ----------------------------------------------------
 func _plan_signs() -> bool:
 	if signs != null and signs.has_method("setup"):
 		signs.setup(self)
@@ -734,10 +831,15 @@ func diagnostics() -> Dictionary:
 		"graph": graph.stats(),
 		"counts": counts(),
 		"chunkStreamer": chunk_streamer.diagnostics() if chunk_streamer != null else {},
+		"groundField": ground_field.diagnostics() if ground_field != null else {},
+		"rooftops": rooftop_layer.diagnostics() if rooftop_layer != null else {},
+		"archMaterials": arch_materials.diagnostics() if arch_materials != null else {},
+		"beacons": beacons.diagnostics() if beacons != null else {},
 		"subsystems": {
 			"sky": sky != null, "lighting": lighting != null, "water": water != null,
 			"weather": weather != null, "scenery": scenery != null, "signs": signs != null,
 			"distant": distant != null, "signals": signals != null,
 			"traffic": traffic != null, "pedestrians": pedestrians != null, "ebikes": ebikes != null,
+			"groundField": ground_field != null,
 		},
 	}

@@ -230,6 +230,9 @@ func _on_built() -> void:
 
 	hud.setup(world, self)
 	maps.setup(world, self)
+	# 观察信标：构建期 HUD 还不存在，提示回调在这里补注入
+	if world.beacons != null and world.beacons.has_method("set_toast"):
+		world.beacons.set_toast(func(m: String, t := 3.0): hud.toast(m, t))
 	# HUD 比 MapUI 先建，_build() 里那次排版问不到小地图尺寸。
 	# MapUI 就绪后补一次排版，否则圆形小地图停在 0×0 不显示。
 	hud.refresh_layout()
@@ -295,6 +298,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mode == Mode.WALKING:
 				walk.zoom(-120.0)
 			camera.distance_scale = clampf(camera.distance_scale / 1.08, 0.5, 6.0)
+		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			# 观察模式：左键按下开始计长按（光标 id 用 0，鼠标没有 pointerId）
+			if mode == Mode.OBSERVER and world != null and world.beacons != null:
+				var g = world.beacons.gesture
+				if mb.pressed:
+					g.begin(0, mb.position.x, mb.position.y, mb.button_index,
+						true, Input.is_key_pressed(KEY_SHIFT), float(Time.get_ticks_msec()))
+				else:
+					g.end(0)
 	elif event is InputEventMouseMotion and _dragging:
 		var mm := event as InputEventMouseMotion
 		var d := mm.position - _last_mouse
@@ -313,6 +325,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_camera_yaw -= d.x * 0.004
 			_look_pitch = clampf(_look_pitch - d.y * 0.003, -0.2, 1.0)
+	elif event is InputEventMouseMotion:
+		# 观察模式的长按计步：按住后移动超过 8px 就取消（把位移还给环绕/平移）
+		if mode == Mode.OBSERVER and world != null and world.beacons != null \
+				and not world.beacons.gesture.pointer.is_empty():
+			var mm2 := event as InputEventMouseMotion
+			world.beacons.gesture.move(0, mm2.position.x, mm2.position.y)
 
 
 ## 大地图展开 → 主动清掉相机拖拽状态。
@@ -369,6 +387,19 @@ func _on_key(k: InputEventKey) -> void:
 		KEY_B:
 			if mode == Mode.OBSERVER:
 				_toggle_aircraft()
+		KEY_I:
+			# 观察模式：移动到信标选中的落点（原版"移动到此地"按钮）
+			if mode == Mode.OBSERVER:
+				_beacon_travel()
+		KEY_O:
+			# 观察模式：收藏 / 更新收藏
+			if mode == Mode.OBSERVER and world != null and world.beacons != null:
+				world.beacons.save_selected()
+		KEY_U:
+			# 观察模式：清除光柱
+			if mode == Mode.OBSERVER and world != null and world.beacons != null:
+				world.beacons.clear()
+				hud.toast("已清除光柱", 2.0)
 		KEY_L:
 			world.lighting.cycle_mode()
 			_apply_light_mode()
@@ -601,7 +632,7 @@ func _enter_observer() -> void:
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 	world.set_aerial(true)
-	hud.toast("观景模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向")
+	hud.toast("观景模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向；长按左键立光柱（I 前往 / O 收藏 / U 清除）", 6.0)
 
 func _exit_observer() -> void:
 	observer.end()
@@ -626,7 +657,7 @@ func _toggle_aircraft() -> void:
 	if _plane_model != null:
 		_plane_model.visible = true
 	camera.set_mode(ChaseCamera.Mode.AIRCRAFT, true)
-	hud.toast("飞行：W/S 俯仰，A/D 横滚，Q/E 方向舵，Shift 加速，Space 导弹，X 减速")
+	hud.toast("飞行：W/S 俯仰，A/D 横滚，Q/E 方向舵，Shift 加速，X 减速")
 
 # ---------------------------------------------------------------------------
 # 主循环
@@ -740,6 +771,11 @@ func _step_car(dt: float) -> void:
 
 	# 子步碰撞（原版 steps = ceil(|speed| * dt / 0.7)）
 	var speed_before := car.speed
+	# 行人撞击要的是"碰撞回滚之后"的前后两帧车姿，所以在这一段前后各拍一次
+	var impact_before := {
+		"x": car.x, "z": car.z, "yaw": car.yaw, "speed": speed_before,
+		"groundY": world.height_field.height_at(car.x, car.z),
+	}
 	var steps := maxi(1, int(ceil(absf(speed_before) * dt / COLLISION_STEP)))
 	var sub := dt / float(steps)
 	for i in steps:
@@ -754,6 +790,13 @@ func _step_car(dt: float) -> void:
 		car.distance += absf(car.speed) * sub
 		car.x = nx
 		car.z = nz
+
+	# 行人被撞倒地（原版 pedestrian-impact.ts）：把这一帧车的实际位移交出去
+	if world.pedestrians != null and world.pedestrians.has_method("apply_car_motion"):
+		world.pedestrians.apply_car_motion(impact_before, {
+			"x": car.x, "z": car.z, "yaw": car.yaw, "speed": car.speed,
+			"groundY": world.height_field.height_at(car.x, car.z),
+		})
 
 	_place_car_model()
 	_camera_yaw = lerp_angle(_camera_yaw, car.yaw, 0.08)
@@ -856,6 +899,57 @@ func _step_observer(dt: float) -> void:
 	camera.observer_yaw = observer.yaw
 	camera.observer_pitch = observer.pitch
 	camera.follow_observer(dt)
+	_step_beacons(dt)
+
+
+## 观察信标：长按判定 + 光柱跟随相机
+##
+## 长按的判定分两段 —— 定时器只在「按住不动够久」时才落地（原版 BeaconHoldGesture）：
+##   · 按下：gesture.begin，记下按下点；
+##   · 移动：超过 8px 就 cancel（把位移让给正常的环绕/平移）；
+##   · 每帧：fire() 检查是否已经按够 650ms。
+func _step_beacons(dt: float) -> void:
+	if world == null or world.beacons == null:
+		return
+	var b = world.beacons
+	if not b.gesture.pointer.is_empty() and str(b.gesture.pointer["phase"]) == "pending":
+		var hit: Vector2 = b.gesture.fire(float(Time.get_ticks_msec()))
+		if is_finite(hit.x):
+			_beacon_place(hit)
+	b.update_system(dt, mode == Mode.OBSERVER, camera.global_position)
+
+
+## 把屏幕坐标投射到地形上落一根光柱
+func _beacon_place(screen: Vector2) -> void:
+	var b = world.beacons
+	var origin := camera.project_ray_origin(screen)
+	var dir := camera.project_ray_normal(screen)
+	var point: Dictionary = b.pick(origin, dir)
+	if point.is_empty():
+		hud.toast("长按地面或建筑选点，天空中无法放置光柱", 3.0)
+		return
+	if not b.select(point):
+		return
+	var name := str(b.selected.get("name", ""))
+	hud.toast("已选点 · %s　I 移动到此地 · O 收藏 · U 清除" % name, 4.0)
+
+
+## I：移动到选中的落点（原版"移动到此地"）
+func _beacon_travel() -> void:
+	var b = world.beacons
+	if b.selected.is_empty():
+		hud.toast("先在观察模式里长按地面选一个落点", 3.0)
+		return
+	var dest: Dictionary = b.resolve_selected()
+	if dest.is_empty():
+		return
+	if not dest.has("arrival"):
+		hud.toast("%s：附近没有适合车辆落地的道路" % str(dest.get("name", "")), 3.5)
+		return
+	var arr: Array = dest["arrival"]
+	car.reset_to(float(arr[0]), float(arr[1]), float(dest.get("yaw", 0.0)))
+	_exit_observer()
+	hud.toast("已移动到 %s" % str(dest.get("name", "")), 3.0)
 
 func _step_aircraft(dt: float) -> void:
 	var result: String = flight.step({

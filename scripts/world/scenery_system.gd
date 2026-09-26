@@ -29,6 +29,13 @@ var _tree_budget := 9000
 var world: CityWorld
 var enabled := true
 var quality := {"near_trees": 36, "canopy_full": 36}
+## 种植层（planting.json 的三层 + open-vegetation 替换）。
+## 与林冠层是两套互不相干的树，见 landscape_layer.gd 头部说明。
+const LANDSCAPE_SCRIPT := preload("res://scripts/world/landscape_layer.gd")
+var landscape = null
+## 草叶层（原版 city-meadow.ts）：瓦片掩码流式 + 程序化草叶
+const MEADOW_SCRIPT := preload("res://scripts/world/meadow_layer.gd")
+var meadow = null
 
 var _species: Array = []        ## [{id, name, height, crown, lods: {full,mid,far}}]
 var _canopy_instances: Array = []
@@ -37,7 +44,6 @@ var _canopy_points := PackedVector2Array()
 var _canopy_grid: PointGrid
 var _canopy_nodes: Dictionary = {}   ## "species|lod" → MeshInstance3D
 var _furniture_nodes: Array = []
-var _detail_nodes: Array = []
 var _timer := 0.0
 var _built := false
 ## 林冠分帧重建状态：phase 0=空闲，1=筛选候选，2=写入 MultiMesh
@@ -54,8 +60,19 @@ var _canopy_xf: Array = []
 func setup(p_world: CityWorld) -> void:
 	world = p_world
 	_load_canopy_asset()
-	_load_planting_details()
 	_load_furniture()
+	# 种植层：独立子节点（对照表里 city-landscape.ts 的归属）
+	landscape = LANDSCAPE_SCRIPT.new()
+	landscape.name = "LandscapeLayer"
+	add_child(landscape)
+	landscape.setup(p_world)
+	# 草叶层：原版在 landscape.init() 里建（CityLandscape.meadow），并且
+	# 草叶就绪后种植层的 lawn-tuft 细节要停摆，避免同一片草画两遍。
+	meadow = MEADOW_SCRIPT.new()
+	meadow.name = "MeadowLayer"
+	add_child(meadow)
+	meadow.setup(p_world)
+	landscape.set_meadow(meadow)
 	_built = true
 	# 首次布点
 	if not world.blocks.is_empty():
@@ -69,6 +86,10 @@ func set_quality(p: Dictionary) -> void:
 	}
 	# 林冠实例预算：设置页可调（TREE_STEPS 4000/9000/16000），档位默认见 PROFILES
 	_tree_budget = int(p.get("tree_budget", TREE_BUDGET.get(GameState.graphics_tier, 9000)))
+	if landscape != null and landscape.has_method("set_quality"):
+		landscape.set_quality(p)
+	if meadow != null and meadow.has_method("set_quality"):
+		meadow.set_quality(p)
 
 
 # ---------------------------------------------------------------------------
@@ -261,82 +282,6 @@ func _canopy_step(focus: Vector3) -> void:
 
 
 # ---------------------------------------------------------------------------
-# 灌木 / 草叶 / 井盖等细节
-# ---------------------------------------------------------------------------
-
-func _load_planting_details() -> void:
-	var man: Dictionary = CityData.landscape_manifest()
-	var models: Array = man.get("models", [])
-	if models.is_empty():
-		return
-	var planting: Dictionary = CityData.planting()
-	var raw: Array = planting.get("details", [])
-	# 每类模型一个 MultiMesh
-	var by_model := {}
-	for d in raw:
-		if d.size() < 5:
-			continue
-		var kind := int(d[3]) if d[3] is float or d[3] is int else 0
-		if not by_model.has(kind):
-			by_model[kind] = []
-		by_model[kind].append(d)
-
-	var nodes: Array = []
-	for kind in by_model.keys():
-		if kind < 0 or kind >= models.size():
-			continue
-		var m: Dictionary = models[kind]
-		var path := "res://data/city/landscape/" + str(m.get("file", ""))
-		if not ResourceLoader.exists(path):
-			continue
-		var scene := load(path) as PackedScene
-		if scene == null:
-			continue
-		var inst := scene.instantiate()
-		for mi in GlbLoader.meshes_of(inst):
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.mesh = mi.mesh
-			var node := MultiMeshInstance3D.new()
-			node.multimesh = mm
-			node.name = "detail-%d" % kind
-			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			add_child(node)
-			nodes.append({"mm": mm, "kind": kind, "entries": by_model[kind], "built": false})
-		inst.queue_free()
-	_detail_nodes = nodes
-	print("[ScenerySystem] 细节种类 %d，条目 %d" % [_detail_nodes.size(), raw.size()])
-
-
-func _update_details(focus: Vector3) -> void:
-	for entry in _detail_nodes:
-		if entry["built"]:
-			continue
-		entry["built"] = true
-		var list: Array = []
-		for d in entry["entries"]:
-			if d.size() < 5:
-				continue
-			var x := float(d[0])
-			var z := float(d[1])
-			if Vector2(x - focus.x, z + focus.z).length() > 400.0:
-				continue
-			var sc := float(d[2]) if d[2] is float or d[2] is int else 1.0
-			var yaw := float(d[4]) if d[4] is float or d[4] is int else 0.0
-			var g := world.ground_height(x, -z)
-			list.append(Transform3D(
-				Basis(Vector3.UP, CoordinateUtil.node_yaw(yaw)).scaled(Vector3(sc, sc, sc)),
-				CoordinateUtil.to_world(x, z, g)))
-			if list.size() >= 900:
-				break
-		var mm: MultiMesh = entry["mm"]
-		mm.instance_count = list.size()
-		mm.visible_instance_count = list.size()
-		for i in list.size():
-			mm.set_instance_transform(i, list[i])
-
-
-# ---------------------------------------------------------------------------
 # 街头家具（长椅）
 # ---------------------------------------------------------------------------
 
@@ -400,6 +345,11 @@ func _load_furniture() -> void:
 func update_system(delta: float, focus: Vector3) -> void:
 	if not enabled or not _built:
 		return
+	# 种植层自带 22m 阈值与空中切换判断，让它先跑（林冠在重建中也不阻塞它）
+	if landscape != null and landscape.has_method("update_system"):
+		landscape.update_system(delta, focus)
+	if meadow != null and meadow.has_method("update_system"):
+		meadow.update_system(delta, focus)
 	# 林冠分帧重建：进行中的任务每帧只做一小块，避免一次重写上万实例导致卡顿
 	if int(_canopy_job["phase"]) != 0:
 		_canopy_step(focus)
@@ -417,7 +367,6 @@ func update_system(delta: float, focus: Vector3) -> void:
 	_timer = 2.0
 	_canopy_last_focus = f2
 	_canopy_step(focus)
-	_update_details(focus)
 	_load_furniture()
 
 
@@ -432,5 +381,7 @@ func diagnostics() -> Dictionary:
 			continue
 		counts[k] = mmi.multimesh.instance_count
 	return {"species": _species.size(), "canopyInstances": _canopy_instances.size(),
-			"detailKinds": _detail_nodes.size(), "furniture": _furniture_nodes.size(),
-			"lodCounts": counts, "quality": quality}
+			"furniture": _furniture_nodes.size(),
+			"lodCounts": counts, "quality": quality,
+			"landscape": landscape.diagnostics() if landscape != null else {},
+			"meadow": meadow.diagnostics() if meadow != null else {}}

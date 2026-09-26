@@ -23,31 +23,40 @@ class_name RoadSurface
 ## 乘法，无法表达 `a + b·g` 的仿射式，所以这里取区间中值 **0.918** 作为常量，
 ## 与逐像素结果的偏差不超过 0.012 —— 视觉上不可分辨。
 
-## 原版 ROAD_LOOK（sunset / night 共用一档）
+## 原版 ROAD_LOOK（sunset / night 共用一档）。
+## `environment` 就是 Babylon 的 `material.environmentIntensity`（day 1 / 黄昏夜 .55）——
+## 本移植不在 StandardMaterial3D 上改，而是交给 ground_field.gdshader 的
+## `env_scale`（用 AO 复刻，见差异清单 §10.2）。
 const LOOK := {
 	GameContent.LightMode.DAY: {
 		"albedo": Color(1.02, 1.03, 1.04), "specular": 0.55,
 		"roughness": 0.803,   ## .66 + .19 × 0.731（ORM 绿通道均值）
+		"environment": 1.0,
 	},
 	GameContent.LightMode.SUNSET: {
 		"albedo": Color(0.72, 0.76, 0.79), "specular": 0.22,
 		"roughness": 0.918,   ## .83 + .12 × 0.731
+		"environment": 0.55,
 	},
 	GameContent.LightMode.NIGHT: {
 		"albedo": Color(0.72, 0.76, 0.79), "specular": 0.22,
 		"roughness": 0.918,
+		"environment": 0.55,
 	},
 }
 ## 原版 RAIN_ROAD_LOOK
 const RAIN_LOOK := {
 	GameContent.LightMode.DAY: {
 		"albedo": Color(0.88, 0.91, 0.94), "specular": 0.72, "roughness": 0.478,
+		"environment": 1.18,
 	},
 	GameContent.LightMode.SUNSET: {
 		"albedo": Color(0.70, 0.75, 0.79), "specular": 0.68, "roughness": 0.455,
+		"environment": 1.10,
 	},
 	GameContent.LightMode.NIGHT: {
 		"albedo": Color(0.70, 0.75, 0.79), "specular": 0.68, "roughness": 0.455,
+		"environment": 1.10,
 	},
 }
 
@@ -238,6 +247,13 @@ func set_mode(m: int) -> void:
 	mode = m
 	if _built:
 		_apply_look()
+
+
+## 当前生效的沥青档（含 environment）—— ground_field 的 env_scale 从这里取，
+## 保证路面环境光强度与昼夜 / 干湿切换始终同步，不出现两套真值。
+func current_look() -> Dictionary:
+	var table := RAIN_LOOK if raining else LOOK
+	return table.get(mode, table[GameContent.LightMode.SUNSET])
 
 
 func set_weather(wet: bool) -> void:

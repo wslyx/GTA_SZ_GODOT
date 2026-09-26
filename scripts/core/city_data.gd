@@ -19,6 +19,11 @@ extends Node
 
 signal core_loaded()
 
+## 未命名道路命名（原版 src/city-road-names.ts）。
+## ⚠️ 用 preload 而不是全局类名：新脚本的 class_name 要等编辑器重扫才进全局类缓存，
+## 运行时直接引用会报 "Could not find type"。
+const ROAD_NAMES_SCRIPT := preload("res://scripts/core/road_names.gd")
+
 const CITY_JSON := "/city/city.json"
 const NAVIGATION_JSON := "/city/navigation.json"
 const TERRAIN_DETAIL_JSON := "/city/terrain-detail.json"
@@ -97,6 +102,9 @@ func load_core() -> void:
 
 	_build_roads(city.get("roads", []))
 	_build_buildings(city.get("buildings", []))
+	# 原版 city-world.ts:250 在拿到 city.json 后**立刻**跑一遍路名生成，
+	# HUD / 大地图 / 自动驾驶都吃这份 display_name。
+	_assign_road_names()
 
 	terrain_detail = DataLoader.json_dict(TERRAIN_DETAIL_JSON)
 	landmark_detail = DataLoader.json_dict(LANDMARK_DETAIL_JSON)
@@ -172,6 +180,19 @@ func _build_roads(raw: Array) -> void:
 			"grade": str(r.get("grade", "0")),
 		}
 		road_index[roads[i]["id"]] = i
+
+
+## 未命名道路命名 —— 逐行对应原版 city-world.ts:250 的
+## `await loadRoadDisplayNames(this.data)`。
+##
+## 上下文点目录（data/map-places.json）是可选件：原版在 fetch 失败时静默降级，
+## 只是"附近"式命名会退化到"邻路附近 / 城市方位"这两级。
+func _assign_road_names() -> void:
+	var places: Array = DataLoader.json_dict("/map-places.json").get("places", [])
+	var t0 := Time.get_ticks_msec()
+	var res: Dictionary = ROAD_NAMES_SCRIPT.assign_display_names(roads, places, extent)
+	print("[CityData] 路名生成 %d ms：未命名 %d 条获得显示名 / 共 %d 条（上下文点 %d）"
+		% [Time.get_ticks_msec() - t0, res["contextual"], res["total"], places.size()])
 
 
 func _build_buildings(raw: Array) -> void:
@@ -348,6 +369,11 @@ func traffic_signals() -> Dictionary:
 
 func parked_ebikes() -> Dictionary:
 	return DataLoader.json_dict("/city/ebikes/parked.json")
+
+
+## ebikes/manifest.json：调色板与骑手服/头盔配色（原版 CityEbikes.init 从这里读）
+func ebike_manifest() -> Dictionary:
+	return DataLoader.json_dict("/city/ebikes/manifest.json")
 
 
 func puddles_layout() -> Dictionary:

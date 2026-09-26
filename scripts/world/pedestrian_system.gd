@@ -38,6 +38,12 @@ var enabled := true
 
 var _parts: Dictionary = {}     ## "body"/"leftLeg"/... → {mesh, mm}
 var _built := false
+## 被撞倒地的刚体控制器（原版 pedestrian-impact.ts）
+const IMPACT_SCRIPT := preload("res://scripts/world/pedestrian_impact.gd")
+## 给 step_body 用的回调（每帧新建 lambda 会白造上百个闭包，这里建一次）
+var _height_cb: Callable
+var _blocked_cb: Callable
+var _downed := 0
 ## 人行道段中点索引。
 ## place() 原本每 220m 全量扫 36969 条路径，是行驶中周期性卡顿的另一个来源。
 var _path_mids := PackedVector2Array()
@@ -49,6 +55,8 @@ var _push_timer := 0.0
 
 func setup(p_world: CityWorld) -> void:
 	world = p_world
+	_height_cb = func(x: float, z: float) -> float: return world.ground_height(x, -z)
+	_blocked_cb = func(x: float, z: float) -> bool: return world.collision.blocked(x, z)
 	_load_paths()
 	_load_asset()
 	if not paths.is_empty() and not world.blocks.is_empty():
@@ -137,8 +145,40 @@ func place(px: float, pz: float) -> void:
 			"dir": 1.0 if i % 2 == 1 else -1.0,
 			"scale": 0.94 + float(i % 5) * 0.025,
 			"x": 0.0, "z": 0.0, "yaw": 0.0,
+			"body": null,
 		})
 	origin = p
+	_downed = 0
+
+
+## 把这一帧车的**实际位移**（碰撞回滚之后）交给碰撞检测。
+## 由 main_game 在车辆子步结束后调用，入参是数据坐标下的前后两帧车姿。
+func apply_car_motion(before: Dictionary, after: Dictionary) -> int:
+	if not enabled or not _built or walkers.is_empty():
+		return 0
+	var hits := 0
+	for w in walkers:
+		if w["body"] != null:
+			continue
+		var px := float(w["x"])
+		var pz := float(w["z"])
+		var person := {"x": px, "y": world.ground_height(px, -pz), "z": pz}
+		var impact: Dictionary = IMPACT_SCRIPT.detect(before, after, person)
+		if impact.is_empty():
+			continue
+		w["body"] = IMPACT_SCRIPT.create_body(person, impact)
+		hits += 1
+	if hits > 0:
+		_downed = _count_downed()
+	return hits
+
+
+func _count_downed() -> int:
+	var n := 0
+	for w in walkers:
+		if w["body"] != null:
+			n += 1
+	return n
 
 
 func update_system(delta: float, focus: Vector3) -> void:
@@ -161,6 +201,11 @@ func update_system(delta: float, focus: Vector3) -> void:
 
 func _advance(dt: float) -> void:
 	for w in walkers:
+		# 倒地的人不再走路，改由刚体控制器推进（原版 phase === 'recovering' 后停住）
+		var body = w["body"]
+		if body != null:
+			IMPACT_SCRIPT.step_body(body, dt, _height_cb, _blocked_cb)
+			continue
 		var seg: Vector4 = w["seg"]
 		var a := Vector2(seg.x, seg.y)
 		var b := Vector2(seg.z, seg.w)
@@ -187,15 +232,28 @@ func _push_instances() -> void:
 			lists[entry["mm"]] = []
 
 	for w in walkers:
-		var g := world.ground_height(float(w["x"]), -float(w["z"]))
-		var base := CoordinateUtil.to_world(float(w["x"]), float(w["z"]), g)
-		var root_yaw := float(w["yaw"])
 		var sc := float(w["scale"])
-		var swing := sin(time * float(w["speed"]) * 6.0 + float(w["phase"])) * GAIT_AMPLITUDE
-
-		# 根变换：朝向 + 缩放 + 落位
-		var root_xf := Transform3D(
-			Basis(Vector3.UP, CoordinateUtil.node_yaw(root_yaw)).scaled(Vector3(sc, sc, sc)), base)
+		var root_xf: Transform3D
+		var swing := 0.0
+		var body = w["body"]
+		if body != null:
+			# 倒地：位置取质心，姿态取 rx/ry/rz；模型的局部原点在**脚底**，
+			# 所以要减去质心偏移（它要跟着 basis 一起转、一起缩放）
+			var basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(body["ry"]))) \
+				* Basis(Vector3.RIGHT, float(body["rx"])) \
+				* Basis(Vector3.FORWARD, float(body["rz"]))
+			basis = basis.scaled(Vector3(sc, sc, sc))
+			var pos := CoordinateUtil.to_world(float(body["x"]), float(body["z"]), float(body["y"])) \
+				- basis * Vector3(0.0, IMPACT_SCRIPT.CENTRE_HEIGHT, 0.0)
+			root_xf = Transform3D(basis, pos)
+		else:
+			var g := world.ground_height(float(w["x"]), -float(w["z"]))
+			var base := CoordinateUtil.to_world(float(w["x"]), float(w["z"]), g)
+			var root_yaw := float(w["yaw"])
+			swing = sin(time * float(w["speed"]) * 6.0 + float(w["phase"])) * GAIT_AMPLITUDE
+			# 根变换：朝向 + 缩放 + 落位
+			root_xf = Transform3D(
+				Basis(Vector3.UP, CoordinateUtil.node_yaw(root_yaw)).scaled(Vector3(sc, sc, sc)), base)
 
 		for key in _parts:
 			var angle := 0.0
@@ -242,4 +300,4 @@ func _push_instances() -> void:
 
 func diagnostics() -> Dictionary:
 	return {"paths": paths.size(), "walkers": walkers.size(), "parts": _parts.size(),
-			"origin": [origin.x, origin.y], "enabled": enabled}
+			"origin": [origin.x, origin.y], "enabled": enabled, "downed": _downed}
