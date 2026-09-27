@@ -127,6 +127,24 @@ func _apply_env(overrides: Dictionary) -> void:
 				var sun = lighting.get("sun")
 				if sun != null:
 					sun.light_energy = float(value)
+			"light_mode":
+				# 光照档（0 白天 / 1 日落 / 2 夜晚）：瞬时套用并同步 GameState，
+				# 让后续 _reset_env 重放同档（过渡要等 gap 秒后再抓下一张）
+				GameState.set_light_mode(int(value))
+				lighting.call("apply_mode", int(value))
+			"hide":
+				# 隐藏 world 上的子系统节点（distant / facades / traffic …）定位遮挡物
+				var w = main.get("world")
+				if w != null:
+					var nd = w.get(str(value))
+					if nd is Node3D:
+						(nd as Node3D).visible = false
+					else:
+						push_warning("[shot] world 上没有 %s" % str(value))
+			"fxaa":
+				# 屏幕空间抗锯齿开关（FXAA 会影响全屏细节观感）
+				GraphicsQuality.set_override("aa", 1 if bool(value) else 0)
+				GraphicsQuality.apply_aa()
 			"sky_energy":
 				if env.sky != null and env.sky.sky_material is PanoramaSkyMaterial:
 					(env.sky.sky_material as PanoramaSkyMaterial).energy_multiplier = float(value)
@@ -178,6 +196,41 @@ func _capture(name: String) -> void:
 ## 截图里"某个元素没出现"时，靠这个区分是没建、还是建了但尺寸为 0。
 func dump_ui() -> void:
 	dump_state()
+	# 天空诊断：所有 WorldEnvironment / 天空球网格 / Sky 材质
+	var w = main.get("world")
+	if w == null:
+		return
+	for we in find_children("*", "WorldEnvironment", true, false):
+		var env: Environment = (we as WorldEnvironment).environment
+		if env == null:
+			continue
+		var mat_desc := "null"
+		if env.sky != null and env.sky.sky_material != null:
+			var sm = env.sky.sky_material
+			if sm is ShaderMaterial:
+				var sh: Shader = (sm as ShaderMaterial).shader
+				mat_desc = "ShaderMaterial(%s)" % (sh.resource_path if sh != null else "null")
+				var sp: ShaderMaterial = sm as ShaderMaterial
+				print("[sky-uniform] sky_mode=%s sky_gain=%s env_blend=%s mode_a=%s mode_b=%s base_energy=%s" % [
+					str(sp.get_shader_parameter("sky_mode")),
+					str(sp.get_shader_parameter("sky_gain")),
+					str(sp.get_shader_parameter("env_blend")),
+					str(sp.get_shader_parameter("mode_a")),
+					str(sp.get_shader_parameter("mode_b")),
+					str(sp.get_shader_parameter("base_energy"))])
+			else:
+				mat_desc = sm.get_class()
+		print("[sky] %s bg=%d sky_mat=%s ambient_src=%d" % [
+			we.name, env.background_mode, mat_desc, env.ambient_light_source])
+	for mi in find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		var n := String(mi.name).to_lower()
+		if "sky" in n or "atmosphere" in n or "night" in n:
+			var mesh_desc := "null"
+			if m.mesh is SphereMesh:
+				var sp := m.mesh as SphereMesh
+				mesh_desc = "SphereMesh r=%.0f seg=%d rings=%d" % [sp.radius, sp.radial_segments, sp.rings]
+			print("[sky-mesh] %s visible=%s mesh=%s pos=%s" % [mi.name, m.visible, mesh_desc, m.global_position])
 	var maps = main.get("maps")
 	if maps == null:
 		print("[ui] maps 为 null")

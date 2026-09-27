@@ -4,7 +4,9 @@ extends Node3D
 ## + city-public-lighting.ts。
 ##
 ## 三档光照的参数是**逐字抄的**原版常量（见 CINEMATIC_LOOK），不是调出来的近似值。
-## 原版 setMode() 直接赋值、不做插值；这里保持一致，切换是瞬时的。
+## 原版 setMode() 直接赋值、不做插值；这里静止时的数值与其逐项一致，
+## 但按键切换（L）时连续参数（太阳/雾/曝光/辉光）会平滑过渡约 2 秒，
+## 天空与 IBL 由 sky_system 同步做交叉淡化；路灯等离散系统仍瞬时切换。
 ##
 ## 局部照明：原版用 2 个池化 SpotLight 扫描相机附近路灯，另有 ~600 盏 OmniLight。
 ## 这里用 Godot 的 OmniLight3D 池（按距离分配最近灯位）实现同样效果：
@@ -101,6 +103,13 @@ const AMBIENT_ENERGY_SCALE := 1.0
 ## 池大小：原版是 2 个 SpotLight 轮转；Godot 里给多一点让近处路灯都能亮
 const LAMP_POOL := 24
 
+## —— 光照档平滑过渡 ——
+## 原版 setMode() 直接赋值、是瞬时硬切；这里在**连续光照参数**（太阳颜色/强度/
+## 方向、环境光、雾、曝光、对比度、辉光）上做帧率无关的指数平滑，
+## 静止时的数值与原版逐项一致（收敛后直接取目标值）。
+## 路灯/灯头自发光/路面材质等**离散系统**仍按原版瞬时切换（灯"啪"地亮起是合理的）。
+const MODE_BLEND_RATE := 2.2   ## 1-exp(-dt·k)：约 2 秒视觉收敛
+
 # ---------------------------------------------------------------------------
 # 公园高杆灯（原版 city-public-lighting.ts:44-45）
 # ---------------------------------------------------------------------------
@@ -129,6 +138,11 @@ var _lamp_pool: Array = []
 var _scan_timer := 0.0
 var _built := false
 var lamp_lit := false
+
+## 光照档过渡：_look_cur 逐帧向 _look_target 指数逼近
+var _look_cur := {}
+var _look_target := {}
+var _mode_animating := false
 
 ## --- 公园高杆灯 --------------------------------------------------------------
 ## 灯位（数据坐标）
@@ -221,24 +235,56 @@ func _create_sun() -> void:
 # 模式切换
 # ---------------------------------------------------------------------------
 
-func apply_mode(m: int) -> void:
+func apply_mode(m: int, animate := false) -> void:
 	mode = m
 	if not _built:
 		return
 	var look: Dictionary = LOOK.get(m, LOOK[GameContent.LightMode.SUNSET])
+
+	# —— 离散系统：按原版瞬时切换 ——
+	# 夜间：点亮路灯
+	lamp_lit = m != GameContent.LightMode.DAY
+	for l in _lamp_pool:
+		l.visible = lamp_lit
+	# 公园高杆灯灯头（夜里 2.1 / 黄昏 .45 / 白天 0）
+	_apply_pole_emissive()
+	if world != null and world.sky != null and world.sky.has_method("apply_mode"):
+		world.sky.apply_mode(m)
+	# 沥青路面的反照率/粗糙度也分档（原版 ROAD_LOOK，见 road_surface.gd）
+	if world != null and world.road_surface != null:
+		world.road_surface.set_mode(m)
+
+	# —— 连续光照参数：平滑过渡或直接落位 ——
+	_look_target = look
+	if animate and not _look_cur.is_empty():
+		# 从当前插值状态继续向新目标收敛（连续切换不跳变）
+		_mode_animating = true
+	else:
+		_look_cur = _copy_look(look)
+		_mode_animating = false
+		_apply_look(_look_cur)
+
+
+## 把一份 LOOK 参数套到太阳 / 环境（原版 apply_mode 的连续参数部分）
+func _apply_look(look: Dictionary) -> void:
 	var env := env_node.environment
 
 	# 太阳：方向、颜色、强度
 	var d: Vector3 = look["sun_dir_data"]
 	# 数据 (east, up, north) → Godot (east, up, -north)
-	var dir_world := Vector3(d.x, d.y, -d.z).normalized()
+	var dir_world := Vector3(d.x, d.y, -d.z)
+	if dir_world.length() > 0.0001:
+		dir_world = dir_world.normalized()
+	else:
+		dir_world = Vector3(0.0, -1.0, 0.0)
 	# 基准点取世界原点即可：这里只需定方向，位置由 update_system() 每帧
 	# 跟着视野中心调整（原版 sun.position = focus − dir*800）。
 	# 不要写 get_parent().global_position —— get_parent() 返回 Node，
 	# 上面没有 global_position，会退化成 Variant 导致推断失败。
 	var origin := Vector3.ZERO
 	sun.global_position = origin - dir_world * 800.0
-	sun.look_at(origin, Vector3.UP)
+	if sun.global_position.distance_to(origin) > 0.01:
+		sun.look_at(origin, Vector3.UP)
 	sun.light_color = look["sun_color"]
 	sun.light_energy = float(look["sun_energy"]) * SUN_ENERGY_SCALE
 
@@ -264,7 +310,7 @@ func apply_mode(m: int) -> void:
 	# 曝光 / 对比度（曝光补偿来自图像设置页，默认 1.0）
 	env.tonemap_exposure = float(look["exposure"]) * GraphicsQuality.exposure_scale()
 	env.adjustment_enabled = true
-	env.adjustment_contrast = look["contrast"]
+	env.adjustment_contrast = float(look["contrast"])
 	env.adjustment_saturation = 1.0 + float(look["shadow_sat"]) * 0.5
 
 	# Bloom
@@ -273,25 +319,56 @@ func apply_mode(m: int) -> void:
 	env.glow_bloom = 0.05
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
-	# 夜间：点亮路灯
-	lamp_lit = m != GameContent.LightMode.DAY
-	for l in _lamp_pool:
-		l.visible = lamp_lit
-	# 公园高杆灯灯头（夜里 2.1 / 黄昏 .45 / 白天 0）
-	_apply_pole_emissive()
 
-	if world != null and world.sky != null and world.sky.has_method("apply_mode"):
-		world.sky.apply_mode(m)
-	# 沥青路面的反照率/粗糙度也分档（原版 ROAD_LOOK，见 road_surface.gd）
-	if world != null and world.road_surface != null:
-		world.road_surface.set_mode(m)
+func _copy_look(look: Dictionary) -> Dictionary:
+	var out := {}
+	for k in look:
+		out[k] = look[k]
+	return out
+
+
+## 逐键插值两份 LOOK：数值 lerp、颜色 lerp、方向 lerp 后归一化
+func _lerp_look(a: Dictionary, b: Dictionary, k: float) -> Dictionary:
+	var out := {}
+	for key in b:
+		var va: Variant = a.get(key, b[key])
+		var vb: Variant = b[key]
+		if va is Vector3 and vb is Vector3:
+			var v: Vector3 = (va as Vector3).lerp(vb as Vector3, k)
+			out[key] = v.normalized() if key == "sun_dir_data" else v
+		elif va is Color and vb is Color:
+			out[key] = (va as Color).lerp(vb as Color, k)
+		elif va is float and vb is float:
+			out[key] = lerpf(va, vb, k)
+		elif va is int and vb is int:
+			out[key] = int(round(lerpf(float(va), float(vb), k)))
+		else:
+			out[key] = vb if k > 0.5 else va
+	return out
+
+
+## 过渡推进：指数逼近目标，收敛后 snap 到精确目标值（保证端点与原版逐项一致）
+func _advance_look(delta: float) -> void:
+	if not _mode_animating or _look_cur.is_empty():
+		return
+	var k := 1.0 - exp(-delta * MODE_BLEND_RATE)
+	_look_cur = _lerp_look(_look_cur, _look_target, k)
+	_apply_look(_look_cur)
+	# 收敛判定：几个敏感标量都贴近目标（或过渡超时）就定格
+	var close := absf(float(_look_cur["sun_energy"]) - float(_look_target["sun_energy"])) < 0.005 \
+		and absf(float(_look_cur["fog_density"]) - float(_look_target["fog_density"])) < 0.000002 \
+		and absf(float(_look_cur["exposure"]) - float(_look_target["exposure"])) < 0.003
+	if close:
+		_look_cur = _copy_look(_look_target)
+		_mode_animating = false
+		_apply_look(_look_cur)
 
 
 func cycle_mode() -> int:
 	match mode:
-		GameContent.LightMode.SUNSET: apply_mode(GameContent.LightMode.NIGHT)
-		GameContent.LightMode.NIGHT: apply_mode(GameContent.LightMode.DAY)
-		_: apply_mode(GameContent.LightMode.SUNSET)
+		GameContent.LightMode.SUNSET: apply_mode(GameContent.LightMode.NIGHT, true)
+		GameContent.LightMode.NIGHT: apply_mode(GameContent.LightMode.DAY, true)
+		_: apply_mode(GameContent.LightMode.SUNSET, true)
 	GameState.set_light_mode(mode)
 	return mode
 
@@ -529,6 +606,8 @@ func _assign_lamps(focus: Vector3) -> void:
 
 
 func update_system(delta: float, focus: Vector3) -> void:
+	# 光照档过渡推进（静止时零开销）
+	_advance_look(delta)
 	_scan_timer -= delta
 	if _scan_timer <= 0.0:
 		_scan_timer = 0.4
@@ -537,8 +616,10 @@ func update_system(delta: float, focus: Vector3) -> void:
 	# 高杆灯杆：只在 256m 格变化时重摆（内部自带格判断）
 	_assign_poles(focus)
 	# 太阳跟随视野中心，保证阴影贴图覆盖玩家附近（原版 sun.position = p - dir*800）
+	# 方向用**当前插值中的**太阳方向（过渡期间太阳缓缓滑到新档位的角度）
 	if sun != null:
-		var look: Dictionary = LOOK.get(mode, LOOK[GameContent.LightMode.SUNSET])
+		var look: Dictionary = _look_cur if not _look_cur.is_empty() \
+			else LOOK.get(mode, LOOK[GameContent.LightMode.SUNSET])
 		var d: Vector3 = look["sun_dir_data"]
 		var dir_world := Vector3(d.x, d.y, -d.z).normalized()
 		sun.global_position = focus - dir_world * 800.0

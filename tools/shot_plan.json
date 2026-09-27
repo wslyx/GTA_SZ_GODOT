@@ -1,1 +1,8 @@
-{ "warmup": 9.0, "gap": 1.5, "shots": [ { "name": "spawn", "env": { "tier": "medium" }, "dump_ui": true } ] }
+{
+  "warmup": 8.0,
+  "gap": 5.0,
+  "shots": [
+    { "name": "discard_night", "env": { "light_mode": 2, "tier": "medium" } },
+    { "name": "night_signs", "env": { "light_mode": 2 } }
+  ]
+}

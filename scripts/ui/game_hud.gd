@@ -173,6 +173,8 @@ var _odo_label: Label
 var _quicktips: Control
 var _toast_label: Label
 var _fps_label: Label
+## 光照档时钟（原版 city-hud.ts 的 hud.clock：白天 14:20 / 日落 18:25 / 夜晚 20:10）
+var _clock_label: Label
 
 ## 预热的字体（原版教训：SystemFont 当帧新建当帧 draw_string 会画成实心方块，
 ## 所以凡是走 draw_* 的文字，字体都在 _build() 里一次性建好）
@@ -354,6 +356,11 @@ func _build_topright() -> void:
 	ql.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	q.add_child(ql)
 	_top_group.add_child(q)
+
+	# 光照档时钟（原版 hud.clock，随 L 键切档更新）
+	_clock_label = _label("", _spaced(_f_ui, 0.9), 11, TOPBTN_C)
+	_clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_top_group.add_child(_clock_label)
 
 
 func _build_story_card() -> void:
@@ -639,6 +646,9 @@ func update_hud(delta: float) -> void:
 	var area := _area_name(pos)
 	# 原版：subtitle = `${areaLabel} · ${mode}`，mode 取 自由驾驶 / 沿途导航 / 步行探索 …
 	_subtitle.text = "%s · %s" % [area if area != "" else "深圳湾", _mode_word()]
+	# 光照档时钟（原版 writeText(hud.clock, …)：day 14:20 / night 20:10 / 其余 18:25）
+	if _clock_label != null:
+		_clock_label.text = "%s · 光照 %s（L 切换）" % [GameState.clock_text(), _light_word()]
 	# 原版 city-quicktips.ts:183 的模式切换：driving/walking/observer/tank，
 	# 飞行中整个快捷条隐藏（quickTips.update({hidden: !!world.flight?.active})）
 	var tip_mode := "driving"
@@ -692,6 +702,16 @@ func _mode_word() -> String:
 	if player.has_route():
 		return "沿途导航"
 	return "自由驾驶"
+
+
+## 光照档名（与 main_game._light_mode_name 一致）
+func _light_word() -> String:
+	match GameState.light_mode:
+		GameContent.LightMode.DAY:
+			return "晴日"
+		GameContent.LightMode.NIGHT:
+			return "夜色"
+	return "日落"
 
 
 func _refresh_story() -> void:

@@ -16,7 +16,12 @@ shader_type spatial;
 //   烘焙 AO   —— strength 地面 .85 / 墙 .60 / 屋顶 .70，direct 份额 day .30 / sunset .24 / night 0
 //   草地      —— 材质名 `land` / `park`
 
-render_mode diffuse_burley, specular_schlick_ggx;
+// 剔除：⚠️ 本着色器覆盖的网格里，屋顶（block_<i>_<j>_roof）属于 buildings.glb
+// 的混合绕序数据（约 64% 三角形绕序反，见 architecture_pbr.gdshader 头注）；
+// 原版材质全部 doubleSided（双面渲染）。必须 cull_disabled + 背面法线取反，
+// 否则绕序反的屋顶从上方被剔除、楼体呈"敞顶"状。
+
+render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 // ---------------------------------------------------------------------------
 // 基础参数（从被替换的 StandardMaterial3D 抄来）
@@ -156,6 +161,10 @@ float city_ambient_at(vec3 p, vec3 n) {
 }
 
 void fragment() {
+	// 双面光照：背面法线取反（Babylon twoSidedLighting），否则背面全黑
+	if (!FRONT_FACING) {
+		NORMAL = -NORMAL;
+	}
 	vec3 wpos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec3 wnormal = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 

@@ -16,10 +16,13 @@ shader_type spatial;
 //   反照率（贴图 × 颜色 × 顶点色）、UV 缩放、法线贴图、粗糙度、金属度、镜面强度、
 //   自发光（窗格掩码贴图 × 颜色 × 强度，白天 0 / 黄昏 .45 / 夜 1.35）。
 //
-// 剔除：原版显式 `backFaceCulling = true`，所以这里用默认的 cull_back，
-// 不做 cull_disabled（即使 GLB 标了 doubleSided）。
+// 剔除：⚠️ 建筑/地标 GLB 的材质全部是 **doubleSided: true**（370/370），原版
+// Babylon 导入后 backFaceCulling=false（双面渲染，从不剔除这些面——楼体三角形
+// 绕序是混合的，64% 反向，单面剔除必然"看见楼内远墙、近墙消失"）。这里必须
+// cull_disabled；双面光照按 Babylon twoSidedLighting 的做法在 fragment 里
+// 对背面法线取反。
 
-render_mode diffuse_burley, specular_schlick_ggx;
+render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform bool use_albedo_tex = false;
 uniform sampler2D albedo_tex : source_color, hint_default_white;
@@ -48,6 +51,10 @@ void vertex() {
 }
 
 void fragment() {
+	// 双面光照（Babylon twoSidedLighting）：背面法线取反，否则内壁全黑
+	if (!FRONT_FACING) {
+		NORMAL = -NORMAL;
+	}
 	vec3 base = albedo_tint.rgb;
 	if (use_albedo_tex) {
 		base *= texture(albedo_tex, UV).rgb;

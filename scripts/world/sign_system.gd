@@ -84,7 +84,9 @@ func _make_pool() -> void:
 		l.pixel_size = 0.012
 		l.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 		l.no_depth_test = false
-		l.double_sided = true
+		# 原版片元 `if(dot(view,vNormal)<=0.)discard;` —— 文字只从正面可见，
+		# 背面（墙另一侧）不可见。double_sided=true 会从墙背面透出镜像文字。
+		l.double_sided = false
 		l.shaded = false
 		l.modulate = Color(1.0, 0.96, 0.90)
 		l.outline_size = 6
@@ -170,9 +172,14 @@ func update_signs(cam_pos: Vector3) -> void:
 		var n := Vector3(float(nrm[0]), float(nrm[1]), -float(nrm[2])).normalized()
 		var t := Vector3(float(tan[0]), float(tan[1]), -float(tan[2])).normalized()
 		# 文字平面：法线朝外、宽度沿 tangent、竖直方向由 n×t 得到
-		var up := n.cross(t).normalized()
+		var up := n.cross(t)
 		if up.y < 0.0:
+			# ⚠️ 翻 up 的同时必须把 t 一起翻：否则 t×up = -n，基变成左手系
+			# （det<0），Label3D 的文字整体镜像 —— 就是"墙上的字反了"。
+			# 原版 city-building-signs.ts 注释同款问题："exterior-facing tangent
+			# order projects right-to-left: reverse U so Chinese reads normally"。
 			up = -up
+			t = -t
 		# 不能叫 basis —— Node3D 已有 basis 属性
 		var sign_basis := Basis(t, up, n)
 		l.global_transform = Transform3D(sign_basis,
