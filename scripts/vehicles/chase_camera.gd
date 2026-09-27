@@ -61,6 +61,11 @@ var observer_pitch := 0.0
 var aircraft_basis := Transform3D.IDENTITY
 var walk_eye := Vector3.ZERO
 
+## follow_vehicle 的位移携带状态（原版 oldCarX/oldCarZ 逻辑）。
+## false = 尚未跟随过，下一帧直接落位到 desired。
+var _has_focus := false
+var _last_focus := Vector3.ZERO
+
 
 func _ready() -> void:
 	fov = 70.0
@@ -93,27 +98,46 @@ func next_view() -> int:
 
 
 ## 驾驶/坦克跟随。target_data 为数据坐标 (east, north) + 地面高度。
-func follow_vehicle(target_data: Vector3, speed: float, dt: float, tank := false) -> void:
+## look_yaw 为**车头**朝向（数据 yaw）：原版相机位置用滞后的 cameraYaw、
+## 注视点却始终锁定车头 yaw 前方 5m —— 转弯时相机甩在车后、视线盯着车头，
+## 这是原版追尾视角手感的关键。不传（NAN）时退化为用车头 = 相机 yaw。
+func follow_vehicle(target_data: Vector3, speed: float, dt: float, tank := false,
+		look_yaw := NAN) -> void:
 	var views := TANK_VIEWS if tank else DRIVE_VIEWS
 	var v: Dictionary = views[mini(view, views.size() - 1)]
 	var f := float(v["f"]) * distance_scale
 	var h := float(v["h"])
+	# 原版只有驾驶视角 0 的高度受 cameraPitch 影响：1.75 + pitch*2
+	if not tank and view == 0:
+		h += look_pitch * 2.0
 
 	var ground: float = ground_height_fn.call(target_data.x, target_data.z) if ground_height_fn.is_valid() else 0.0
-	# 数据 yaw → 世界方向；相机位于车后（-forward）
-	var dir := CoordinateUtil.yaw_to_direction(yaw)
 	var focus := CoordinateUtil.to_world(target_data.x, target_data.z, ground)
-	# f 已经是"沿车头方向的偏移"（view0 = -8.6 即车后 8.6m），直接相乘即可。
-	# 之前写成 dir * -f，把负号抵消掉了，相机会跑到车头**前方**。
-	var desired := focus + dir * f + Vector3(0.0, h + look_pitch * 2.0, 0.0)
-	# 目标点：车头前方 5m，高度按视角
+	# 相机位置跟随滞后 yaw（原版 desired 用 cameraYaw）
+	var cam_dir := CoordinateUtil.yaw_to_direction(yaw)
+	var desired := focus + cam_dir * f + Vector3(0.0, h, 0.0)
+	# 注视点跟随**车头** yaw（原版 target 用 s.yaw）：车头前方 5m
+	var look_dir := CoordinateUtil.yaw_to_direction(yaw if is_nan(look_yaw) else look_yaw)
 	var look_height := 2.65 if view == 0 else 1.15
-	var look_at := focus + dir * 5.0 + Vector3(0.0, look_height, 0.0)
+	var look_at := focus + look_dir * 5.0 + Vector3(0.0, look_height, 0.0)
 
-	var factor := 1.0 - exp(-dt * 9.0)
-	if mode == Mode.COCKPIT:
-		factor = 1.0 - exp(-dt * 20.0)
-	global_position = global_position.lerp(desired, factor)
+	# 原版：camera.position += 车辆本帧位移（x/z，随车平移不滞后），
+	# 再向 desired 指数平滑（view1 用 20，其余 9）。
+	# 传送（快速移动/信标落点/换载具）时位移会远超任何帧间移动，直接落位。
+	var factor := 1.0 - exp(-dt * (20.0 if view == 1 else 9.0))
+	if not _has_focus:
+		_has_focus = true
+		_last_focus = focus
+		global_position = desired
+	else:
+		var carry := focus - _last_focus
+		carry.y = 0.0
+		_last_focus = focus
+		if carry.length() > 25.0:
+			global_position = desired
+		else:
+			global_position += carry
+			global_position = global_position.lerp(desired, factor)
 	look_at_target(look_at)
 	fov = rad_to_deg(FOV_BASE + absf(speed) * FOV_SPEED_GAIN)
 

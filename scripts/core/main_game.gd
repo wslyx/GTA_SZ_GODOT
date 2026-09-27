@@ -56,6 +56,14 @@ var _walk_first_person := false
 var _car_model: Node3D
 var _tank_model: Node3D
 var _plane_model: Node3D
+## 车轮滚动/转向动画（原版 city-world.ts 的 wheelSpin 逻辑）。
+## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
+## 直接用 `CarWheels` 会报 "Could not find type CarWheels"，必须 preload。
+const CAR_WHEELS_SCRIPT := preload("res://scripts/vehicles/car_wheels.gd")
+var _car_wheels = null               ## CAR_WHEELS_SCRIPT 实例（untyped：全局类名未注册）
+var _wheel_spin := 0.0
+## 世界时钟（原版 world.time，永不停表：悬挂起伏用它驱动）
+var _game_time := 0.0
 ## 步行时的角色本体（原版 city-rider.ts）。
 ## ⚠️ 用 preload 而不是全局类名 Rider：新增脚本的 class_name 要等编辑器
 ## 重扫一次才会进全局类缓存，运行时直接跑会报 "Could not find type Rider"。
@@ -192,6 +200,10 @@ func _load_vehicle_models() -> void:
 		# 所以必须在材质标定之后、且挂在 _car_model 之下（随车移动）。
 		_sport_details = SportDetails.new()
 		_sport_details.apply(_car_model)
+		# 车轮滚动/转向动画：收集 wheel_* / brake_* 网格并读 vehicle-manifest.json
+		# 的 wheelRadius / wheelCentresGltf（原版 init 里 setPivotPoint 那段）。
+		_car_wheels = CAR_WHEELS_SCRIPT.new()
+		_car_wheels.setup(_car_model)
 
 var _vehicle_materials: VehicleMaterials = null
 var _sport_details: SportDetails = null
@@ -257,6 +269,7 @@ func _on_built() -> void:
 	# 出生点
 	var sp := CityData.spawn_pos
 	car.reset_to(sp.x, sp.y, CityData.spawn_yaw)
+	_camera_yaw = CityData.spawn_yaw
 	walk.active = false
 	_apply_light_mode()
 	GraphicsQuality.apply_to_world(world)
@@ -481,9 +494,11 @@ func _reset_to_road() -> void:
 		tank.z = t.y
 		tank.yaw = t.z
 		tank.speed = 0.0
+		_camera_yaw = t.z
 	elif mode == Mode.CAR:
 		var c := _snap_to_road(car.x, car.z)
 		car.reset_to(c.x, c.y, c.z)
+		_camera_yaw = c.z
 	else:
 		return
 	hud.toast(_last_road_message)
@@ -517,6 +532,7 @@ func _toggle_tank() -> void:
 		if _tank_model != null:
 			_tank_model.visible = true
 		camera.set_mode(ChaseCamera.Mode.TANK, true)
+		_camera_yaw = tank.yaw
 		hud.toast("切换为坦克：Q/E 炮塔，PgUp/PgDn 炮管，Space 开炮")
 	else:
 		if not _tank_safe_for_car():
@@ -529,6 +545,7 @@ func _toggle_tank() -> void:
 		if _tank_model != null:
 			_tank_model.visible = false
 		camera.set_mode(ChaseCamera.Mode.DRIVING, true)
+		_camera_yaw = tank.yaw
 		hud.toast("切换为轿车")
 
 ## 换车空间检测的采样偏移。
@@ -672,6 +689,8 @@ func _process(delta: float) -> void:
 		return
 
 	var dt := clampf(delta, 0.0, 0.05)
+	# 原版 update() 第一行：this.time += dt（暂停也不停表）
+	_game_time += dt
 
 	_update_modes(dt)
 	_check_manual_arrival()
@@ -799,10 +818,17 @@ func _step_car(dt: float) -> void:
 		})
 
 	_place_car_model()
-	_camera_yaw = lerp_angle(_camera_yaw, car.yaw, 0.08)
+	# 车轮滚动：原版 wheelSpin += s.speed*dt/wheelRadius（用碰撞回滚后的 speed，
+	# 撞墙时轮子同步停转/倒转）；转向用物理转角 car.steer（前轮 + 刹车盘）。
+	if _car_wheels != null and _car_wheels.part_count > 0:
+		_wheel_spin += car.speed * dt / _car_wheels.wheel_radius
+		_car_wheels.apply(_wheel_spin, car.steer)
+	# 相机偏航以 1-exp(-dt*3) 追车头（原版 cameraYaw 慢速跟随，转弯时相机甩在车后）
+	_camera_yaw = lerp_angle(_camera_yaw, car.yaw, 1.0 - exp(-dt * 3.0))
 	camera.yaw = _camera_yaw
 	camera.look_pitch = _look_pitch
-	camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false)
+	# 注视点传**车头** yaw（原版 target 用 s.yaw，转弯时锁定车头而非相机方向）
+	camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false, car.yaw)
 	lights.update_brake(throttle < 0.0 and car.speed > 0.5, car.speed < -0.5)
 	lights.place(_car_model.global_transform if _car_model != null else camera.global_transform)
 
@@ -841,10 +867,10 @@ func _step_tank(dt: float) -> void:
 		_tank_model.global_transform = Transform3D(
 			Basis(Vector3.UP, CoordinateUtil.node_yaw(tank.yaw)),
 			CoordinateUtil.to_world(tank.x, tank.z, g + 0.05))
-	_camera_yaw = lerp_angle(_camera_yaw, tank.yaw, 0.06)
+	_camera_yaw = lerp_angle(_camera_yaw, tank.yaw, 1.0 - exp(-dt * 3.0))
 	camera.yaw = _camera_yaw
 	camera.look_pitch = _look_pitch
-	camera.follow_vehicle(Vector3(tank.x, 0.0, tank.z), tank.speed, dt, true)
+	camera.follow_vehicle(Vector3(tank.x, 0.0, tank.z), tank.speed, dt, true, tank.yaw)
 	lights.update_brake(handbrake, tank.speed < -0.5)
 	lights.place(_tank_model.global_transform if _tank_model != null else camera.global_transform)
 
@@ -948,6 +974,7 @@ func _beacon_travel() -> void:
 		return
 	var arr: Array = dest["arrival"]
 	car.reset_to(float(arr[0]), float(arr[1]), float(dest.get("yaw", 0.0)))
+	_camera_yaw = float(dest.get("yaw", 0.0))
 	_exit_observer()
 	hud.toast("已移动到 %s" % str(dest.get("name", "")), 3.0)
 
@@ -1016,9 +1043,22 @@ func _place_car_model() -> void:
 	#   前轮 wheel_lf_rubber / wheel_rf_rubber  Z = -1.43
 	#   后轮 wheel_lr_rubber / wheel_rr_rubber  Z = +1.78
 	# 之前统一按 PLUS_Z 处理（rotation.y = PI − yaw），结果是车头朝后、倒着开。
-	_car_model.global_transform = Transform3D(
-		Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)),
-		CoordinateUtil.to_world(car.x, car.z, g + 0.02))
+	#
+	# 车体姿态三件套（原版 city-world.ts update()，在 car.rotation 上合成
+	# R = Ry(yaw)·Rx(pitch)·Rz(roll)，这里按本空间前向轴换算后逐项照抄）：
+	#   悬挂起伏  sin(time*7)·min(.008, |speed|·.0004)
+	#   俯仰      前后 ±1.5m 处地面高差 atan2(front−rear, 3)（本空间车头 −Z，
+	#             抬头为正，与原版 −atan2(front−rear,3) 的抬头效果一致）
+	#   侧倾      −steer·speed·.0025（转弯压向弯内的街机侧倾）
+	var bob := sin(_game_time * 7.0) * minf(0.008, absf(car.speed) * 0.0004)
+	var h_front := world.height_field.height_at(car.x + sin(car.yaw) * 1.5, car.z + cos(car.yaw) * 1.5)
+	var h_rear := world.height_field.height_at(car.x - sin(car.yaw) * 1.5, car.z - cos(car.yaw) * 1.5)
+	var pitch := atan2(h_front - h_rear, 3.0)
+	var roll := -car.steer * car.speed * 0.0025
+	var basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)) \
+		* Basis(Vector3.RIGHT, pitch) * Basis(Vector3.BACK, roll)
+	_car_model.global_transform = Transform3D(basis,
+		CoordinateUtil.to_world(car.x, car.z, g + 0.02 + bob))
 
 # ---------------------------------------------------------------------------
 # 交互
@@ -1297,6 +1337,7 @@ func _on_map_quick_travel(pos: Vector2) -> void:
 	if not near.is_empty():
 		yaw = float(near.get("yaw", yaw))
 	car.reset_to(pos.x, pos.y, yaw)
+	_camera_yaw = yaw
 	_flush_speed()
 	if maps.big_map_visible:
 		maps.toggle_big_map()
