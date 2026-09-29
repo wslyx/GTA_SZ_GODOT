@@ -281,14 +281,17 @@ func update_system(delta: float, focus: Vector3) -> void:
 		return
 	_scan_timer = RESCAN_INTERVAL
 	# 重摆实例只在焦点移动超过阈值时做（灯是静止的）；每 3s 兜底重扫一次，
-	# 防止缓慢挪动时远处新路口长时间进不了可见集。灯色刷新照常跟随相位。
+	# 防止缓慢挪动时远处新路口长时间进不了可见集。
 	var fd := Vector2(focus.x, -focus.z)
 	_fallback_timer += RESCAN_INTERVAL
-	if fd.distance_to(_last_rescan_focus) < RESCAN_MOVE and _fallback_timer < RESCAN_FALLBACK:
-		return
-	_fallback_timer = 0.0
-	_last_rescan_focus = fd
-	_rescan(focus)
+	if fd.distance_to(_last_rescan_focus) >= RESCAN_MOVE or _fallback_timer >= RESCAN_FALLBACK:
+		_fallback_timer = 0.0
+		_last_rescan_focus = fd
+		_rescan(focus)
+	# 灯色只由相位（time）决定，跟焦点动没动无关，必须每个 tick 都刷。
+	# 之前 _refresh_colors() 被塞在重扫分支里：玩家站着不动时只有 3s 兜底
+	# 那一次会执行，红/黄/绿最长冻住 3 秒再跳变，与上面注释承诺的
+	# "灯色刷新不受影响，照常按相位走" 不一致。
 	_refresh_colors()
 
 

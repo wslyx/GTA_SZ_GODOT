@@ -267,6 +267,9 @@ func to_dict() -> Dictionary:
 		"location": location, "x": px, "z": pz, "minutes": minutes,
 		"lightMode": light_mode, "rain": rain, "graphicsTier": graphics_tier,
 		"completedRides": completed_rides.duplicate(),
+		# 城市足迹：到过的目的地。之前漏写这一项，读档后 visited_destinations
+		# 被清空，地图上的"已发现"标记与足迹计数全部回退。
+		"visitedDestinations": visited_destinations.duplicate(),
 	}
 
 
@@ -294,6 +297,9 @@ func from_dict(d: Dictionary) -> void:
 	completed_rides.clear()
 	for r in d.get("completedRides", []):
 		completed_rides.append(str(r))
+	visited_destinations.clear()
+	for v in d.get("visitedDestinations", []):
+		visited_destinations.append(str(v))
 	changed.emit()
 
 

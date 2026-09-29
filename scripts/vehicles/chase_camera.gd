@@ -167,11 +167,18 @@ func follow_observer(dt: float) -> void:
 
 
 ## 飞机：相机位于机体后上方
+##
+## ⚠️ 方向别搞反：飞机模型的机头在 −Z，main_game 建基时取的 z 轴是 `-fwd`，
+## 所以 **basis.z 指向机尾**，机头方向是 `-basis.z`。
+## 之前写成 `- basis.z * 16`（机头前方 16 m）并且 `look_at(origin + basis.z * 30)`
+## （看机尾后方 30 m），结果是相机悬在机鼻前面、迎面拍自己，与注释完全相反。
 func follow_aircraft(dt: float) -> void:
 	var b := aircraft_basis
-	var back := b.origin - b.basis.z * 16.0 + Vector3(0.0, 4.6, 0.0)
+	# 机尾（+basis.z）后上方
+	var back := b.origin + b.basis.z * 16.0 + Vector3(0.0, 4.6, 0.0)
 	global_position = global_position.lerp(back, 1.0 - exp(-dt * 6.0))
-	look_at_target(b.origin + b.basis.z * 30.0)
+	# 注视机头前方（−basis.z）
+	look_at_target(b.origin - b.basis.z * 30.0)
 	fov = rad_to_deg(FOV_AIRCRAFT)
 
 

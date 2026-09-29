@@ -43,6 +43,16 @@ var story: StorySystem
 var audio: ProceduralAudio
 
 var mode: int = Mode.CAR
+## 上次乘坐的地面载具（Mode.CAR / Mode.TANK）：下车时记录，上车时据此回到那一台。
+##
+## ⚠️ 不能改用 `_tank_model.visible` 来判断该回哪种车 —— 下车那一刻已经把
+## 坦克模型设为不可见，visible 恒为 false，于是从坦克上下来后按 F 永远只回轿车，
+## 还会把轿车瞬移到脚下，坦克就此丢失（_toggle_tank 在 WALKING 下直接 return，
+## 也切不回去）。
+var _last_ground_vehicle: int = Mode.CAR
+## 进入观景前的模式，退出观景时据此还原。
+## 之前 _exit_observer 固定回到"车"，于是步行中按 G 再退出会被凭空塞进车里。
+var _pre_observer_mode: int = Mode.CAR
 ## 会话就绪标志。不能叫 `ready` —— `Node` 已有同名 `ready` 信号，会报
 ## "Member 「ready」 redefined (original in native class 'Node3D')"。
 var session_ready := false
@@ -581,6 +591,7 @@ func _toggle_vehicle_entry() -> void:
 		if not walk.exit_car(v, offset):
 			hud.toast("车门旁边没有落脚点")
 			return
+		_last_ground_vehicle = Mode.TANK if mode == Mode.TANK else Mode.CAR
 		if mode == Mode.TANK:
 			if _tank_model != null:
 				_tank_model.visible = false
@@ -598,11 +609,17 @@ func _toggle_vehicle_entry() -> void:
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
 		hud.toast("%s · WASD 行走 / Shift 跑步 / 拖动环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
 	elif mode == Mode.WALKING:
-		var v2 := _vehicle_state()
+		# 回到下车前那一台（判据是 _last_ground_vehicle，不是模型的 visible）
+		var want_tank := _last_ground_vehicle == Mode.TANK and _tank_model != null
+		var v2: Dictionary
+		if want_tank:
+			v2 = {"x": tank.x, "z": tank.z, "yaw": tank.yaw, "speed": tank.speed}
+		else:
+			v2 = _vehicle_state()
 		if not walk.can_enter(v2, 5.0, WALK_EXIT_OFFSET):
 			hud.toast("走近车门再按 F 上车")
 			return
-		mode = Mode.TANK if _tank_model != null and _tank_model.visible else Mode.CAR
+		mode = Mode.TANK if want_tank else Mode.CAR
 		_camera_yaw = walk.yaw
 		if mode == Mode.TANK:
 			tank.x = walk.x
@@ -633,6 +650,19 @@ func _flush_speed() -> void:
 	_keys.clear()
 
 func _enter_observer() -> void:
+	_pre_observer_mode = mode
+	# 步行进观景：角色本体要收起来。_step_walk 是唯一管理 _rider 的地方，
+	# 切到 OBSERVER 后它不再跑，不在这里显式隐藏的话角色会一直杵在地面上。
+	if mode == Mode.WALKING:
+		walk.active = false
+		if _rider != null:
+			_rider.set_enabled(false)
+	# 飞行中进观景：必须先把飞机停掉，否则 flight 仍 active 而 mode 已不是
+	# AIRCRAFT，_step_aircraft 不再跑，飞机模型会挂在天上不动。
+	elif mode == Mode.AIRCRAFT:
+		flight.stop()
+		if _plane_model != null:
+			_plane_model.visible = false
 	var p := _player_position_data()
 	observer.begin(p.x, world.height_field.height_at(p.x, p.y) + 60.0, p.y, _camera_yaw)
 	observer.ground_height = func(x: float, z: float) -> float: return world.height_field.height_at(x, z)
@@ -653,13 +683,29 @@ func _enter_observer() -> void:
 
 func _exit_observer() -> void:
 	observer.end()
-	mode = Mode.CAR if _car_model == null or _car_model.visible else Mode.TANK
+	# 还原进观景前的模式。之前这里固定回到车：从坦克进观景再退出会掉回轿车，
+	# 步行进观景再退出则被凭空塞进车里、且角色模型还留在外面。
+	match _pre_observer_mode:
+		Mode.TANK:
+			mode = Mode.TANK
+			if _tank_model != null:
+				_tank_model.visible = true
+			camera.set_mode(ChaseCamera.Mode.TANK, true)
+		Mode.WALKING:
+			mode = Mode.WALKING
+			if _rider != null:
+				_rider.set_enabled(true)
+			camera.set_mode(ChaseCamera.Mode.WALKING, true)
+		_:
+			mode = Mode.CAR
+			if _car_model != null:
+				_car_model.visible = true
+			camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 	if _plane_model != null:
 		_plane_model.visible = false
 	flight.stop()
 	paused = false
 	world.set_aerial(false)
-	camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 	hud.toast("已退出观景")
 
 func _toggle_aircraft() -> void:
@@ -714,9 +760,16 @@ func _process(delta: float) -> void:
 	world.facades.update_system(dt, focus)
 
 	# 玩法
+	# ⚠️ 暂停时必须整段跳过：_update_modes() 开头有 `if paused: return`，但这段
+	# 在它之后、不受那个守卫管。于是打开暂停菜单后 rides.step() / career.step()
+	# 仍每帧执行，合约的 elapsed 照常累加、评分照常随时间衰减 —— 暂停没真暂停，
+	# 挂机在暂停界面里也能把合约"拖"到超时。
 	var speed := float(_vehicle_state()["speed"]) if mode in [Mode.CAR, Mode.TANK] else walk.speed
-	rides.step(p, speed, absf(float(_vehicle_state()["speed"])) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
-	var res: Dictionary = career.step(dt, p, speed, false, false)
+	var res: Dictionary = {}
+	if not paused:
+		rides.step(p, speed, absf(float(_vehicle_state()["speed"])) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
+		res = career.step(dt, p, speed, false, false)
+		story.note_position(p)
 	if res.get("completed", false):
 		hud.toast(str(res["message"]), 4.0)
 		if audio != null:
@@ -725,7 +778,6 @@ func _process(delta: float) -> void:
 			_pending_level_up_dialogue = res["dialogue"]
 			var opts: Array = res["dialogue"].get("options", [])
 			panels.show_dialogue(str(res["dialogue"]["line"]), opts, "career")
-	story.note_position(p)
 
 	# UI
 	hud.update_hud(dt)
@@ -975,6 +1027,9 @@ func _beacon_travel() -> void:
 	var arr: Array = dest["arrival"]
 	car.reset_to(float(arr[0]), float(arr[1]), float(dest.get("yaw", 0.0)))
 	_camera_yaw = float(dest.get("yaw", 0.0))
+	# 这里是把**车**挪到落点，所以退出观景必须落到 CAR，
+	# 不能沿用"进观景前是步行/坦克"的还原逻辑。
+	_pre_observer_mode = Mode.CAR
 	_exit_observer()
 	hud.toast("已移动到 %s" % str(dest.get("name", "")), 3.0)
 
@@ -1351,6 +1406,9 @@ func _on_map_photo(pos: Vector2) -> void:
 	observer.begin(pos.x, world.height_field.height_at(pos.x, pos.y) + 60.0, pos.y, _camera_yaw)
 	observer.ground_height = func(x: float, z: float) -> float: return world.height_field.height_at(x, z)
 	observer.blocked = func(x: float, z: float) -> bool: return world.collision.blocked(x, z)
+	# 与 _enter_observer 一样记录来源，退出时才能还原（大地图里点"俯瞰此处"时
+	# 玩家可能是步行或开着坦克，不能一律退回车里）
+	_pre_observer_mode = mode if mode != Mode.OBSERVER else _pre_observer_mode
 	mode = Mode.OBSERVER
 	autopilot.cancel()
 	_clear_pending()

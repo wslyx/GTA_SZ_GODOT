@@ -87,19 +87,29 @@ func plan(from: Vector2, target: Vector2) -> PackedVector2Array:
 
 ## 开始导航到目标点。传入 precomputed（≥2 点）时直接沿用预览路线。
 func start(target: Vector2, from: Vector2, precomputed := PackedVector2Array()) -> bool:
+	# ⚠️ 失败分支必须把 active 一并置 false。
+	# compute() 里"受困超时 → 以当前位置重规划"会调用本函数；若规划失败只设
+	# phase/reason 而不动 active，compute() 会带着仍为 true 的 active 继续往下走
+	# `_route[_route.size() - 1]` / `_advance_cursor` 的 `_route[_index]` ——
+	# _route 此时已被下面的赋值清成空数组，索引越界直接崩。
+	# 同理，失败时也不能把 _route 覆写成空数组：那会毁掉当前正在跑的路线，
+	# 让一次失败的重规划把车从半路上直接打回"无路可走"。
 	if graph == null or graph.nodes.is_empty():
 		phase = Phase.BLOCKED
 		reason = "no-graph"
+		active = false
 		push_warning("[Autopilot] 路网为空（节点 %d），无法规划"
 			% [0 if graph == null else graph.nodes.size()])
 		return false
-	_route = precomputed if precomputed.size() >= 2 else graph.route(from, target)
-	if _route.size() < 2:
+	var planned := precomputed if precomputed.size() >= 2 else graph.route(from, target)
+	if planned.size() < 2:
 		phase = Phase.BLOCKED
 		reason = "no-route"
+		active = false
 		push_warning("[Autopilot] 规划失败：(%.1f, %.1f) → (%.1f, %.1f)，路线点 %d"
-			% [from.x, from.y, target.x, target.y, _route.size()])
+			% [from.x, from.y, target.x, target.y, planned.size()])
 		return false
+	_route = planned
 	_index = 0
 	_proj = _route[0]
 	active = true
@@ -168,6 +178,13 @@ func _target_point(pos: Vector2) -> Vector2:
 func compute(pos: Vector2, yaw: float, speed: float, dt: float) -> Dictionary:
 	if not active:
 		return {"throttle": 0.0, "steer": 0.0}
+	# 兜底：active 为真却拿着一条不足 2 点的残路线（历史存档 / 外部直改字段），
+	# 下面的 _route[_route.size() - 1] 与 _advance_cursor 都会越界。
+	if _route.size() < 2:
+		active = false
+		phase = Phase.BLOCKED
+		reason = "no-route"
+		return {"throttle": 0.0, "steer": 0.0}
 
 	# 到达判定
 	var goal := _route[_route.size() - 1]
@@ -202,7 +219,12 @@ func compute(pos: Vector2, yaw: float, speed: float, dt: float) -> Dictionary:
 			_reroute_cooldown = REROUTE_COOLDOWN
 			reason = "reroute"
 			# 绕行：以当前点重新规划（原版 findRoute(avoid)）
+			# 重规划可能失败（当前点与目标落到同一路网节点 / 该点不与路网连通），
+			# 此时 start() 已把 active 置 false，必须立刻收手 —— 否则下面继续用
+			# 已被清空的 _route 取目标点会越界崩溃。
 			start(goal, pos)
+			if not active:
+				return {"throttle": 0.0, "steer": 0.0}
 
 	# 目标朝向
 	var target := _target_point(pos)
