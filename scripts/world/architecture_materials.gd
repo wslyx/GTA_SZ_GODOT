@@ -93,6 +93,12 @@ const SCAN_INTERVAL := 1.5
 const SHADER_PATH := "res://shaders/architecture_pbr.gdshader"
 ## 原版 `profile.environment ?? .96`
 const DEFAULT_ENV := 0.96
+## 立面多样性（原版 city-facade-diversity.ts）：整楼主题 + 图集窗格。
+## 两张图集被所有 :fv 材质共享（原版 shared atlas），不加 draw call。
+const FACADE_ATLAS_PATH := ARCH + "facade-atlas.png"
+const FACADE_WINDOWS_PATH := ARCH + "facade-windows.png"
+## 只对 buildings.glb 的 block_* 网格启用（原版 /^block_-?\d+_-?\d+_/）
+const BLOCK_MESH_RE := "^block_-?\\d+_-?\\d+_"
 
 var world: CityWorld
 var enabled := true
@@ -103,15 +109,23 @@ var _materials: Dictionary = {}
 var _slots: Dictionary = {}
 var _shader: Shader = null
 var _ordinary_re: RegEx = null
+var _block_re: RegEx = null
 var _mode := -1
 var _scan_timer := 0.0
-var _stats := {"materials": 0, "assignments": 0, "withoutUV": 0, "retired": 0}
+## 立面多样性图集（缺任一张则整体回退普通材质，同原版 shared.ready）
+var _facade_atlas: Texture2D = null
+var _facade_windows: Texture2D = null
+## :fv 材质列表（set_mode 时同步 facade_night / facade_glow）
+var _fv_materials: Array = []
+var _stats := {"materials": 0, "assignments": 0, "withoutUV": 0, "retired": 0, "facadeVariety": 0}
 
 
 func setup(p_world: CityWorld) -> void:
 	world = p_world
 	_ordinary_re = RegEx.new()
 	_ordinary_re.compile(ORDINARY_MESH_RE)
+	_block_re = RegEx.new()
+	_block_re.compile(BLOCK_MESH_RE)
 	if ResourceLoader.exists(SHADER_PATH):
 		_shader = load(SHADER_PATH) as Shader
 	if _shader == null:
@@ -120,11 +134,14 @@ func setup(p_world: CityWorld) -> void:
 		var albedo := _load_texture(ARCH + str(TEXTURE_URLS[kind]), MAX_ALBEDO)
 		var mask := _load_texture(ARCH + kind + "-windows.png", MAX_MASK)
 		_slots[kind] = {"albedo": albedo, "mask": mask}
+	# 立面多样性图集（1024²；任一缺失就回退普通材质——同原版 shared.ready）
+	_facade_atlas = _load_texture(FACADE_ATLAS_PATH, MAX_ALBEDO)
+	_facade_windows = _load_texture(FACADE_WINDOWS_PATH, MAX_ALBEDO)
 	print("[ArchMaterials] 立面 profile %d 个 / 贴图组 %d（%s）"
 		% [PROFILES.size(), _slots.size(), "齐" if _slots_ready("curtain-glass") else "缺"])
 	_apply_all()
-	print("[ArchMaterials] 接管网格 surface %d 个 / 共享材质 %d 个（预算 31）/ 无 UV %d"
-		% [_stats["assignments"], _materials.size(), _stats["withoutUV"]])
+	print("[ArchMaterials] 接管网格 surface %d 个 / 共享材质 %d 个（预算 31 + 立面多样性 :fv 变体）/ 无 UV %d / 立面多样性 %d"
+		% [_stats["assignments"], _materials.size(), _stats["withoutUV"], _stats["facadeVariety"]])
 	# ⚠️ `"...%s" % 数组` 会把数组当成参数列表 → "not all arguments converted"。
 	# 要套一层中括号，或先 str()。
 	print("[ArchMaterials] 逐材质环境光强度 env_scale 取值：%s" % [str(_env_values())])
@@ -242,18 +259,24 @@ func _profile_for(mesh_name: String, kind: String, role: String) -> String:
 ##
 ## ⚠️ 这里返回的是 **ShaderMaterial**，不是 StandardMaterial3D —— 因为
 ## `profile.environment` 只能靠 shader 的 `AO` 复刻（见 architecture_pbr.gdshader 头部）。
-func _material_for(src: StandardMaterial3D, id: String, has_uv: bool) -> ShaderMaterial:
+## facade=True 时建 `:fv` 变体：整楼主题 + 图集窗格（原版 facade-diversity 插件）。
+func _material_for(src: StandardMaterial3D, id: String, has_uv: bool,
+		facade: bool = false) -> ShaderMaterial:
 	var profile: Dictionary = PROFILES.get(id, {})
 	if profile.is_empty() or _shader == null:
 		return null
 	var tex_kind := str(profile.get("texture", ""))
 	var textured := tex_kind != "" and has_uv
+	var facade_ok := facade and _facade_atlas != null and _facade_windows != null
 	var key := id
-	if tex_kind != "":
+	if facade_ok:
+		key = id + ":fv"
+	elif tex_kind != "":
 		key = id + (":uv" if textured else ":solid")
 	if _materials.has(key):
 		var cached: ShaderMaterial = _materials[key]
-		if textured and not bool(cached.get_shader_parameter("use_albedo_tex")) \
+		if not facade_ok and textured \
+				and not bool(cached.get_shader_parameter("use_albedo_tex")) \
 				and src.albedo_texture != null:
 			_attach_albedo(tex_kind, cached, src.albedo_texture)
 		return cached
@@ -265,7 +288,7 @@ func _material_for(src: StandardMaterial3D, id: String, has_uv: bool) -> ShaderM
 	var solid_glazing := id.ends_with("glass") or id.ends_with("window") or id == "city-shopfront"
 	var rough := float(profile["roughness"])
 	var metal := float(profile["metallic"])
-	if solid_glazing:
+	if solid_glazing and not facade_ok:
 		color = color * 0.42
 		metal = 0.0
 		rough = clampf(rough * 0.55, 0.14, 0.23)
@@ -283,11 +306,33 @@ func _material_for(src: StandardMaterial3D, id: String, has_uv: bool) -> ShaderM
 	mat.set_shader_parameter("emission_energy", 0.0)
 	# 逐材质环境光强度（原版 `profile.environment ?? .96`）
 	mat.set_shader_parameter("env_scale", float(profile.get("environment", DEFAULT_ENV)))
+	if facade_ok:
+		# 立面多样性：着色器内部吃图集（albedo/粗糙度/窗光全部由 UV2 主题决定）
+		mat.set_shader_parameter("use_facade_variety", true)
+		mat.set_shader_parameter("facade_atlas", _facade_atlas)
+		mat.set_shader_parameter("facade_windows", _facade_windows)
+		_apply_fv_mode(mat)
+		_fv_materials.append(mat)
+		_materials[key] = mat
+		return mat
 	if textured:
 		_attach_albedo(tex_kind, mat, src.albedo_texture)
 	_apply_night(mat, profile, tex_kind, textured)
 	_materials[key] = mat
 	return mat
+
+
+## 立面多样性的光照档（原版 bindForSubMesh）：
+## 夜 facade_night=1 / glow=(1,.08)；黄昏 night=0 / glow=(.55,.08)；白天 glow=0。
+## glow.y 是窗光互反照增益（bounce，本版未搬，仅保留占位）。
+func _apply_fv_mode(mat: ShaderMaterial) -> void:
+	var night := _mode == GameContent.LightMode.NIGHT
+	var day := _mode == GameContent.LightMode.DAY
+	var gain := 0.0
+	if not day:
+		gain = 1.0 if night else 0.55
+	mat.set_shader_parameter("facade_night", 1.0 if night else 0.0)
+	mat.set_shader_parameter("facade_glow", Vector2(gain, 0.08))
 
 
 ## 原版 attachAlbedo：反照率 + 窗格掩码（掩码只在两个贴图都合格时才挂）
@@ -343,6 +388,10 @@ func set_mode(mode: int) -> void:
 		var profile: Dictionary = PROFILES.get(id, {})
 		if profile.is_empty():
 			continue
+		# 立面多样性材质的窗光由 facade_night/glow 驱动，不走旧发光路径
+		if str(key).ends_with(":fv"):
+			_apply_fv_mode(mat)
+			continue
 		var tex_kind := str(profile.get("texture", ""))
 		_apply_night(mat, profile, tex_kind,
 			bool(mat.get_shader_parameter("use_albedo_tex")))
@@ -363,6 +412,9 @@ func apply_meshes(root: Node, asset_name: String) -> int:
 	if kind == "":
 		return 0
 	var n := 0
+	# 立面多样性只认 buildings.glb 的 block_* 网格（原版 assetName 闸门）
+	var fv_asset := kind == "ordinary" \
+		and asset_name.get_file().get_basename().to_lower() == "buildings"
 	for mi in GlbLoader.meshes_of(root):
 		var mesh: Mesh = mi.mesh
 		if mesh == null:
@@ -372,6 +424,7 @@ func apply_meshes(root: Node, asset_name: String) -> int:
 		var mesh_kind := kind
 		if kind == "landmark" and mi.name.begins_with("detail_"):
 			mesh_kind = "detail"
+		var fv_mesh := fv_asset and _block_re.search(mi.name) != null
 		for s in mesh.get_surface_count():
 			# 已经挂了 override 的 surface 一律不碰：既避免重复套用，也避免把
 			# ground_field.gd 的屋顶 surface override 顶掉（它在更早的步骤里挂上）。
@@ -385,12 +438,18 @@ func apply_meshes(root: Node, asset_name: String) -> int:
 			if id == "":
 				continue
 			# `BitField[ArrayFormat]` 与常量做位与后的类型推断不出来，显式转 int
-			var has_uv: bool = (int(mesh.surface_get_format(s)) & Mesh.ARRAY_FORMAT_TEX_UV) != 0
-			var mat := _material_for(src, id, has_uv)
+			var fmt: int = int(mesh.surface_get_format(s))
+			var has_uv: bool = (fmt & Mesh.ARRAY_FORMAT_TEX_UV) != 0
+			# UV2 才有 主题/种子 输入；同网格里 office/residential 带、
+			# concrete/darkglass 不带（已实测），按 surface 就地分档
+			var has_uv2: bool = (fmt & Mesh.ARRAY_FORMAT_TEX_UV2) != 0
+			var mat := _material_for(src, id, has_uv, fv_mesh and has_uv2)
 			if mat == null:
 				continue
 			mi.set_surface_override_material(s, mat)
 			_stats["assignments"] = int(_stats["assignments"]) + 1
+			if fv_mesh and has_uv2:
+				_stats["facadeVariety"] = int(_stats["facadeVariety"]) + 1
 			if not has_uv and str(PROFILES[id].get("texture", "")) != "":
 				_stats["withoutUV"] = int(_stats["withoutUV"]) + 1
 			n += 1
@@ -427,6 +486,11 @@ func diagnostics() -> Dictionary:
 		"profiles": PROFILES.size(),
 		"materials": _materials.size(),
 		"materialBudget": 31,
+		"facadeVariety": {
+			"ready": _facade_atlas != null and _facade_windows != null,
+			"materials": _fv_materials.size(),
+			"assignments": _stats["facadeVariety"],
+		},
 		"textureGroups": _slots.size(),
 		"texturesReady": _slots_ready("curtain-glass"),
 		"mode": _mode,

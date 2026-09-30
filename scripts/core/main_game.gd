@@ -136,6 +136,7 @@ func _build_world() -> void:
 	world.scenery = _add_system(SCENERY_SCRIPT, "ScenerySystem")
 	world.signs = _add_system(SIGN_SCRIPT, "SignSystem")
 	world.distant = _add_system(DISTANT_SCRIPT, "DistantSystem")
+	world.distant_city = _add_system(DISTANT_CITY_SCRIPT, "DistantCity")
 	world.signals = _add_system(SIGNALS_SCRIPT, "TrafficSignals")
 	world.traffic = _add_system(TRAFFIC_SCRIPT, "TrafficSystem")
 	world.pedestrians = _add_system(PED_SCRIPT, "PedestrianSystem")
@@ -190,6 +191,8 @@ const WEATHER_SCRIPT := preload("res://scripts/world/weather_system.gd")
 const SCENERY_SCRIPT := preload("res://scripts/world/scenery_system.gd")
 const SIGN_SCRIPT := preload("res://scripts/world/sign_system.gd")
 const DISTANT_SCRIPT := preload("res://scripts/world/distant_system.gd")
+## 远景城市壳（原版 city-distant-city.ts + city-distant-geometry.ts 的远景层级）
+const DISTANT_CITY_SCRIPT := preload("res://scripts/world/distant_city.gd")
 const SIGNALS_SCRIPT := preload("res://scripts/world/traffic_signals.gd")
 const TRAFFIC_SCRIPT := preload("res://scripts/world/traffic_system.gd")
 const PED_SCRIPT := preload("res://scripts/world/pedestrian_system.gd")
@@ -1761,6 +1764,7 @@ func diagnostics() -> Dictionary:
 		"signs": world.signs.diagnostics() if world.signs != null else {},
 		"scenery": world.scenery.diagnostics() if world.scenery != null else {},
 		"distant": world.distant.diagnostics() if world.distant != null else {},
+		"distantCity": world.distant_city.diagnostics() if world.distant_city != null else {},
 		"facades": world.facades.diagnostics() if world.facades != null else {},
 		"weather": world.weather.diagnostics() if world.weather != null else {},
 		"career": career.status(),

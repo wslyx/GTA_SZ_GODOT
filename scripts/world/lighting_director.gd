@@ -256,6 +256,9 @@ func apply_mode(m: int, animate := false) -> void:
 	# 沥青路面的反照率/粗糙度也分档（原版 ROAD_LOOK，见 road_surface.gd）
 	if world != null and world.road_surface != null:
 		world.road_surface.set_mode(m)
+	# 远景城市壳的夜间窗格增益（原版 DistantWindows 的 night.gain：夜 2.4 / 黄昏 .85 / 白天 0）
+	if world != null and world.distant_city != null and world.distant_city.has_method("set_mode"):
+		world.distant_city.set_mode(m)
 
 	# —— 连续光照参数：平滑过渡或直接落位 ——
 	_look_target = look

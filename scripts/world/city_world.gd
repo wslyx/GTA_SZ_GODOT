@@ -81,6 +81,10 @@ var weather = null
 var scenery = null
 var signs = null
 var distant = null
+## 远景城市壳（原版 city-distant-city.ts）：高空模式下远处 ≥3300m 的
+## 极简楼壳，与近处真楼互补。⚠️ 用 preload 引用（新 class_name 不在全局缓存）
+const DISTANT_CITY_SCRIPT := preload("res://scripts/world/distant_city.gd")
+var distant_city = null
 var signals = null
 var traffic = null
 var pedestrians = null
@@ -251,7 +255,7 @@ func _process(delta: float) -> void:
 
 
 func _update_subsystems(delta: float) -> void:
-	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, signs, ground_field, rooftop_layer, arch_materials]:
+	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials]:
 		if sys != null and sys.has_method("update_system"):
 			sys.update_system(delta, focus)
 
@@ -523,6 +527,9 @@ func _plan_distant() -> bool:
 		distant.build_all(self)
 	if distant.has_method("drape_roads"):
 		distant.drape_roads(roads_root)
+	# 远景城市壳：同样在后台线程建网格，这里只负责点火
+	if distant_city != null and distant_city.has_method("build_all"):
+		distant_city.build_all(self)
 	return true
 
 
