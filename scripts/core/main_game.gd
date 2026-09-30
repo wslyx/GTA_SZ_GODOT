@@ -74,6 +74,12 @@ var _tank_barrel: Node3D
 ## 6 个弹位 + 2 组爆炸的节点成本不进启动路径。
 var _missiles = null
 var _plane_model: Node3D
+## 螺旋桨节点（floatplane.glb 里的 floatplane_propeller，桨叶网格 floatplane_propeller_mesh
+## 是它的子节点）。原版 city-flight.ts:48 旋转的就是这个父节点。
+var _plane_propeller: Node3D
+## 螺旋桨累计转角（rad）。原版是每帧 rotation.z += 增量，这里累计后整体赋值，
+## 免得 glTF 导入器给节点带任何基础旋转时增量写法叠错轴。
+var _propeller_angle := 0.0
 ## 车轮滚动/转向动画（原版 city-world.ts 的 wheelSpin 逻辑）。
 ## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
 ## 直接用 `CarWheels` 会报 "Could not find type CarWheels"，必须 preload。
@@ -188,6 +194,11 @@ const FACADE_SCRIPT := preload("res://scripts/world/facade_streamer.gd")
 ## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
 ## 直接写 `FlightMissiles.new()` 会报 "Could not find type"，必须 preload。
 const MISSILES_SCRIPT := preload("res://scripts/vehicles/flight_missiles.gd")
+## 飞行碰撞（原版 city-flight-collision.ts）：建筑三维棱柱 + 地形采样。
+## ⚠️ 飞行不能用驾驶的 CityCollision.blocked(x,z) —— 那是纯二维足迹判定，
+## 没有高度概念：飞多高都撞建筑投影，且 blocked() 对水面/非陆地返回 true，
+## 海湾上空全是"墙"。见 world/flight_collision.gd 头部说明。
+const FLIGHT_COLLISION_SCRIPT := preload("res://scripts/world/flight_collision.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -207,6 +218,11 @@ func _load_vehicle_models() -> void:
 			push_warning("[MainGame] tank.glb 缺少炮塔/炮管节点，炮塔姿态不联动")
 	if _plane_model != null:
 		_plane_model.visible = false
+		# 螺旋桨是独立节点（translation [0,0,-4.09]，无基础旋转），
+		# 飞行中按油门转速旋转 —— 见 _step_aircraft 末尾。
+		_plane_propeller = _find_child_by_name(_plane_model, "floatplane_propeller")
+		if _plane_propeller == null:
+			push_warning("[MainGame] floatplane.glb 缺少 floatplane_propeller 节点，螺旋桨不转")
 	# 步行角色（原版 city-rider.ts 的久岐忍）。原版是按 F 下车时才异步加载
 	# （提示"正在准备步行角色"）；这里文件在本地，直接在加载画面后面同步预载，
 	# 首次按 F 不卡顿，12MB 模型的实例化成本也藏进了启动加载。
@@ -389,10 +405,18 @@ func _on_key(k: InputEventKey) -> void:
 		if panels.handle_settings_key(k):
 			paused = panels.settings_visible
 		return
+	# "?"（Shift+/，多数键盘 / 与 ? 同键）完整按键帮助：打开时接管按键，
+	# 只认 Esc / ? 关闭 —— 与设置页一样是模态的，期间不该误触载具或其它面板。
+	if panels.help_visible:
+		if code == KEY_ESCAPE or code == KEY_SLASH:
+			panels.toggle_help()
+		return
 	match code:
 		KEY_ESCAPE:
 			if panels.dialog_active:
 				panels.close_dialogue()
+			elif panels.help_visible:
+				panels.toggle_help()
 			elif panels.journal_visible:
 				panels.toggle_journal()
 			elif maps.big_map_visible:
@@ -434,8 +458,13 @@ func _on_key(k: InputEventKey) -> void:
 				_enter_observer()
 		KEY_B:
 			# B 是"无人机 ⇄ 飞机"的开关，两个方向都要认（此前只认 OBSERVER，
-			# 于是飞上去之后就再也按不回无人机了）
+			# 于是飞上去之后就再也按不回无人机了）。
+			# 驾驶 / 坦克 / 步行里按 B：先进无人机（_enter_observer 会记下来源
+			# 模式），随即切飞机 —— 不用再记"先按 G 再按 B"两步。
 			if mode == Mode.OBSERVER or mode == Mode.AIRCRAFT:
+				_toggle_aircraft()
+			elif not panels.dialog_active:
+				_enter_observer()
 				_toggle_aircraft()
 		KEY_I:
 			# 观察模式：移动到信标选中的落点（原版"移动到此地"按钮）
@@ -454,6 +483,10 @@ func _on_key(k: InputEventKey) -> void:
 			world.lighting.cycle_mode()
 			_apply_light_mode()
 			hud.toast("光照：%s" % _light_mode_name())
+		KEY_SLASH:
+			# "?"（Shift+/）完整按键帮助：各模式（驾驶 / 步行 / 坦克 / 无人机 /
+			# 飞机）的全部按键分组列出，Esc 或 ? 关闭。
+			panels.toggle_help()
 		KEY_Y:
 			var on: bool = world.weather.toggle()
 			GameState.rain = on
@@ -776,14 +809,41 @@ func _toggle_aircraft() -> void:
 		flight.stop()
 		if _plane_model != null:
 			_plane_model.visible = false
-		# 收回飞机 → 回到无人机，并把无人机放到飞机所在的位置
+		# 收回飞机 → 回到无人机，并把无人机放到飞机所在的位置。
+		# ⚠️ 不要在这里写 _pre_observer_mode = Mode.CAR：它会把 _enter_observer
+		# 记下的真实来源（坦克 / 步行 / 轿车）覆盖成轿车 —— 现在驾驶 / 步行里
+		# 也能按 B 直达飞机，收回后按 G 应该回到出发时那种载具。
 		observer.begin(flight.x, maxf(flight.y, 80.0), flight.z, flight.yaw)
 		mode = Mode.OBSERVER
-		_pre_observer_mode = Mode.CAR
 		camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 		hud.toast("收回飞机，回到无人机")
 		return
-	flight.start(observer.x, maxf(observer.y, 240.0), observer.z, observer.yaw)
+	# 起飞净空搜索（原版 start()：p.y ≥ max(80, 地形+65)，向上每 25m 探测，
+	# 机身两侧 ±7m 的三条 "前 60m" 探测线都不撞才起飞；找不到就拒绝起飞）。
+	# ⚠️ 不能省：直接在观测点起爆式开飞，出生点若在楼群里第一子步就撞毁。
+	_ensure_flight_collision()
+	var spawn_y := maxf(maxf(observer.y, 240.0),
+			world.height_field.height_at(observer.x, observer.z) + 65.0)
+	var spawn_ok := false
+	for i in 60:
+		if spawn_y > 2050.0:
+			break
+		spawn_ok = true
+		for side in [-7.0, 0.0, 7.0]:
+			var from := _flight_spawn_point(observer.x, spawn_y, observer.z,
+					observer.yaw, side, -6.0, -1.5)
+			var to := _flight_spawn_point(observer.x, spawn_y, observer.z,
+					observer.yaw, side, 60.0, 2.4)
+			if not _flight_collision.sweep(from, to, world.height_field.height_at).is_empty():
+				spawn_ok = false
+				break
+		if spawn_ok:
+			break
+		spawn_y += 25.0
+	if not spawn_ok:
+		hud.toast("此处净空不足，无法起飞 —— 挪个位置再按 B", 3.0)
+		return
+	flight.start(observer.x, spawn_y, observer.z, observer.yaw)
 	if _plane_model != null:
 		_plane_model.visible = true
 	# 飞行期间由 _step_aircraft 接管，无人机先停：否则 observer.step 仍在跑，
@@ -792,6 +852,17 @@ func _toggle_aircraft() -> void:
 	mode = Mode.AIRCRAFT
 	camera.set_mode(ChaseCamera.Mode.AIRCRAFT, true)
 	hud.toast("飞行：W/S 俯仰，A/D 横滚，Q/E 方向舵，Shift 加速，X 减速")
+
+
+## 起飞探测线的采样点：yaw 平飞姿态下的 (right·side + forward·forward + up·up)。
+## 数据坐标（与 FlightSim.point_at 同一套基）。
+func _flight_spawn_point(px: float, py: float, pz: float, yaw: float,
+		side: float, forward: float, up: float) -> Vector3:
+	var b := FlightSim.basis_from(yaw, 0.0, 0.0)
+	return Vector3(px, py, pz) \
+			+ (b["right"] as Vector3) * side \
+			+ (b["forward"] as Vector3) * forward \
+			+ (b["up"] as Vector3) * up
 
 # ---------------------------------------------------------------------------
 # 主循环
@@ -1148,18 +1219,27 @@ func _ensure_missiles() -> void:
 
 ## 飞行 / 导弹共用的扫掠回调（原版 city-flight.ts 的 sweep + FlightCityCollision）。
 ##
-## ⚠️ 修过一个坐标 bug：FlightSim 的位姿是**数据坐标**（x 东 / z 北，与
-## flight.start(observer.x, observer.z) 同源，机模也用 to_world(flight.x, flight.z)
-## 摆放），而这里此前按世界坐标又做了一次 −mid.z 换算、并用 height_at_world
-## 取高 —— 等于把撞击点镜像到南北对称的位置，撞楼与撞地都判在错误的一侧。
-## 数据坐标直接喂给 collision.blocked 与 height_at 即可。
+## 历史坑（保留警示）：FlightSim 的位姿是**数据坐标**（x 东 / z 北），与
+## flight.start(observer.x, observer.z) 同源 —— 早先这里按世界坐标又做了一次
+## −mid.z 换算，把撞击点镜像到南北对称的位置。现在喂给 FlightCollision 的
+## from/to 本身就是数据坐标，内部不要再做任何换算。
+##
+## ⚠️ 此前这里直接用驾驶的 collision.blocked(x,z)（二维足迹，无高度概念）：
+## 飞多高都撞建筑投影，且 blocked() 对水面/非陆地返回 true，海湾上空全是"墙"。
+## 已换成专门的 FlightCollision（建筑棱柱 + 地形采样，原版同款）。
 func _flight_sweep(from: Vector3, to: Vector3) -> Dictionary:
-	var mid := (from + to) * 0.5
-	if world.collision.blocked(mid.x, mid.z):
-		return {"kind": "building", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
-	if mid.y < world.height_field.height_at(mid.x, mid.z):
-		return {"kind": "terrain", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
-	return {}
+	_ensure_flight_collision()
+	return _flight_collision.sweep(from, to, world.height_field.height_at)
+
+
+var _flight_collision = null
+
+
+func _ensure_flight_collision() -> void:
+	if _flight_collision != null:
+		return
+	_flight_collision = FLIGHT_COLLISION_SCRIPT.new()
+	_flight_collision.build(CityData.buildings)
 
 
 func _step_aircraft(dt: float) -> void:
@@ -1217,17 +1297,32 @@ func _step_aircraft(dt: float) -> void:
 		var fwd: Vector3 = b["forward"]
 		var up: Vector3 = b["up"]
 		var world_pos := CoordinateUtil.to_world(flight.x, flight.z, flight.y)
+		# ⚠️⚠️ basis() 的向量是**数据坐标**（z=北），摆机模必须先翻成世界坐标
+		# （z=−北），否则整个模型被南北镜像：机头指向运动方向的反侧，
+		# 相机跟着"机尾"悬到运动路径前方迎面拍机鼻，横滚 A/D 与方向舵 Q/E
+		# 看起来全反了。导弹 _draw() 早就做了同样的翻转（dir.x, dir.y, -dir.z），
+		# 这里是同一坐标系契约 —— 别再漏。
+		var fwd_w := Vector3(fwd.x, fwd.y, -fwd.z).normalized()
+		var up_w := Vector3(up.x, up.y, -up.z)
 		# ⚠️ 水上飞机模型的机头在 **-Z**，不是 +Z。
 		# 实测：floatplane_propeller_mesh Z = -4.19（机身一端），
 		# floatplane_airframe_fp_glass（座舱玻璃）Z = -0.52 —— 螺旋桨在座舱前方 3.7 m，
 		# 是拉进式（tractor）布局，所以 -Z 才是机头。
-		# 因此基的 z 轴取 **-fwd**（等价于绕 up 转 180°），y 轴仍取 up；
+		# 因此基的 z 轴取 **-fwd_w**（等价于绕 up 转 180°），y 轴仍取 up_w；
 		# Godot 的 Basis(x, y, z) 要求右手系 x = y × z，cross 会自动把 x 一并翻过来。
-		var z_axis := -fwd.normalized()
-		var y_axis := (up - z_axis * up.dot(z_axis)).normalized()
+		var z_axis := -fwd_w
+		var y_axis := (up_w - z_axis * up_w.dot(z_axis)).normalized()
 		var x_axis := y_axis.cross(z_axis)
 		_plane_model.global_transform = Transform3D(
 			Basis(x_axis, y_axis, z_axis), world_pos)
+		# 螺旋桨旋转（原版 city-flight.ts:106 syncModel）：
+		#   this.propeller.rotation.z += dt * (45 + this.sim.throttle * 70)
+		# 转速 = 45 + 油门×70 rad/s（≈7~19 圈/秒）。只在 phase == "flying" 时转：
+		# 坠毁（exploding）即熄火，收起（idle）时模型本来就不可见。
+		# 桨节点在模型局部 -Z 端、无基础旋转，绕局部 Z 轴转即为绕桨轴。
+		if _plane_propeller != null and flight.phase == "flying":
+			_propeller_angle = fposmod(_propeller_angle + dt * (45.0 + flight.throttle * 70.0), TAU)
+			_plane_propeller.rotation = Vector3(0.0, 0.0, _propeller_angle)
 	camera.aircraft_basis = _plane_model.global_transform if _plane_model != null else Transform3D.IDENTITY
 	camera.follow_aircraft(dt)
 

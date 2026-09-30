@@ -106,7 +106,10 @@ func _ready() -> void:
 
 func _mat(_name: String, color: Color, glow: float, alpha := 1.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	m.name = "flight-missile-%s" % _name
+	# ⚠️ Resource 在 Godot 4 里叫 resource_name（没有 name 属性）：
+	# 写 m.name 会落进 3.x 兼容层报
+	# "Godot 3.x SpatialMaterial remapped parameter not found: name"。
+	m.resource_name = "flight-missile-%s" % _name
 	# 原版 disableLighting = true + emissiveColor = color.scale(glow)
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.albedo_color = Color(color.r * glow, color.g * glow, color.b * glow, alpha)

@@ -132,6 +132,7 @@ func _build() -> void:
 	journal_body = journal.get_child(3)
 
 	_build_settings()
+	_build_help()
 
 	# 对话
 	dialog = Control.new()
@@ -877,12 +878,12 @@ func _build_pause() -> void:
 
 	# place-content:center 的那块内容
 	var center := VBoxContainer.new()
-	# 以屏幕中心为锚的手工盒：640×510
+	# 以屏幕中心为锚的手工盒：640×560（按键表加到三行后从 510 放大）
 	center.set_anchors_preset(Control.PRESET_CENTER)
 	center.offset_left = -320.0
 	center.offset_right = 320.0
-	center.offset_top = -255.0
-	center.offset_bottom = 255.0
+	center.offset_top = -280.0
+	center.offset_bottom = 280.0
 	center.add_theme_constant_override("separation", 0)
 	pause_overlay.add_child(center)
 
@@ -917,15 +918,17 @@ func _build_pause() -> void:
 	_pause_resume.pressed.connect(func(): resume_requested.emit())
 	center.add_child(_pause_resume)
 
-	var gap1 := Control.new(); gap1.custom_minimum_size = Vector2(0, 34)
+	var gap1 := Control.new(); gap1.custom_minimum_size = Vector2(0, 26)
 	center.add_child(gap1)
 
-	# 原版 .controls：initUI 那排按键表，cinematic-hud 里移进 #pause
+	# 原版 .controls：initUI 那排按键表，cinematic-hud 里移进 #pause。
+	# 只放最高频的速查项；完整按键表在 "?" 帮助页（含飞行 / 无人机 / 光柱）。
 	var controls := VBoxContainer.new()
 	controls.add_theme_constant_override("separation", 9)
-	var row1 := ["W S|油门 / 刹车", "A D|转向", "空格|手刹", "C|镜头", "L|日落 / 夜色 / 晴日"]
-	var row2 := ["F|上下车", "V|看车", "G|无人机", "K|显隐鼠标", "R|回到道路"]
-	for row in [row1, row2]:
+	var row1 := ["W S|油门 / 刹车", "A D|转向", "空格|手刹", "F|上下车", "C|镜头"]
+	var row2 := ["T|坦克", "G|无人机", "B|飞机", "E|互动", "V|看车"]
+	var row3 := ["R|回到道路", "M|地图", "J|手账", "F10|图像设置", "?|完整按键帮助"]
+	for row in [row1, row2, row3]:
 		var h := HBoxContainer.new()
 		h.alignment = BoxContainer.ALIGNMENT_CENTER
 		h.add_theme_constant_override("separation", 19)
@@ -1058,6 +1061,134 @@ func _on_audio_toggle() -> void:
 		return
 	audio_player.muted = not audio_player.muted
 	_refresh_audio_controls()
+
+# ---------------------------------------------------------------------------
+# "?" 按键帮助页（Shift+/ 打开，Esc 或 ? 关闭）
+#
+# Esc 暂停页只放得下一张速查小抄；这里把**全部模式**的按键分组列全 ——
+# 尤其是飞机 / 无人机 / 光柱那几组，此前除了进入时一闪而过的 toast
+# 再也没有任何地方能查。
+# ---------------------------------------------------------------------------
+
+## 帮助分组：title + rows（[键, 说明]）。两列一组（键 | 说明 ×2），竖向滚动。
+const HELP_SECTIONS := [
+	{"title": "通用", "rows": [
+		["Esc", "暂停 / 关闭面板"], ["M", "大地图"],
+		["J", "城市手账"], ["F10", "图像设置"],
+		["P", "帧率显示"], ["L", "光照：晴日 / 夜色 / 日落"],
+		["Y", "天气：雨 / 晴"], ["C", "切换镜头"],
+		["K", "显隐鼠标"], ["?", "本帮助页"],
+	]},
+	{"title": "驾驶（轿车 · 默认模式）", "rows": [
+		["W / S", "油门 / 刹车·倒车"], ["A / D", "转向"],
+		["空格", "手刹"], ["F", "上下车（先停稳）"],
+		["E", "互动（剧情 / 乘车点）"], ["V", "看车"],
+		["R", "回到道路上"], ["H", "鸣笛"],
+		["T", "切换坦克"], ["G", "切换无人机"],
+	]},
+	{"title": "步行（下车后）", "rows": [
+		["W A S D", "移动（方向键亦可）"], ["Shift", "跑步"],
+		["C", "第一 / 第三人称"], ["F", "上最近的车"],
+		["E", "互动"], ["G", "切换无人机"],
+	]},
+	{"title": "坦克（驾驶中按 T）", "rows": [
+		["W / S", "前进 / 后退"], ["A / D", "车体转向"],
+		["Q / E", "旋转炮塔"], ["PgUp / PgDn", "俯仰炮管"],
+		["空格 / 回车", "开炮"], ["F", "下车"],
+	]},
+	{"title": "观景无人机（按 G 进入 · G 退出）", "rows": [
+		["W A S D", "平移"], ["Q / E", "降 / 升"],
+		["Shift", "加速"], ["拖动鼠标", "转向视角"],
+		["长按左键", "立落地光柱"], ["I", "移动到光柱处"],
+		["O", "收藏光柱地点"], ["U", "清除光柱"],
+		["B", "切换观光飞机"], ["G", "退出观景"],
+	]},
+	{"title": "观光飞机（无人机中按 B，驾驶中也可直接按 B）", "rows": [
+		["W / S", "抬头 / 俯冲"], ["A / D", "左右侧倾"],
+		["Q / E", "方向舵"], ["Shift", "加大油门"],
+		["X", "收油减速"], ["空格", "发射导弹"],
+		["B", "收回飞机 → 无人机"], ["F / G", "返回驾驶"],
+	]},
+]
+
+var help_root: Control
+var help_visible := false
+
+
+func _build_help() -> void:
+	help_root = Control.new()
+	help_root.name = "help"
+	help_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	help_root.visible = false
+	add_child(help_root)
+
+	# 与暂停页同款的暗化底（略深一档，帮助页信息密）
+	var dim := ColorRect.new()
+	dim.color = Color(0.035, 0.137, 0.161, 0.66)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	help_root.add_child(dim)
+
+	# 以屏幕中心为锚的面板：820×720
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -410.0
+	panel.offset_right = 410.0
+	panel.offset_top = -360.0
+	panel.offset_bottom = 360.0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.043, 0.106, 0.153, 0.94)       ## #0b1b27f0 附近
+	sb.border_color = Color(0.737, 0.804, 0.757, 0.26)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 28; sb.content_margin_right = 28
+	sb.content_margin_top = 20; sb.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", sb)
+	help_root.add_child(panel)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+
+	var title := _mk_label("按键帮助", _spaced(_font(26), 4.0), 26,
+		Color(0.941, 0.945, 0.906))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var sub := _mk_label("按 ? 或 Esc 关闭", _font(11), 11, Color(0.663, 0.729, 0.702))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(sub)
+
+	# 内容多：竖向滚动兜底，低分辨率窗口也不会被裁掉
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	scroll.add_child(box)
+
+	for section in HELP_SECTIONS:
+		var head := _mk_label(str(section["title"]), _font(13), 13,
+			Color(0.545, 0.737, 0.671))
+		box.add_child(head)
+		# 4 列网格 = 两组「键 | 说明」并排，压住总高度
+		var grid := GridContainer.new()
+		grid.columns = 4
+		grid.add_theme_constant_override("h_separation", 22)
+		grid.add_theme_constant_override("v_separation", 7)
+		for row in section["rows"]:
+			grid.add_child(_kbd_chip(str(row[0])))
+			var d := _mk_label(str(row[1]), _font(12), 12, Color(0.824, 0.875, 0.847))
+			d.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			grid.add_child(d)
+		box.add_child(grid)
+
+
+func toggle_help() -> bool:
+	help_visible = not help_visible
+	if help_root != null:
+		help_root.visible = help_visible
+	return help_visible
 
 # ---------------------------------------------------------------------------
 # 手账
