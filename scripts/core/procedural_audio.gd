@@ -77,6 +77,49 @@ func _ready() -> void:
 	bgm_player.volume_db = -80.0
 	add_child(bgm_player)
 
+	# —— 母线压缩器（原版 city-audio.ts:43）——
+	#   master → compressor → analyser → destination
+	#   threshold −17 dB / knee 16 / ratio 3 / attack .01s / release .2s
+	# Godot 对应 AudioEffectCompressor，挂在 Master 总线（bus 0）末端。
+	# ⚠️ knee 在 Godot 的压缩器里没有对应项（它是软拐点宽度），AudioEffectCompressor
+	# 只有 threshold/ratio/attack/release/gain；硬拐点比原版稍"硬"，其余四项一致。
+	# ⚠️ 单位不统一：Godot 是 attack_us（微秒）与 release_ms（毫秒）
+	#（实跑抓到：Invalid assignment of property 'attack' —— 该属性名不存在）。
+	# 原版 .01 s = 10000 µs；原版 .2 s = 200 ms。
+	var comp := AudioEffectCompressor.new()
+	comp.threshold = -17.0
+	comp.ratio = 3.0
+	comp.attack_us = 10000.0    ## 原版 .01 s
+	comp.release_ms = 200.0     ## 原版 .2 s
+	comp.gain = 0.0
+	AudioServer.add_bus_effect(0, comp)
+
+
+## 窗口失焦 / 回到前台 —— 原版 city-audio.ts:25 的 visibilitychange：
+##   document.hidden → context.suspend()；回到前台且是被可见性挂起的 → resume()
+## Godot 里等价的是 APPLICATION_FOCUS_OUT / _IN 通知（切走窗口时把合成停下来，
+## 避免后台继续跑 22kHz 的逐样本合成空耗 CPU）。
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			_suspend_by_focus(true)
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			_suspend_by_focus(false)
+
+
+func _suspend_by_focus(hidden: bool) -> void:
+	if hidden:
+		if player != null:
+			player.stream_paused = true
+		if bgm_player != null:
+			bgm_player.stream_paused = true
+		return
+	# 只有"当时确实在播"的才恢复 —— 否则会把尚未 unlock 的播放器提前启动
+	if player != null and _unlocked:
+		player.stream_paused = false
+	if bgm_player != null and bgm_player.stream != null:
+		bgm_player.stream_paused = false
+
 
 func unlock() -> void:
 	if _unlocked or not enabled:

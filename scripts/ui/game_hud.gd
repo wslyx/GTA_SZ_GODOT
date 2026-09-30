@@ -145,6 +145,35 @@ const QUICK_TIPS := {
 ## 原版 LABELS：左端的模式名（carView 时是「看车」，本版未做看车镜头）
 const QUICK_LABELS := {"driving": "驾驶", "walking": "步行", "observer": "观景", "tank": "坦克"}
 
+## 飞行仪表 —— 原版 city-flight-hud.css 的数值
+##   .flight-instruments{left:32px;top:155px;width:232px;padding:20px 22px;
+##     background:linear-gradient(120deg,#0f202edb,#12252d9c);border:1px #ffffff29;
+##     border-radius:9px}
+## Godot 的 StyleBoxFlat 没有渐变，取渐变的起点色（#0f202edb）作整块底色。
+const FL_BG := Color(0.059, 0.125, 0.180, 0.859)      ## #0f202edb
+const FL_EDGE := Color(1.0, 1.0, 1.0, 0.161)          ## #ffffff29
+const FL_SMALL := Color(0.620, 0.792, 0.773)          ## #9ecac5
+const FL_TEXT := Color(0.957, 0.953, 0.914)           ## #f4f3e9
+const FL_PHASE := Color(0.835, 0.863, 0.824, 0.651)   ## #d5dcd2a6
+const FL_DT := Color(0.627, 0.710, 0.741)             ## #a0b5bd
+const FL_UNIT := Color(0.714, 0.804, 0.784)           ## #b6cdc8
+const FL_TRACK := Color(1.0, 1.0, 1.0, 0.086)         ## #ffffff16
+const FL_THROTTLE := Color(0.584, 0.851, 0.776)       ## #95d9c6
+const FL_PANEL_W := 232.0
+const FL_PANEL_POS := Vector2(32.0, 155.0)
+const FL_PAD := Vector2(22.0, 20.0)
+## 油门条宽度 = 面板宽 232 − 左右 padding 22×2
+const FL_BAR_W := 188.0
+## .flight-crash{top:32%;border-top:2px #ffb968;background:linear-gradient(180deg,#2a171dcc,#161c2800)}
+const FL_CRASH_EDGE := Color(1.0, 0.725, 0.408)       ## #ffb968
+const FL_CRASH_BG := Color(0.165, 0.090, 0.114, 0.800) ## #2a171dcc
+const FL_CRASH_SMALL := Color(1.0, 0.737, 0.541)      ## #ffbc8a
+## .flight-help{bottom:26px;left:50%;gap:7px;padding:14px 26px;background:#0b1b27d9}
+const FL_HELP_BG := Color(0.043, 0.106, 0.153, 0.851) ## #0b1b27d9
+const FL_HELP_EDGE := Color(1.0, 1.0, 1.0, 0.145)     ## #ffffff25
+const FL_HELP_SPAN := Color(0.741, 0.796, 0.784)      ## #bdcbc8
+const FL_HELP_MISSILE := Color(0.741, 0.910, 0.847)   ## #bde8d8
+
 var world: CityWorld
 var player = null
 var enabled := true
@@ -173,6 +202,19 @@ var _odo_label: Label
 var _quicktips: Control
 var _toast_label: Label
 var _fps_label: Label
+## 飞行仪表（原版 city-flight-hud.ts）
+var _flight_panel: PanelContainer
+var _flight_phase: Label
+var _flight_speed: Label
+var _flight_alt: Label
+var _flight_heading: Label
+var _flight_throttle: Label
+var _flight_bar_fill: ColorRect
+var _flight_crash: PanelContainer
+var _flight_crash_span: Label
+var _flight_help: PanelContainer
+var _flight_missile: Label
+var _flight_throttle_value := 0.55
 ## 光照档时钟（原版 city-hud.ts 的 hud.clock：白天 14:20 / 日落 18:25 / 夜晚 20:10）
 var _clock_label: Label
 
@@ -284,6 +326,7 @@ func _build() -> void:
 	_build_invitation()
 	_build_dial()
 	_build_quicktips()
+	_build_flight()
 
 	_toast_label = _label("", _f_ui, 12, Color(0.949, 0.945, 0.906))
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -533,6 +576,156 @@ func _build_quicktips() -> void:
 	_tip_boxes.append(q)
 
 
+## 飞行仪表 —— 原版 city-flight-hud.ts 的 .flight-instruments / .flight-crash /
+## .flight-help 三块。此前本版只做了模式文案，仪表（空速 / 离地高度 / 航向 /
+## 油门）与坠毁倒计时都没有。
+func _build_flight() -> void:
+	# ---- 仪表盘 ----
+	_flight_panel = PanelContainer.new()
+	_flight_panel.name = "flight-instruments"
+	_flight_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = FL_BG
+	sb.border_color = FL_EDGE
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = FL_PAD.x
+	sb.content_margin_right = FL_PAD.x
+	sb.content_margin_top = FL_PAD.y
+	sb.content_margin_bottom = FL_PAD.y
+	_flight_panel.add_theme_stylebox_override("panel", sb)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flight_panel.add_child(v)
+
+	var small := _label("BAY WINGS / 湾翼", _spaced(_f_ui, 2.0), 10, FL_SMALL)
+	v.add_child(small)
+	var strong := _label("海湾自由飞行", _f_ui, 17, FL_TEXT)
+	v.add_child(strong)
+	_flight_phase = _label("", _f_ui, 11, FL_PHASE)
+	v.add_child(_flight_phase)
+
+	# dl：grid 两列，gap 18px 行 / 24px 列，margin 24px 上 / 16px 下
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 18)
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 16)
+	v.add_child(spacer)
+	v.add_child(grid)
+
+	_flight_speed = _flight_readout(grid, "空速", "KM/H")
+	_flight_alt = _flight_readout(grid, "离地高度", "M")
+	_flight_heading = _flight_readout(grid, "航向", "°")
+	_flight_throttle = _flight_readout(grid, "油门", "%")
+	# 航向那一格的单位就是 °，不需要再留 6px 间隔 —— 保持与其余三格一致即可。
+
+	var track := ColorRect.new()
+	track.color = FL_TRACK
+	track.custom_minimum_size = Vector2(FL_BAR_W, 3)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(track)
+	# 填充条挂在 track 上（ColorRect 不是容器，子节点的 position 不会被排版覆盖）
+	_flight_bar_fill = ColorRect.new()
+	_flight_bar_fill.color = FL_THROTTLE
+	_flight_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flight_bar_fill.size = Vector2(0, 3)
+	track.add_child(_flight_bar_fill)
+	_root.add_child(_flight_panel)
+
+	# ---- 坠毁提示 ----
+	_flight_crash = PanelContainer.new()
+	_flight_crash.name = "flight-crash"
+	_flight_crash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var csb := StyleBoxFlat.new()
+	csb.bg_color = FL_CRASH_BG
+	csb.border_color = FL_CRASH_EDGE
+	csb.border_width_top = 2
+	csb.set_border_width_all(0)
+	csb.border_width_top = 2
+	csb.content_margin_left = 48.0
+	csb.content_margin_right = 48.0
+	csb.content_margin_top = 25.0
+	csb.content_margin_bottom = 25.0
+	_flight_crash.add_theme_stylebox_override("panel", csb)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 12)
+	cv.alignment = BoxContainer.ALIGNMENT_CENTER
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flight_crash.add_child(cv)
+	var cs := _label("FLIGHT ENDED", _spaced(_f_ui, 4.0), 11, FL_CRASH_SMALL)
+	cs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(cs)
+	var ct := _label("飞机撞毁", _spaced(_f_ui, 6.0), 30, FL_TEXT)
+	ct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(ct)
+	_flight_crash_span = _label("3 秒后返回无人机", _f_ui, 14, FL_TEXT)
+	_flight_crash_span.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(_flight_crash_span)
+	_root.add_child(_flight_crash)
+
+	# ---- 底部操作提示 ----
+	_flight_help = PanelContainer.new()
+	_flight_help.name = "flight-help"
+	_flight_help.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hsb := StyleBoxFlat.new()
+	hsb.bg_color = FL_HELP_BG
+	hsb.border_color = FL_HELP_EDGE
+	hsb.set_border_width_all(1)
+	hsb.set_corner_radius_all(7)
+	hsb.content_margin_left = 26.0
+	hsb.content_margin_right = 26.0
+	hsb.content_margin_top = 14.0
+	hsb.content_margin_bottom = 14.0
+	_flight_help.add_theme_stylebox_override("panel", hsb)
+	var hv := VBoxContainer.new()
+	hv.add_theme_constant_override("separation", 7)
+	hv.alignment = BoxContainer.ALIGNMENT_CENTER
+	hv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flight_help.add_child(hv)
+	var hs := _label("W / S · 抬头 / 俯冲　 A / D · 左右侧倾", _f_ui, 13, FL_TEXT)
+	hs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hv.add_child(hs)
+	var h1 := _label("方向键亦可操纵 · Q / E 方向舵 · Shift 加速 · X 减速 · 空格发射导弹",
+		_f_ui, 12, FL_HELP_SPAN)
+	h1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hv.add_child(h1)
+	_flight_missile = _label("", _f_num, 12, FL_HELP_MISSILE)
+	_flight_missile.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hv.add_child(_flight_missile)
+	var h2 := _label("B 无人机 · G / F 返回驾驶 · L 切换光照", _f_ui, 12, FL_HELP_SPAN)
+	h2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hv.add_child(h2)
+	_root.add_child(_flight_help)
+	_flight_panel.visible = false
+	_flight_crash.visible = false
+	_flight_help.visible = false
+
+
+## 仪表盘里的一个读数格：dt 小标题 + dd 数值 + 单位小字
+## （原版 dt 11px #a0b5bd / dd 26px / small 9px #b6cdc8 margin-left 6px）
+func _flight_readout(grid: GridContainer, title: String, unit: String) -> Label:
+	var cell := VBoxContainer.new()
+	cell.add_theme_constant_override("separation", 5)
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_child(cell)
+	var dt := _label(title, _spaced(_f_ui, 1.0), 11, FL_DT)
+	cell.add_child(dt)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(row)
+	var dd := _label("0", _f_num, 26, FL_TEXT)
+	row.add_child(dd)
+	var u := _label(unit, _spaced(_f_num, 1.0), 9, FL_UNIT)
+	row.add_child(u)
+	return dd
+
+
 # ---------------------------------------------------------------------------
 # 尺寸 / 布局（原版是 CSS 定位，这里在每次尺寸变化时算一遍，不每帧算）
 # ---------------------------------------------------------------------------
@@ -584,7 +777,27 @@ func _on_viewport_resized() -> void:
 	_quicktips.position = Vector2(0, _vh() - 19.0 - 30.0)
 	_quicktips.size = Vector2(_vw(), 30)
 	_quicktips.queue_redraw()
+	_layout_flight()
 	_dial.queue_redraw()
+
+
+## 飞行三块的定位（原版 CSS 的 left/top/bottom + translateX(-50%)）
+func _layout_flight() -> void:
+	if _flight_panel == null:
+		return
+	_flight_panel.position = FL_PANEL_POS
+	_flight_panel.custom_minimum_size = Vector2(FL_PANEL_W, 0)
+	_flight_panel.size = _flight_panel.get_combined_minimum_size()
+	_flight_bar_fill.size = Vector2(FL_BAR_W * _flight_throttle_value, 3.0)
+
+	var crash_sz := _flight_crash.get_combined_minimum_size()
+	_flight_crash.size = crash_sz
+	_flight_crash.position = Vector2(_vw() * 0.5 - crash_sz.x * 0.5, _vh() * 0.32)
+
+	var help_sz := _flight_help.get_combined_minimum_size()
+	_flight_help.size = help_sz
+	_flight_help.position = Vector2(_vw() * 0.5 - help_sz.x * 0.5,
+		_vh() - 26.0 - help_sz.y)
 
 
 ## 邀请卡：宽高都由内容决定（原版 width:auto + max-width:330px）。
@@ -668,6 +881,7 @@ func update_hud(delta: float) -> void:
 		_apply_tip_boxes()
 		_quicktips.queue_redraw()
 
+	_update_flight(flying)
 	_refresh_story()
 	_refresh_invitation()
 	# 卡片高度由内容决定，低对比度的左侧强调线跟着它同步
@@ -685,6 +899,65 @@ func update_hud(delta: float) -> void:
 		var fps := Engine.get_frames_per_second()
 		_fps_label.text = "FPS %d · %.1f m/s · %.0f,%.0f" % [fps, speed, pos.x, pos.y]
 	_dial.queue_redraw()
+
+
+## 飞行仪表刷新 —— 原版 city-flight-hud.ts 的 update()。
+## 四项读数（空速 / 离地高度 / 航向 / 油门）、油门条、阶段文案、坠毁倒计时、
+## 导弹状态，全部按原版公式。
+func _update_flight(flying: bool) -> void:
+	if _flight_panel == null or player == null:
+		return
+	# 原版：panel.hidden = menuOpen || !observer.active || photoTarget?.id==='car'
+	# 本版没有菜单打开态与看车镜头，等价条件就是"处于飞行模式且飞机确实在飞"。
+	# ⚠️ has_method 返回 Variant，`var show :=` 会推断失败（无头实跑抓到）
+	var show: bool = flying and player.has_method("flight_hud_state")
+	_flight_panel.visible = show
+	_flight_help.visible = show
+	if not show:
+		_flight_crash.visible = false
+		return
+	var s: Dictionary = player.flight_hud_state()
+	var live := bool(s.get("active", false))
+	_flight_panel.visible = live
+	_flight_help.visible = live
+	if not live:
+		_flight_crash.visible = false
+		return
+
+	var phase := str(s.get("phase", ""))
+	_flight_speed.text = "%d" % int(round(float(s.get("speed", 0.0)) * 3.6))
+	_flight_alt.text = "%d" % int(round(float(s.get("altitude", 0.0))))
+	# 原版 String(Math.round((yaw*180/PI%360+360)%360)).padStart(3,'0')
+	#
+	# ⚠️ 两个坑（开窗截图肉眼看到 "航向 -99°" 才发现的）：
+	#   ① GDScript 的 `%` 是**截断求余**，负数会返回负数（−99 % 360 = −99），
+	#      不像 JS 的 `%` 也返回负数但原版随后又 +360 再 %360 归正了；
+	#      这里用 fposmod 一次归到 [0,360)。
+	#   ② 原版是先归正、再 round，所以 359.6° 会显示成 "000°" 而不是 "360°"。
+	var heading := int(round(fposmod(rad_to_deg(float(s.get("yaw", 0.0))), 360.0)))
+	_flight_heading.text = "%03d°" % heading
+	var th := clampf(float(s.get("throttle", 0.0)), 0.0, 1.0)
+	_flight_throttle.text = "%d" % int(round(th * 100.0))
+	_flight_throttle_value = th
+	_flight_bar_fill.size = Vector2(FL_BAR_W * th, 3.0)
+	_flight_phase.text = "飞行中断" if phase == "exploding" else "辅助平飞 · 松开按键自动回正"
+
+	# 坠毁倒计时：原版 Math.max(1, Math.ceil((FLIGHT_RECOVERY_MS-(now-crashedAt))/1000))
+	_flight_crash.visible = phase == "exploding"
+	if _flight_crash.visible:
+		var left_ms := float(s.get("recovery_ms", 3000)) \
+			- float(Time.get_ticks_msec() - int(s.get("crashed_at", 0)))
+		_flight_crash_span.text = "%d 秒后返回无人机" % maxi(1, int(ceil(left_ms / 1000.0)))
+
+	# 导弹状态（原版 .flight-missile-status）
+	var ms: Dictionary = s.get("missiles", {})
+	var cd := float(ms.get("cooldown", 0.0))
+	if phase == "exploding":
+		_flight_missile.text = ""
+	elif cd > 0.05:
+		_flight_missile.text = "导弹装填 %.1f 秒" % cd
+	else:
+		_flight_missile.text = "导弹就绪 · 按住空格连续发射"
 
 
 ## 原版 city-graphics-panel 的档位中文名
@@ -736,8 +1009,10 @@ func _refresh_story() -> void:
 			body = str(st.get("synopsis", ""))
 			entry = true
 		else:
+			# 步骤不再有静态 text 字段（改为原版的 lines/objective），
+			# 卡片这里显示 objective —— 它本来就是给玩家看的"下一步做什么"
 			var step: Dictionary = player.story.current_step()
-			body = str(step.get("text", ""))
+			body = str(step.get("objective", ""))
 	if title == "":
 		# 故事跑完就退回合约/自由驾驶，卡片不留空
 		var c: Dictionary = player.career.status() if player.career != null else {}

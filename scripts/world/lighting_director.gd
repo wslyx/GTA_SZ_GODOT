@@ -128,6 +128,9 @@ var world: CityWorld
 var sun: DirectionalLight3D
 var env_node: WorldEnvironment
 var mode: int = GameContent.LightMode.SUNSET
+## 天气系统同步的雨态（低画质档雨天 SSR 兜底用，见 _apply_ssr）
+var raining := false
+var _quality_params: Dictionary = {}
 
 var _lamps: Array = []                ## {pos: Vector3, height: float}
 ## 灯位空间索引：20409 个灯位全量扫一遍（每 0.4s）在 GDScript 里太重，
@@ -374,19 +377,13 @@ func cycle_mode() -> int:
 
 
 func set_quality(p: Dictionary) -> void:
+	_quality_params = p.duplicate()
 	# —— 路灯池数量（设置页可调 8/16/24；低画质档默认 8）——
 	var lamps := int(p.get("lamps", 8 if float(p.get("detail_scale", 1.0)) <= 0.5 else LAMP_POOL))
 	_active_lamps = clampi(lamps, 0, LAMP_POOL)
 	var env := env_node.environment
 	env.ssao_enabled = bool(p.get("ao", true))
-	# —— 屏幕空间反射（低档关，中/高档开）——
-	# 步数越高越贵；这是本档位里唯一"开了就可能掉帧"的一项，故跟画质档走。
-	env.ssr_enabled = bool(p.get("ssr", false))
-	if env.ssr_enabled:
-		env.ssr_max_steps = maxi(8, int(p.get("ssr_steps", 24)))
-		env.ssr_fade_in = 15.0
-		env.ssr_fade_out = 2.0
-		env.ssr_depth_tolerance = 0.2
+	_apply_ssr(env, p)
 	# Bloom：显式开关（设置页）优先，回退到档位的 bloom_scale
 	if p.has("bloom"):
 		env.glow_enabled = bool(p["bloom"])
@@ -414,6 +411,35 @@ func set_quality(p: Dictionary) -> void:
 			RenderingServer.directional_shadow_atlas_set_size(int(step["size"]), true)
 	# 阴影绘制距离：街面 260m / 高空 1050m（原版 SHADOW_ORTHO_*），比默认省一大截
 	_apply_shadow_distance()
+
+
+## 屏幕空间反射（低档关，中/高档开）+ 雨天低档兜底。
+## 步数越高越贵；这是本档位里唯一"开了就可能掉帧"的一项，故跟画质档走。
+## 但雨天的"湿感"完全来自反射：原版湿路靠平面镜把天空/建筑镜像回来，
+## 本版没有平面镜，低档若连 SSR 也关，RAIN_LOOK（rough .455 / specular .68）
+## 就只剩一块无反射的浅蓝塑料面 —— 修复记录 19.5「部分路段平坦浅蓝、无沥青
+## 颗粒」的实测根因。所以下雨时低档也强制开最低配 SSR，只求湿路有天空倒影。
+func _apply_ssr(env: Environment, p: Dictionary) -> void:
+	var tier_on := bool(p.get("ssr", false))
+	env.ssr_enabled = tier_on or raining
+	if env.ssr_enabled:
+		var steps := maxi(8, int(p.get("ssr_steps", 24)))
+		if not tier_on:
+			steps = 12  # 低档雨天兜底：最少步数，只为天空反射
+		env.ssr_max_steps = steps
+		env.ssr_fade_in = 15.0
+		env.ssr_fade_out = 2.0
+		env.ssr_depth_tolerance = 0.2
+
+
+## 天气系统在下雨 / 雨停时调用：记状态并重放 SSR。
+func set_raining_state(v: bool) -> void:
+	if raining == v:
+		return
+	raining = v
+	if _quality_params.is_empty() or env_node == null:
+		return
+	_apply_ssr(env_node.environment, _quality_params)
 
 
 # ---------------------------------------------------------------------------
@@ -571,7 +597,7 @@ func _apply_pole_emissive() -> void:
 	elif mode == GameContent.LightMode.SUNSET:
 		gain = PARK_DUSK_GAIN
 	for m in _pole_mats:
-		var sm := m as StandardMaterial3D
+		var sm: StandardMaterial3D = m as StandardMaterial3D
 		if sm == null:
 			continue
 		sm.emission_enabled = gain > 0.0

@@ -376,7 +376,7 @@ func diagnostics() -> Dictionary:
 		# _canopy_nodes 里存的是 MultiMeshInstance3D（见 _build_canopy）。
 		# 它和 MeshInstance3D 是 GeometryInstance3D 下的**兄弟类**，不是继承关系，
 		# `as MeshInstance3D` 恒为 null，再取 .multimesh 就是空引用崩溃。
-		var mmi := _canopy_nodes[k] as MultiMeshInstance3D
+		var mmi: MultiMeshInstance3D = _canopy_nodes[k] as MultiMeshInstance3D
 		if mmi == null or mmi.multimesh == null:
 			continue
 		counts[k] = mmi.multimesh.instance_count

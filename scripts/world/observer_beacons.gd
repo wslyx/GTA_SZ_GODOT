@@ -42,6 +42,16 @@ var _active := false
 var _seq := 0
 var _toast: Callable = Callable()
 
+## 长按手势（原版 BeaconHoldGesture，定义在 observer_beacon_state.gd 的内嵌类）。
+##
+## ⚠️ 这个属性此前**根本不存在**：main_game 的鼠标事件（`_input` 里的
+## `world.beacons.gesture.begin/move/end`）与 `_step_beacons` 都在访问它，
+## 于是观察模式下按一次左键就抛
+## "Invalid access to property or key 'gesture' on a base object of type
+## Node3D (ObserverBeacons)"，并且 `_step_beacons` **每帧**都抛 ——
+## 长按选点实际完全不可用（开窗截图时才暴露：无头模式不进观察模式）。
+var gesture = STATE.HoldGesture.new()
+
 
 func setup(p_world: CityWorld, toast: Callable = Callable()) -> void:
 	world = p_world

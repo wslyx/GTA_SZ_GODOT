@@ -152,7 +152,7 @@ func place(px: float, pz: float) -> void:
 		scan = range(graph.nodes.size())
 	var all_ids: Array = []
 	for i in scan:
-		var d := graph.nodes[i].distance_to(p)
+		var d: float = graph.nodes[i].distance_to(p)
 		if d > MIN_SPAWN_DIST and d < MAX_SPAWN_DIST and graph.degree(i) > 1:
 			all_ids.append(i)
 	if all_ids.is_empty():
@@ -164,7 +164,7 @@ func place(px: float, pz: float) -> void:
 	var near_ids: Array = []
 	var near_d := PackedFloat32Array()
 	for idx in all_ids:
-		var d := graph.nodes[idx].distance_to(p)
+		var d: float = graph.nodes[idx].distance_to(p)
 		if near_ids.size() < NEAR_POOL:
 			near_ids.append(idx)
 			near_d.append(d)

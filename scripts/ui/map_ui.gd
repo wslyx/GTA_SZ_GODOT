@@ -265,6 +265,15 @@ const CATEGORY_NAMES := {
 	"place": "城市地点", "road": "道路",
 }
 const CATEGORY_ICONS := {"landmark": "◇", "district": "⌑", "park": "♧", "road": "⌁", "place": "◇"}
+
+## 大地图标注排布（原版 city-map-geometry.ts 的 placeMapLabels）
+##   cellSize 64 / padding 7 / 边缘留白 8
+const LABEL_CELL := 64.0
+const LABEL_PAD := 7.0
+const LABEL_EDGE := 8.0
+const LABEL_FONT_SIZE := 16
+## 名称只在 zoom ≥ 1.1 时画（原版同门限）
+const LABEL_MIN_SCALE := 1.1
 ## 原版 isPark：height===0 且名字命中 公园|湖|海滨|绿道
 const RE_PARK := "公园|湖|海滨|绿道"
 ## 列表行数上限（原版 listLimit = 70）
@@ -1504,6 +1513,85 @@ func clear_destination() -> void:
 	hide_route_choice()
 
 
+## 原版 placeMapLabels：64px 网格 + 逐格重叠测试的确定性排布。
+##
+## 候选按 priority 降序（同优先级按 id 字典序）依次落位；每个候选按序尝试自己的
+## 备选偏移 offsets，取第一个「不出界且不压到已放置标签」的位置；四个偏移都
+## 失败就放弃这个标签（宁可不画，也不叠字）。
+func _place_labels(candidates: Array, width: float, height: float) -> Array:
+	var accepted: Array = []
+	var cells := {}
+	var ids := {}
+	var sorted := candidates.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var pa := float(a.get("priority", 0.0))
+		var pb := float(b.get("priority", 0.0))
+		if pa != pb:
+			return pa > pb
+		return str(a.get("id", "")) < str(b.get("id", "")))
+	for c in sorted:
+		var cand: Dictionary = c
+		var id := str(cand.get("id", ""))
+		if ids.has(id):
+			continue
+		var w := float(cand.get("width", 0.0))
+		var h := float(cand.get("height", 0.0))
+		var cx := float(cand.get("x", 0.0))
+		var cy := float(cand.get("y", 0.0))
+		if not (is_finite(cx + cy + w + h)):
+			continue
+		var offsets: Array = cand.get("offsets", [Vector2.ZERO])
+		for off in offsets:
+			var o: Vector2 = off
+			var left := cx + o.x - w * 0.5
+			var top := cy + o.y - h * 0.5
+			if left < LABEL_EDGE or top < LABEL_EDGE \
+				or left + w > width - LABEL_EDGE or top + h > height - LABEL_EDGE:
+				continue
+			var keys := _label_cell_keys(left, top, w, h)
+			var clash := false
+			for key in keys:
+				var bucket: Array = cells.get(key, [])
+				for b in bucket:
+					var pb: Dictionary = b
+					if left < float(pb["left"]) + float(pb["width"]) + LABEL_PAD \
+						and left + w + LABEL_PAD > float(pb["left"]) \
+						and top < float(pb["top"]) + float(pb["height"]) + LABEL_PAD \
+						and top + h + LABEL_PAD > float(pb["top"]):
+						clash = true
+						break
+				if clash:
+					break
+			if clash:
+				continue
+			var placed := cand.duplicate()
+			placed["x"] = cx + o.x
+			placed["y"] = cy + o.y
+			placed["left"] = left
+			placed["top"] = top
+			accepted.append(placed)
+			ids[id] = true
+			for key2 in keys:
+				if not cells.has(key2):
+					cells[key2] = []
+				(cells[key2] as Array).append(placed)
+			break
+	return accepted
+
+
+## 标签外扩 padding 后覆盖到的 64px 网格键
+func _label_cell_keys(left: float, top: float, w: float, h: float) -> Array:
+	var out: Array = []
+	var x0 := int(floor((left - LABEL_PAD) / LABEL_CELL))
+	var x1 := int(floor((left + w + LABEL_PAD) / LABEL_CELL))
+	var y0 := int(floor((top - LABEL_PAD) / LABEL_CELL))
+	var y1 := int(floor((top + h + LABEL_PAD) / LABEL_CELL))
+	for x in range(x0, x1 + 1):
+		for y in range(y0, y1 + 1):
+			out.append("%d,%d" % [x, y])
+	return out
+
+
 func _draw_big_map() -> void:
 	var size := _map_canvas.size
 	_map_canvas.draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.05, 0.92))
@@ -1576,16 +1664,43 @@ func _draw_big_map() -> void:
 
 	# 地标：圆点**始终**绘制（只有几十个，开销可忽略，也是点选目的地的靶心）；
 	# 名称只在 zoom ≥ 1.1 时画，否则全城视图下几十个中文标签会糊成一片。
+	# 名称走原版 placeMapLabels 的 64px 网格避让排布（此前是盲画，互相压字）。
 	var font := _font(16)
+	var labels: Array = []
 	for lm in CityData.all_landmarks():
 		var p := Vector2(float(lm.get("x", 0.0)), float(lm.get("z", 0.0)))
 		var s := map_to_screen(p, big_view, big_scale, size)
 		if s.x < 0.0 or s.y < 0.0 or s.x > size.x or s.y > size.y:
 			continue
 		_map_canvas.draw_circle(s, 4.0, Color(0.95, 0.82, 0.45))
-		if big_scale >= 1.1:
-			_map_canvas.draw_string(font, s + Vector2(8, 5), str(lm.get("name", "")),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.96, 0.94, 0.88))
+		if big_scale < LABEL_MIN_SCALE:
+			continue
+		var name := str(lm.get("name", ""))
+		if name == "":
+			continue
+		# 原版 city-map.ts:359-363：width = 文字宽 + 16，height = 字号 + 12，
+		# 锚点在圆点上方 20px，priority 850，四个备选偏移按序尝试
+		var lw := float(font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			LABEL_FONT_SIZE).x) + 16.0
+		labels.append({
+			"id": name,
+			"name": name,
+			"x": s.x,
+			"y": s.y - 20.0,
+			"width": lw,
+			"height": float(LABEL_FONT_SIZE) + 12.0,
+			"priority": 850.0,
+			"offsets": [Vector2(0.0, 0.0), Vector2(0.0, 42.0),
+				Vector2(lw * 0.5 + 7.0, 20.0), Vector2(-lw * 0.5 - 7.0, 20.0)],
+		})
+	# 原版是 reverse() 后绘制（后画的在上层），这里顺序一致：低优先级先画
+	var placed_labels := _place_labels(labels, size.x, size.y)
+	for i in range(placed_labels.size() - 1, -1, -1):
+		var pl: Dictionary = placed_labels[i]
+		var cx := float(pl["left"]) + float(pl["width"]) * 0.5
+		var cy := float(pl["top"]) + float(pl["height"]) * 0.5 + 5.0
+		_map_canvas.draw_string(font, Vector2(cx, cy), str(pl["name"]),
+			HORIZONTAL_ALIGNMENT_CENTER, -1, LABEL_FONT_SIZE, Color(0.96, 0.94, 0.88))
 
 	# 自动驾驶路线（浅绿，双层描边；原版 onAutoDrive 后大地图同样绘制）
 	if player != null and player.has_route():

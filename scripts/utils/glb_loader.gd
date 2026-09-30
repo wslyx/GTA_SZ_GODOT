@@ -184,7 +184,8 @@ static func meshes_of(root: Node) -> Array[MeshInstance3D]:
 ## `MeshInstance3D.receive_shadows` 这个属性（那是 Godot 3 的 GeometryInstance
 ## 属性，4 里接收阴影是自动的），写了会报
 ## "Invalid assignment of property or key 'receive_shadows'"。只设置 cast_shadow。
-static func configure_meshes(meshes: Array, receive_shadows := true, cast_shadows := true) -> void:
+static func configure_meshes(meshes: Array, receive_shadows := true, cast_shadows := true,
+		vertex_colors := true) -> void:
 	for m in meshes:
 		var mi := m as MeshInstance3D
 		if mi == null:
@@ -193,3 +194,38 @@ static func configure_meshes(meshes: Array, receive_shadows := true, cast_shadow
 			GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		)
+		if vertex_colors:
+			enable_vertex_colors([mi])
+
+
+## 建筑的颜色**全部**烘焙在 COLOR_0 顶点色里：blocks/*.glb 与 buildings.glb 的
+## 每个材质反照率都是 (1,1,1)， primitive 属性只有 POSITION / NORMAL / COLOR_0
+##（连 TEXCOORD_0 都没有）。
+##
+## ⚠️ Godot 的 glTF 导入器**不会**自动打开 `vertex_color_use_as_albedo` ——
+## 实测这 255 个建筑网格的该标志全是 false，于是顶点色被忽略、整城渲染成
+## **纯白纸模型**（白天尤其明显，住宅楼群洗成一片白）。这是 glTF 语义上的
+## 正确行为（COLOR_0 是 baseColor 的乘数），所以凡带 COLOR 属性的表面一律开启。
+##
+## 无头模式看不到画面，这个问题是开窗截图后才发现的（见 修复记录 二十四）。
+static func enable_vertex_colors(meshes: Array) -> int:
+	var done := 0
+	for m in meshes:
+		var mi := m as MeshInstance3D
+		if mi == null or mi.mesh == null:
+			continue
+		var mesh: Mesh = mi.mesh
+		for s in mesh.get_surface_count():
+			if not (mesh.surface_get_format(s) & Mesh.ARRAY_FORMAT_COLOR):
+				continue
+			var mats: Array = []
+			var sm: Material = mesh.surface_get_material(s)
+			if sm != null:
+				mats.append(sm)
+			if mi.material_override != null:
+				mats.append(mi.material_override)
+			for mat in mats:
+				if mat is StandardMaterial3D and not (mat as StandardMaterial3D).vertex_color_use_as_albedo:
+					(mat as StandardMaterial3D).vertex_color_use_as_albedo = true
+					done += 1
+	return done

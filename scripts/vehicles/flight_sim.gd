@@ -77,6 +77,15 @@ func _pose() -> Dictionary:
 	return {"x": x, "y": y, "z": z, "yaw": yaw, "pitch": pitch, "roll": roll}
 
 
+## 公开的姿态快照（导弹挂点用 flightPoint(pose, …) 的那套字段）。
+##
+## ⚠️ 别再拿 `status()` 当 pose 用：status() 里位置是 `"position": [x,y,z]` 数组，
+## 没有 x/y/z 键 —— 导弹 fire() 读 pose["x"] 会抛
+## "Invalid access to property or key 'x' on a base object of type 'Dictionary'"。
+func pose() -> Dictionary:
+	return _pose()
+
+
 func _restore(p: Dictionary) -> void:
 	x = p["x"]
 	y = p["y"]
@@ -87,7 +96,17 @@ func _restore(p: Dictionary) -> void:
 
 
 ## 机体基向量（原版 flightBasis）
+## 姿态基（forward / right / up）—— 原版 city-flight-simulation.ts 的 flightBasis。
+## 只依赖三个角，所以抽成静态函数供 FlightMissiles 复用（导弹要用同一套基）。
+static func basis_from(y: float, p: float, r: float) -> Dictionary:
+	return _basis_of(y, p, r)
+
+
 func basis() -> Dictionary:
+	return _basis_of(yaw, pitch, roll)
+
+
+static func _basis_of(yaw: float, pitch: float, roll: float) -> Dictionary:
 	var sy := sin(yaw)
 	var cy := cos(yaw)
 	var sp := sin(pitch)

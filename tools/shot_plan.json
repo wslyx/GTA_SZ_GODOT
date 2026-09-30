@@ -1,8 +1,73 @@
 {
-  "warmup": 8.0,
-  "gap": 5.0,
+  "warmup": 7.0,
+  "gap": 3.0,
+  "settle": 2.5,
   "shots": [
-    { "name": "discard_night", "env": { "light_mode": 2, "tier": "medium" } },
-    { "name": "night_signs", "env": { "light_mode": 2 } }
+    {
+      "name": "v_day",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium"
+      }
+    },
+    {
+      "name": "v_sunset",
+      "env": {
+        "light_mode": 1,
+        "tier": "medium"
+      }
+    },
+    {
+      "name": "v_night",
+      "env": {
+        "light_mode": 2,
+        "tier": "medium"
+      }
+    },
+    {
+      "name": "v_rain_sunset",
+      "env": {
+        "light_mode": 1,
+        "tier": "low",
+        "rain": true
+      }
+    },
+    {
+      "name": "v_tank_night",
+      "env": {
+        "light_mode": 2,
+        "tier": "medium",
+        "mode": "tank",
+        "aim": [
+          1.25,
+          -0.05
+        ]
+      }
+    },
+    {
+      "name": "v_observer_day",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium",
+        "mode": "observer"
+      }
+    },
+    {
+      "name": "v_aircraft_day",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium",
+        "mode": "aircraft"
+      }
+    },
+    {
+      "name": "v_missile",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium",
+        "mode": "aircraft",
+        "fire": true
+      }
+    }
   ]
 }

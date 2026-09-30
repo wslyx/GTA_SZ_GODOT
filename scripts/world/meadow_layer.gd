@@ -481,8 +481,8 @@ func _write(groups: Dictionary, x: float, z: float, patch_count: int) -> void:
 			var h := float(c["height"])
 			var w := float(c["width"])
 			var g := world.ground_height(cx, -cz) - 0.004
-			var basis := Basis(Vector3.UP, -float(c["yaw"])).scaled(Vector3(w, h, w))
-			mm.set_instance_transform(i, Transform3D(basis, CoordinateUtil.to_world(cx, cz, g)))
+			var inst_basis := Basis(Vector3.UP, -float(c["yaw"])).scaled(Vector3(w, h, w))
+			mm.set_instance_transform(i, Transform3D(inst_basis, CoordinateUtil.to_world(cx, cz, g)))
 			# 原版：variation = .84 + hash*.26，dry = soil*.22
 			var variation := float(c["variation"])
 			var dry := float(c["soil"]) * 0.22

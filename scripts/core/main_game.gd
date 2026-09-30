@@ -65,6 +65,14 @@ var _last_mouse := Vector2.ZERO
 var _walk_first_person := false
 var _car_model: Node3D
 var _tank_model: Node3D
+## 坦克实体炮塔 / 炮管节点（原版 city-tank.ts 的 turretTransform）。
+## tank.glb 的层级是 tank_root → tank_turret(→ tank_barrel → 炮身各件)。
+## 名称来自 GLB 的 node 表，导入后 Godot 保留原名。
+var _tank_turret: Node3D
+var _tank_barrel: Node3D
+## 飞行导弹（原版 city-flight-missiles.ts）。首次起飞时才实例化，
+## 6 个弹位 + 2 组爆炸的节点成本不进启动路径。
+var _missiles = null
 var _plane_model: Node3D
 ## 车轮滚动/转向动画（原版 city-world.ts 的 wheelSpin 逻辑）。
 ## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
@@ -177,6 +185,9 @@ const TRAFFIC_SCRIPT := preload("res://scripts/world/traffic_system.gd")
 const PED_SCRIPT := preload("res://scripts/world/pedestrian_system.gd")
 const EBIKE_SCRIPT := preload("res://scripts/world/ebike_system.gd")
 const FACADE_SCRIPT := preload("res://scripts/world/facade_streamer.gd")
+## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
+## 直接写 `FlightMissiles.new()` 会报 "Could not find type"，必须 preload。
+const MISSILES_SCRIPT := preload("res://scripts/vehicles/flight_missiles.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -190,6 +201,10 @@ func _load_vehicle_models() -> void:
 	_plane_model = _load_glb("res://data/city/floatplane.glb", "PlayerPlane")
 	if _tank_model != null:
 		_tank_model.visible = false
+		_tank_turret = _find_child_by_name(_tank_model, "tank_turret")
+		_tank_barrel = _find_child_by_name(_tank_model, "tank_barrel")
+		if _tank_turret == null or _tank_barrel == null:
+			push_warning("[MainGame] tank.glb 缺少炮塔/炮管节点，炮塔姿态不联动")
 	if _plane_model != null:
 		_plane_model.visible = false
 	# 步行角色（原版 city-rider.ts 的久岐忍）。原版是按 F 下车时才异步加载
@@ -399,16 +414,28 @@ func _on_key(k: InputEventKey) -> void:
 			else:
 				camera.next_view()
 		KEY_F:
-			_toggle_vehicle_entry()
+			# 原版飞行 HUD 的按键表写明「G / F 返回驾驶」：飞行中 F 要能从飞机
+			# 一路退回驾驶，而不是落进 _toggle_vehicle_entry（它只认 CAR/TANK，
+			# 在 AIRCRAFT 下是空操作，飞行中按 F 此前毫无反应）。
+			if mode == Mode.AIRCRAFT:
+				_toggle_aircraft()      # 飞机 → 无人机
+				_exit_observer()        # 无人机 → 驾驶
+			else:
+				_toggle_vehicle_entry()
 		KEY_T:
 			_toggle_tank()
 		KEY_G:
-			if mode == Mode.OBSERVER:
+			if mode == Mode.AIRCRAFT:
+				_toggle_aircraft()
+				_exit_observer()
+			elif mode == Mode.OBSERVER:
 				_exit_observer()
 			else:
 				_enter_observer()
 		KEY_B:
-			if mode == Mode.OBSERVER:
+			# B 是"无人机 ⇄ 飞机"的开关，两个方向都要认（此前只认 OBSERVER，
+			# 于是飞上去之后就再也按不回无人机了）
+			if mode == Mode.OBSERVER or mode == Mode.AIRCRAFT:
 				_toggle_aircraft()
 		KEY_I:
 			# 观察模式：移动到信标选中的落点（原版"移动到此地"按钮）
@@ -581,6 +608,33 @@ func _tank_safe_for_car() -> bool:
 				return false
 	return true
 
+## 在子树里按名字找节点（GLB 导入后节点名保留，层级可能多一层根）。
+func _find_child_by_name(root: Node, wanted: String) -> Node3D:
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n.name == wanted and n is Node3D:
+			return n as Node3D
+		for c in n.get_children():
+			stack.append(c)
+	return null
+
+
+## 把炮塔/炮管的姿态落到实体节点上（原版 city-tank.ts 里炮塔实体跟着 aim 转）。
+##
+## 推导：车体 rotation.y = node_yaw(tank.yaw) = PI − yaw；炮塔要指向
+## 世界角 a = yaw + turret_yaw，对应 node_yaw(a) = PI − yaw − turret_yaw。
+## 炮塔是车体的子节点，其**局部** rotation.y = node_yaw(a) − node_yaw(yaw)
+## = −turret_yaw。
+## 炮管绕自身 X 轴俯仰：局部 +Z 要转向 +Y（fire() 里 dir.y = sin(barrel_pitch)
+## 为正即抬高），绕 X 转 θ 时 (0,0,1) → (0,−sinθ,cosθ)，故 θ = −barrel_pitch。
+func _apply_tank_pose() -> void:
+	if _tank_turret != null:
+		_tank_turret.rotation.y = -tank.turret_yaw
+	if _tank_barrel != null:
+		_tank_barrel.rotation.x = -tank.barrel_pitch
+
+
 func _toggle_vehicle_entry() -> void:
 	if mode == Mode.CAR or mode == Mode.TANK:
 		var v := _vehicle_state()
@@ -708,17 +762,34 @@ func _exit_observer() -> void:
 	world.set_aerial(false)
 	hud.toast("已退出观景")
 
+## 无人机 ⇄ 观光水上飞机。
+##
+## ⚠️ 这里此前**从来没有写过 `mode = Mode.AIRCRAFT`**（全仓搜不到任何一处对
+## AIRCRAFT 的赋值）——按 B 之后只是启了 flight 状态机、切了相机、显示了飞机模型，
+## 但 `_update_modes` 仍然按 OBSERVER 分支跑 `_step_observer`：
+##   · 飞机完全不受控（`_step_aircraft` 不执行，W/S/A/D 只让无人机平移）；
+##   · `flight_hud_state` 也不被调用，飞行仪表盘永远不显示（`mode != AIRCRAFT`）。
+## 无头模式发现不了（它不进飞行模式），是"应用参数 → 等过渡 → 截图"的探针
+## 在 v_aircraft 与 v_observer 两张图逐像素相同（差 0.0055）时暴露的。
 func _toggle_aircraft() -> void:
 	if flight.active():
 		flight.stop()
 		if _plane_model != null:
 			_plane_model.visible = false
+		# 收回飞机 → 回到无人机，并把无人机放到飞机所在的位置
+		observer.begin(flight.x, maxf(flight.y, 80.0), flight.z, flight.yaw)
+		mode = Mode.OBSERVER
+		_pre_observer_mode = Mode.CAR
 		camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 		hud.toast("收回飞机，回到无人机")
 		return
 	flight.start(observer.x, maxf(observer.y, 240.0), observer.z, observer.yaw)
 	if _plane_model != null:
 		_plane_model.visible = true
+	# 飞行期间由 _step_aircraft 接管，无人机先停：否则 observer.step 仍在跑，
+	# 退出飞行时无人机会停在"飞机当前所在处"之外的地方。
+	observer.end()
+	mode = Mode.AIRCRAFT
 	camera.set_mode(ChaseCamera.Mode.AIRCRAFT, true)
 	hud.toast("飞行：W/S 俯仰，A/D 横滚，Q/E 方向舵，Shift 加速，X 减速")
 
@@ -919,6 +990,7 @@ func _step_tank(dt: float) -> void:
 		_tank_model.global_transform = Transform3D(
 			Basis(Vector3.UP, CoordinateUtil.node_yaw(tank.yaw)),
 			CoordinateUtil.to_world(tank.x, tank.z, g + 0.05))
+		_apply_tank_pose()
 	_camera_yaw = lerp_angle(_camera_yaw, tank.yaw, 1.0 - exp(-dt * 3.0))
 	camera.yaw = _camera_yaw
 	camera.look_pitch = _look_pitch
@@ -1008,8 +1080,8 @@ func _beacon_place(screen: Vector2) -> void:
 		return
 	if not b.select(point):
 		return
-	var name := str(b.selected.get("name", ""))
-	hud.toast("已选点 · %s　I 移动到此地 · O 收藏 · U 清除" % name, 4.0)
+	var spot_name := str(b.selected.get("name", ""))
+	hud.toast("已选点 · %s　I 移动到此地 · O 收藏 · U 清除" % spot_name, 4.0)
 
 
 ## I：移动到选中的落点（原版"移动到此地"）
@@ -1033,7 +1105,68 @@ func _beacon_travel() -> void:
 	_exit_observer()
 	hud.toast("已移动到 %s" % str(dest.get("name", "")), 3.0)
 
+## 发射一枚导弹（空格 / 截图探针都用这一个入口）。
+##
+## ⚠️ 必须传 `flight.pose()` 而不是 `flight.status()`：status() 的位置字段是
+## `"position": [x,y,z]` 数组，没有 x/y/z 键，直接喂给 fire() 会抛
+## "Invalid access to property or key 'x' on a base object of type 'Dictionary'"
+## —— 无头模式按不到空格，这个错误是靠开窗截图（探针调 fire）才暴露的。
+func fire_missile() -> bool:
+	if flight.phase != "flying":
+		return false
+	_ensure_missiles()
+	if _missiles == null:
+		return false
+	var fired: bool = _missiles.fire(flight.pose(), flight.speed)
+	if fired and audio != null:
+		audio.cue("engage")
+	return fired
+
+
+## 从飞行模式回到无人机：飞机收起、无人机落到指定位置、模式与相机一起还原。
+## 越界与坠毁恢复两条分支共用（此前两处都只切了相机、没动 mode）。
+func _return_to_observer_from_flight(px: float, py: float, pz: float) -> void:
+	if _plane_model != null:
+		_plane_model.visible = false
+	if _missiles != null:
+		_missiles.clear()
+	flight.stop()
+	observer.begin(px, py, pz, flight.yaw)
+	mode = Mode.OBSERVER
+	_pre_observer_mode = Mode.CAR
+	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
+
+
+## 首次起飞时建导弹节点（原版是在 loadFlight() 里建的）。
+func _ensure_missiles() -> void:
+	if _missiles != null:
+		return
+	_missiles = MISSILES_SCRIPT.new()
+	_missiles.name = "FlightMissiles"
+	add_child(_missiles)
+
+
+## 飞行 / 导弹共用的扫掠回调（原版 city-flight.ts 的 sweep + FlightCityCollision）。
+##
+## ⚠️ 修过一个坐标 bug：FlightSim 的位姿是**数据坐标**（x 东 / z 北，与
+## flight.start(observer.x, observer.z) 同源，机模也用 to_world(flight.x, flight.z)
+## 摆放），而这里此前按世界坐标又做了一次 −mid.z 换算、并用 height_at_world
+## 取高 —— 等于把撞击点镜像到南北对称的位置，撞楼与撞地都判在错误的一侧。
+## 数据坐标直接喂给 collision.blocked 与 height_at 即可。
+func _flight_sweep(from: Vector3, to: Vector3) -> Dictionary:
+	var mid := (from + to) * 0.5
+	if world.collision.blocked(mid.x, mid.z):
+		return {"kind": "building", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
+	if mid.y < world.height_field.height_at(mid.x, mid.z):
+		return {"kind": "terrain", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
+	return {}
+
+
 func _step_aircraft(dt: float) -> void:
+	_ensure_missiles()
+	# 原版 city-flight.ts:85：phase==='flying' && keys.has('Space') → fire()
+	if flight.phase == "flying" and Input.is_key_pressed(KEY_SPACE):
+		fire_missile()
 	var result: String = flight.step({
 		"move_forward": Input.is_key_pressed(KEY_W),
 		"move_back": Input.is_key_pressed(KEY_S),
@@ -1043,32 +1176,41 @@ func _step_aircraft(dt: float) -> void:
 		"turret_right": Input.is_key_pressed(KEY_E),
 		"run": Input.is_key_pressed(KEY_SHIFT),
 		"brake_tank": Input.is_key_pressed(KEY_X),
-	}, dt, Time.get_ticks_msec(),
-		func(from: Vector3, to: Vector3) -> Dictionary:
-			var mid := (from + to) * 0.5
-			var d := Vector2(mid.x, -mid.z)
-			if world.collision.blocked(d.x, d.y):
-				return {"kind": "building", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
-			if mid.y < world.height_field.height_at_world(mid):
-				return {"kind": "terrain", "point": {"x": mid.x, "y": mid.y, "z": mid.z}}
-			return {},
-		CityData.extent)
+	}, dt, Time.get_ticks_msec(), _flight_sweep, CityData.extent)
+
+	# 导弹推进（原版 city-flight.ts:89：只在 phase==='flying' 时 step）
+	if _missiles != null:
+		if flight.phase == "flying":
+			# ⚠️ _missiles 是 Variant（preload 出来的脚本），`var impacts :=`
+			# 会推断失败（无头实跑抓到：Cannot infer the type of "impacts"）
+			var impacts: Array = _missiles.step(dt, _flight_sweep)
+			_missiles.update_visuals(dt, impacts)
+			if impacts.size() > 0 and audio != null:
+				audio.impact(0.6)
+		else:
+			# 坠毁 / 待机时把在飞的导弹与爆炸一起收掉（原版 crashed → missiles.clear()）
+			_missiles.clear()
 
 	if result == "crashed":
 		hud.toast("飞机坠毁，3 秒后恢复为无人机", 3.0)
+		# 原版 city-flight.ts:88：撞毁瞬间在命中点起爆 + onExplosion 音效
+		if _missiles != null:
+			var hp: Dictionary = flight.hit.get("point", {})
+			_missiles.burst_at(Vector3(float(hp.get("x", flight.x)),
+				float(hp.get("y", flight.y)), float(hp.get("z", flight.z))), flight.yaw)
+		if audio != null:
+			audio.explosion()
 	elif result == "boundary":
+		# 越界自动回无人机（原版 boundary 分支）。⚠️ 光把相机切回 OBSERVER 不够：
+		# mode 还停在 AIRCRAFT，_step_aircraft 会继续跑（flight 已 idle），
+		# 飞行仪表盘与模式文案都还是"飞行"。必须把模式与无人机状态一起还原。
 		hud.toast("已到城市边界，自动返回")
-		observer.x = flight.x
-		observer.y = maxf(flight.y, 120.0)
-		observer.z = flight.z
-		camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
+		_return_to_observer_from_flight(flight.x, maxf(flight.y, 120.0), flight.z)
 	elif result == "recovered":
-		observer.x = flight.last_safe.get("x", observer.x)
-		observer.y = maxf(float(flight.last_safe.get("y", 120.0)), 80.0)
-		observer.z = flight.last_safe.get("z", observer.z)
-		if _plane_model != null:
-			_plane_model.visible = false
-		camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
+		_return_to_observer_from_flight(
+			float(flight.last_safe.get("x", observer.x)),
+			maxf(float(flight.last_safe.get("y", 120.0)), 80.0),
+			float(flight.last_safe.get("z", observer.z)))
 
 	if _plane_model != null:
 		var b := flight.basis()
@@ -1110,9 +1252,9 @@ func _place_car_model() -> void:
 	var h_rear := world.height_field.height_at(car.x - sin(car.yaw) * 1.5, car.z - cos(car.yaw) * 1.5)
 	var pitch := atan2(h_front - h_rear, 3.0)
 	var roll := -car.steer * car.speed * 0.0025
-	var basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)) \
+	var car_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(car.yaw, CoordinateUtil.ModelForward.MINUS_Z)) \
 		* Basis(Vector3.RIGHT, pitch) * Basis(Vector3.BACK, roll)
-	_car_model.global_transform = Transform3D(basis,
+	_car_model.global_transform = Transform3D(car_basis,
 		CoordinateUtil.to_world(car.x, car.z, g + 0.02 + bob))
 
 # ---------------------------------------------------------------------------
@@ -1147,8 +1289,8 @@ func _interact() -> void:
 	var on_foot := mode == Mode.WALKING
 	var sres: Dictionary = story.interact(p, speed, on_foot)
 	if sres.get("ok", false):
-		var s: Dictionary = sres["step"]
-		panels.show_dialogue(str(s["text"]), s.get("options", []), "story")
+		# 台词由 story_system 按原版 lines 拼好（步骤里不再有静态 text 字段）
+		panels.show_dialogue(str(sres["message"]), sres.get("options", []), "story")
 		return
 
 	var rres: Dictionary = rides.interact(p, speed)
@@ -1168,8 +1310,7 @@ func _resolve_dialogue(idx: int) -> void:
 	if kind == "story":
 		var r: Dictionary = story.choose(idx)
 		if r.get("advanced", false):
-			var s: Dictionary = r["step"]
-			panels.show_dialogue(str(s["text"]), s.get("options", []), "story")
+			panels.show_dialogue(str(r["message"]), r.get("options", []), "story")
 		elif r.get("completed", false):
 			hud.toast(str(r["message"]), 5.0)
 	elif kind == "career":
@@ -1215,6 +1356,23 @@ func data_yaw() -> float:
 		Mode.OBSERVER: return observer.yaw
 		Mode.AIRCRAFT: return flight.yaw
 	return car.yaw
+
+## 飞行 HUD 的状态快照 —— 原版 city-flight.ts:36 的 `get stats()`。
+## altitude 是**离地高度**：`Math.max(0, sim.pose.y - heightAt(x, z))`，
+## 与飞行碰撞用的是同一套高度场，仪表与"撞地"判定才不会互相打脸。
+## missiles 由 FlightMissiles 提供（未启用时为空字典，HUD 会显示就绪）。
+func flight_hud_state() -> Dictionary:
+	var s := flight.status()
+	var agl := flight.y
+	if world != null and world.height_field != null:
+		agl = flight.y - world.height_field.height_at(flight.x, flight.z)
+	s["altitude"] = maxf(0.0, agl)
+	s["crashed_at"] = flight.crashed_at
+	s["recovery_ms"] = FlightSim.RECOVERY_MS
+	if _missiles != null and _missiles.has_method("stats"):
+		s["missiles"] = _missiles.stats()
+	return s
+
 
 func mode_text() -> String:
 	match mode:

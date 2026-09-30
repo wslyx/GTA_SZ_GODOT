@@ -161,11 +161,11 @@ func _apply_material_look(mesh: Mesh) -> void:
 		if not (mat is StandardMaterial3D):
 			continue
 		var sm := mat as StandardMaterial3D
-		var name := strip.sub(str(sm.resource_name), "", false)
-		if _mats.has(name):
+		var mat_name := strip.sub(str(sm.resource_name), "", false)
+		if _mats.has(mat_name):
 			continue
-		_mats[name] = sm
-		match name:
+		_mats[mat_name] = sm
+		match mat_name:
 			"darkglass", "landmarkglass":
 				# 玻璃设备房 / 天窗：压暗底色 + 低粗糙度，好让天空在它上面读得出来
 				sm.albedo_color = sm.albedo_color * 0.9
@@ -216,11 +216,11 @@ func set_mode(mode: int) -> void:
 	elif mode == GameContent.LightMode.SUNSET:
 		on = 0.6
 	for m in _lamp_mats:
-		var sm := m as StandardMaterial3D
+		var sm: StandardMaterial3D = m as StandardMaterial3D
 		sm.emission_enabled = on > 0.0
 		sm.emission_energy_multiplier = on * 1.2
 	for m2 in _led_mats:
-		var sm2 := m2 as StandardMaterial3D
+		var sm2: StandardMaterial3D = m2 as StandardMaterial3D
 		sm2.emission_enabled = on > 0.0
 		sm2.emission_energy_multiplier = on * 1.6
 
@@ -364,10 +364,10 @@ func _write_step() -> void:
 		while ii < list.size() and written < WRITE_CHUNK:
 			var a: Array = list[ii]
 			# [x, z, y, sx, sy, sz, yaw]
-			var basis := Basis(Vector3.UP, -float(a[6])).scaled(
+			var inst_basis := Basis(Vector3.UP, -float(a[6])).scaled(
 				Vector3(float(a[3]), float(a[4]), float(a[5])))
 			var pos := CoordinateUtil.to_world(float(a[0]), float(a[1]), float(a[2]))
-			mm.set_instance_transform(ii, Transform3D(basis, pos) * local)
+			mm.set_instance_transform(ii, Transform3D(inst_basis, pos) * local)
 			mm.set_instance_color(ii, _tint(kind, float(a[0]), float(a[1])))
 			ii += 1
 			written += 1

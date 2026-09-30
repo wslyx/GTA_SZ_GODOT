@@ -193,6 +193,9 @@ func set_raining(v: bool) -> void:
 	# 沥青材质单独走原版 RAIN_ROAD_LOOK（反照率/粗糙度/镜面强度三档一起换）
 	if world != null and world.road_surface != null:
 		world.road_surface.set_weather(raining)
+	# 低画质档雨天 SSR 兜底（湿路反射，见 lighting_director._apply_ssr）
+	if world != null and world.lighting != null and world.lighting.has_method("set_raining_state"):
+		world.lighting.set_raining_state(raining)
 	if world != null and world.lighting != null and world.lighting.has_method("apply_mode"):
 		# 雨压：重放当前光照模式
 		world.lighting.apply_mode(GameState.light_mode)

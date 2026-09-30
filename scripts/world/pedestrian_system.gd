@@ -239,13 +239,13 @@ func _push_instances() -> void:
 		if body != null:
 			# 倒地：位置取质心，姿态取 rx/ry/rz；模型的局部原点在**脚底**，
 			# 所以要减去质心偏移（它要跟着 basis 一起转、一起缩放）
-			var basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(body["ry"]))) \
+			var fall_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(body["ry"]))) \
 				* Basis(Vector3.RIGHT, float(body["rx"])) \
 				* Basis(Vector3.FORWARD, float(body["rz"]))
-			basis = basis.scaled(Vector3(sc, sc, sc))
+			fall_basis = fall_basis.scaled(Vector3(sc, sc, sc))
 			var pos := CoordinateUtil.to_world(float(body["x"]), float(body["z"]), float(body["y"])) \
-				- basis * Vector3(0.0, IMPACT_SCRIPT.CENTRE_HEIGHT, 0.0)
-			root_xf = Transform3D(basis, pos)
+				- fall_basis * Vector3(0.0, IMPACT_SCRIPT.CENTRE_HEIGHT, 0.0)
+			root_xf = Transform3D(fall_basis, pos)
 		else:
 			var g := world.ground_height(float(w["x"]), -float(w["z"]))
 			var base := CoordinateUtil.to_world(float(w["x"]), float(w["z"]), g)

@@ -21,6 +21,11 @@ var plan: Dictionary = {}
 var shots: Array = []
 var warmup := 6.0
 var gap := 1.2
+## 应用参数后到截图之间的等待（光照档是约 2s 的插值过渡，必须等它收敛）
+var settle := 2.5
+## 已应用的张数（与 idx = 下一张要应用的下标 配合，把"应用"和"截图"分成两步）
+var _applied := 0
+var _apply_t := 0.0
 
 var started := false
 var t := 0.0
@@ -33,6 +38,7 @@ func _ready() -> void:
 	plan = _read_plan()
 	warmup = float(plan.get("warmup", 6.0))
 	gap = float(plan.get("gap", 1.2))
+	settle = float(plan.get("settle", 2.5))
 	shots = plan.get("shots", [])
 	if shots.is_empty():
 		shots = [{"name": "shot"}]
@@ -64,6 +70,13 @@ func _read_plan() -> Dictionary:
 	return parsed
 
 
+## ⚠️ 时序：**应用参数 → 等 settle 秒 → 再截图**。
+##
+## 此前是"应用完立刻截"，而光照档（L）是约 2 秒的连续过渡（太阳/雾/曝光/辉光
+## 都是插值），于是每张图拍到的其实是**上一档**的画面 —— 实测证据：一张
+## light_mode=0 与一张 light_mode=2 的截图逐像素差只有 0.073，而 light_mode=0
+## 的图与 light_mode=1 的图差了 0.19（v_day 拍到的是日落）。
+## settle 默认 2.5s（> 过渡时长），可在 shot_plan.json 里覆盖。
 func _process(delta: float) -> void:
 	if finished or main == null:
 		return
@@ -75,24 +88,93 @@ func _process(delta: float) -> void:
 		print("[shot] session_ready 达成")
 		return
 	t += delta
-	if idx == 0 and t < warmup:
-		return
 	if idx >= shots.size():
-		finished = true
-		print("[shot] 全部完成")
-		get_tree().quit(0)
+		if _applied >= shots.size():
+			finished = true
+			print("[shot] 全部完成")
+			get_tree().quit(0)
 		return
-	if idx > 0:
-		# 每张之间还要等 gap（第一张已经等过 warmup）
-		if t < warmup + gap * idx:
-			return
-	var shot: Dictionary = shots[idx]
-	_apply_env(shot.get("env", {}))
-	print("[shot] #%d %s <- %s" % [idx + 1, str(shot.get("name", "")), JSON.stringify(shot.get("env", {}))])
-	if bool(shot.get("dump_ui", false)):
-		dump_ui()
-	idx += 1
-	_capture(str(shot.get("name", "shot")))
+	# 1) 到点就应用这一张的参数
+	if _applied == idx and t >= warmup + gap * float(idx):
+		var shot: Dictionary = shots[idx]
+		_apply_env(shot.get("env", {}))
+		print("[shot] #%d %s <- %s" % [idx + 1, str(shot.get("name", "")),
+			JSON.stringify(shot.get("env", {}))])
+		if bool(shot.get("dump_ui", false)):
+			dump_ui()
+		if bool(shot.get("dump_materials", false)):
+			dump_materials()
+		_applied = idx + 1
+		_apply_t = t
+		return
+	# 2) 过渡收敛后再截图（顺带处理"必须在曝光前一刻发生"的项）
+	if _applied == idx + 1 and t >= _apply_t + settle:
+		_late_env(shots[idx].get("env", {}))
+		_capture(str(shots[idx].get("name", "shot")))
+		idx += 1
+
+
+## 建筑材质体检：按 (材质类, 反照率, 是否有贴图) 聚合，看空中/街面看到的
+## 建筑到底用的什么材质 —— "白天建筑洗白"这类问题靠它定位。
+func dump_materials() -> void:
+	var w = main.get("world")
+	if w == null:
+		print("[mat] world 为 null")
+		return
+	var stat := {}
+	for root_name in ["buildings_root", "facades_root", "landmarks_root", "chunks_root"]:
+		var root = w.get(root_name)
+		if root == null:
+			continue
+		var stack: Array = [root]
+		while not stack.is_empty():
+			var n: Node = stack.pop_back()
+			var mesh: Mesh = null
+			var override_mat: Material = null
+			if n is MeshInstance3D:
+				mesh = (n as MeshInstance3D).mesh
+				override_mat = (n as MeshInstance3D).material_override
+			# ⚠️ 实际渲染用的是**逐 surface 的 override**（architecture_materials.gd
+			# 用 set_surface_override_material 接管），源材质只是底稿。第一版探针
+			# 只读了 material_override / surface_get_material，量到的是"白底稿"，
+			# 得出了错误结论。
+			var mat: Material = override_mat
+			if mesh != null and mesh.get_surface_count() > 0:
+				var so := (n as MeshInstance3D).get_surface_override_material(0)
+				if so != null:
+					mat = so
+				elif mat == null:
+					mat = mesh.surface_get_material(0)
+			if mat != null:
+				var vc := "-"
+				if mat is StandardMaterial3D:
+					vc = "%s/uvc=%s" % [
+						str((mat as StandardMaterial3D).albedo_color),
+						str((mat as StandardMaterial3D).vertex_color_use_as_albedo)]
+				elif mat is ShaderMaterial:
+					vc = "tex=%s" % str((mat as ShaderMaterial).get_shader_parameter("use_albedo_tex"))
+				var key := "%s|%s" % [mat.get_class(), vc]
+				stat[key] = int(stat.get(key, 0)) + 1
+			for c in n.get_children():
+				stack.append(c)
+	var by_class := {}
+	for k in stat.keys():
+		var cls := str(k).split("|")[0]
+		by_class[cls] = int(by_class.get(cls, 0)) + int(stat[k])
+	for cls in by_class.keys():
+		print("[mat-class] %s = %d" % [cls, int(by_class[cls])])
+	var keys: Array = stat.keys()
+	keys.sort_custom(func(a, b): return int(stat[a]) > int(stat[b]))
+	for k in keys.slice(0, min(12, keys.size())):
+		print("[mat] %4d  %s" % [int(stat[k]), k])
+
+
+## 必须在**截图前一刻**执行的动作。
+## `fire` 走这里：导弹 6 秒就寿终，若在应用参数时就发射，settle 2.5s 后它已经
+## 飞出 700m，画面里什么都没有。
+func _late_env(overrides: Dictionary) -> void:
+	if bool(overrides.get("fire", false)) and main.has_method("fire_missile"):
+		main.call("fire_missile")
 
 
 ## 覆盖环境参数。键名直接对应 Environment 的属性名，另外支持几个快捷键：
@@ -158,6 +240,68 @@ func _apply_env(overrides: Dictionary) -> void:
 				# 想和原版截图（画质·中）对齐就得显式指定。
 				GraphicsQuality.set_tier(str(value))
 				GraphicsQuality.apply_to_world(world)
+			"mode":
+				# 玩家模式切换（car / tank / observer / aircraft），用来截坦克炮塔
+				# 与飞行 HUD —— 这两个都是"只在特定模式下才画"的东西。
+				# 走游戏自己的入口（不直接改 mode 字段，免得漏掉相机同步），
+				# 但入口是 **toggle**：已经在目标模式里就不要点了，否则会切回去
+				# （本轮实测：连续两张 "mode":"aircraft" 的第二张其实切回了无人机，
+				#  于是"带导弹的图"与"飞行图"逐像素相同）。
+				# Mode 枚举：CAR 0 / TANK 1 / WALKING 2 / OBSERVER 3 / AIRCRAFT 4
+				var want := {"car": 0, "tank": 1, "walking": 2, "observer": 3, "aircraft": 4}
+				var target := str(value)
+				if not want.has(target):
+					push_warning("[shot] 未知模式 %s" % target)
+				elif int(main.get("mode")) != int(want[target]):
+					match target:
+						"tank": main.call("_toggle_tank")
+						"observer": main.call("_enter_observer")
+						"aircraft": main.call("_toggle_aircraft")
+						_: pass
+			"aim":
+				# 坦克炮塔/炮管指向 [turret_yaw, barrel_pitch]，用来验证
+				# "炮塔节点联动"是否真的转到了模型上（默认炮口朝前，看不出来）。
+				var tk = main.get("tank")
+				if tk != null and value is Array and (value as Array).size() >= 2:
+					tk.set("turret_yaw", float(value[0]))
+					tk.set("barrel_pitch", float(value[1]))
+			"vertex_colors":
+				# 诊断用：把顶点色开关强行设成指定值，用于 A/B 量化
+				# "blocks 的 COLOR_0 到底影响了多少亮度"。
+				var w3 = main.get("world")
+				var n3 := 0
+				var visited := 0
+				var colored := 0
+				for rn in ["buildings_root", "chunks_root", "facades_root", "landmarks_root"]:
+					var rt = w3.get(rn)
+					if rt == null:
+						continue
+					for mi in GlbLoader.meshes_of(rt):
+						visited += 1
+						if mi.mesh == null:
+							continue
+						for s2 in mi.mesh.get_surface_count():
+							if (int(mi.mesh.surface_get_format(s2)) & Mesh.ARRAY_FORMAT_COLOR) == 0:
+								continue
+							colored += 1
+							var mm: Material = mi.get_surface_override_material(s2)
+							if mm == null:
+								mm = mi.mesh.surface_get_material(s2)
+							if mm is StandardMaterial3D:
+								(mm as StandardMaterial3D).vertex_color_use_as_albedo = bool(value)
+								n3 += 1
+				print("[shot] vertex_colors -> %s (改了 %d 材质 / 扫过 %d 网格 / 命中 COLOR 的表面 %d)" % [
+					str(value), n3, visited, colored])
+			"rain":
+				# 雨天开关（走 WeatherSystem.toggle，会顺带切 RAIN_ROAD_LOOK
+				# 与低画质档的 SSR 兜底）
+				var wx = world.get("weather")
+				if wx != null and bool(value) != bool(wx.get("raining")):
+					wx.call("toggle")
+			"fire":
+				# 发射一枚导弹（实际执行时机见 _late_env —— 必须在截图前一刻）
+				if main.has_method("fire_missile"):
+					main.call("fire_missile")
 			"exposure":
 				GraphicsQuality.set_override("exposure", float(value))
 				lighting.call("apply_mode", GameState.light_mode)
