@@ -34,6 +34,13 @@ var _seconds := 99.0      ## 已经过去的秒数；>= LIFE 视为熄灭
 
 
 func _ready() -> void:
+	_ensure_built()
+
+
+## 球体池在首次使用时构建（--script 无头探针里 _ready 不触发，双保险）
+func _ensure_built() -> void:
+	if not _spheres.is_empty():
+		return
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
@@ -59,6 +66,7 @@ func _ready() -> void:
 
 ## 在命中点起爆。world_pos 是 **Godot 世界坐标**，yaw 用于把偏移转到命中局部轴。
 func burst(world_pos: Vector3, yaw: float) -> void:
+	_ensure_built()
 	_origin = world_pos
 	_yaw = yaw
 	_seconds = 0.0
@@ -76,6 +84,7 @@ func burst(world_pos: Vector3, yaw: float) -> void:
 
 ## 原版 step(seconds)：由 FlightMissiles 在每次 step 时推进
 func step(seconds: float) -> void:
+	_ensure_built()
 	_seconds = seconds
 	_step(seconds)
 

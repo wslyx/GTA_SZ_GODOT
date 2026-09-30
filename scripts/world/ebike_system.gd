@@ -309,40 +309,71 @@ func _build_parked(px: float, pz: float, aerial: bool) -> void:
 	var by_type := [[], [], []]
 	for idx in chosen:
 		by_type[int(bikes[idx]["type"])].append(idx)
+	# 供 _flush_vehicles 与骑行中的车合并写入（骑行骑手每 0.1s 刷新，
+	# 停车排 0.5s 才重建一次 —— 缓存选中列表让两条路径共用同一批 MultiMesh）
+	_parked_chosen = chosen
+	_flush_vehicles()
 
+
+## 把「停车排 + 骑行中的车」合并写进按 type 分组的车辆 MultiMesh。
+## ⚠️ 骑行中的车此前**根本没画**：_sync_riders 只推了骑手网格 —— 原版是把
+## 同一矩阵同时推给 buffers[r.type]（车）和 rider，缺了车体，路上就只剩
+## 悬空坐着的骑手。
+var _parked_chosen: Array = []
+## 骑行中的车：_riding_by_type[type] = [{xf: Transform3D, paint: int}, ...]
+var _riding_by_type: Array = [[], [], []]
+
+
+func _flush_vehicles() -> void:
 	for entry in _multimeshes:
 		var t := int(entry["type"])
-		var list: Array = by_type[t]
-		var mm: MultiMesh = entry["mm"]
-		mm.instance_count = list.size()
-		mm.visible_instance_count = list.size()
-		# 只有 ebike_paint 面吃车身色；其余件写白色，否则会被当成车漆一起涂
 		var tint: String = str(entry.get("tint", ""))
-		for i in list.size():
-			var bi: int = list[i]
+		var mm: MultiMesh = entry["mm"]
+		var parked: Array = []
+		for bi in _parked_chosen:
+			if int(bikes[bi]["type"]) == t:
+				parked.append(bi)
+		var riding: Array = _riding_by_type[t] if t >= 0 and t < _riding_by_type.size() else []
+		var total := parked.size() + riding.size()
+		mm.instance_count = total
+		mm.visible_instance_count = total
+		var write_i := 0
+		# 只有 ebike_paint 面吃车身色；其余件写白色，否则会被当成车漆一起涂
+		for bi in parked:
 			var xf = _bike_xf[bi]
 			if xf == null:
 				xf = _compute_bike_xf(bikes[bi])
 				_bike_xf[bi] = xf
-			mm.set_instance_transform(i, xf)
+			mm.set_instance_transform(write_i, xf)
 			if tint != "paint":
-				mm.set_instance_color(i, NO_TINT)
-				continue
-			var col = _bike_col[bi]
-			if col == null:
-				col = _colour_for(t, int(bikes[bi]["palette"]))
-				_bike_col[bi] = col
-			mm.set_instance_color(i, col)
+				mm.set_instance_color(write_i, NO_TINT)
+			else:
+				var col = _bike_col[bi]
+				if col == null:
+					col = _colour_for(t, int(bikes[bi]["palette"]))
+					_bike_col[bi] = col
+				mm.set_instance_color(write_i, col)
+			write_i += 1
+		for rb in riding:
+			mm.set_instance_transform(write_i, rb["xf"])
+			mm.set_instance_color(write_i,
+					_colour_for(t, int(rb["paint"])) if tint == "paint" else NO_TINT)
+			write_i += 1
 
 
 ## 一辆停车电摩的世界变换（数据不变 → 结果不变，算一次缓存在 _bike_xf）
 func _compute_bike_xf(b: Dictionary) -> Transform3D:
 	# 不能叫 basis —— Node3D 已有 basis 属性，本地变量重名会触发
 	# SHADOWED_VARIABLE_BASE_CLASS 告警
-	var xf_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(b["yaw"])))
-	# 车身倾角
+	# ⚠️ ebikes.glb 实测前向是 **-Z**（前灯 _lamp z=-0.71 / 尾灯 redlamp z=+0.73，
+	# 座垫偏 +Z），与轿车、飞机同一资产管线。此前用默认 PLUS_Z（PI−yaw）
+	# 车头朝后 —— 路上的骑手全都"倒着骑"。
+	var xf_basis := Basis(Vector3.UP,
+			CoordinateUtil.node_yaw(float(b["yaw"]), CoordinateUtil.ModelForward.MINUS_Z))
+	# 车身倾角：绕模型**自身前向轴**（局部 -Z）滚转，随车头方向一起转
+	# （此前挂在全局 FORWARD 轴上，车头一转倾倒方向就错）
 	if absf(float(b["lean"])) > 0.001:
-		xf_basis = xf_basis.rotated(Vector3.FORWARD, float(b["lean"]))
+		xf_basis = xf_basis * Basis(Vector3(0.0, 0.0, -1.0), float(b["lean"]))
 	var g := world.ground_height(float(b["x"]), -float(b["z"]))
 	return Transform3D(xf_basis, CoordinateUtil.to_world(float(b["x"]), float(b["z"]), g))
 
@@ -492,15 +523,25 @@ func _sync_riders(px: float, pz: float) -> void:
 	var transforms: Array = []
 	var cloth_cols: Array = []
 	var helmet_cols: Array = []
+	# 骑行中的车按 type 归集（与骑手同一矩阵 —— 原版 buffers[r.type] 与 rider
+	# 共用一份变换），由 _flush_vehicles 合并停车排一起写入
+	for arr in _riding_by_type:
+		arr.clear()
 	for r in riders:
 		if Vector2(float(r["x"]), float(r["z"])).distance_to(eye) > RIDER_RENDER_DIST:
 			continue
 		var g := world.ground_height(float(r["x"]), -float(r["z"]))
-		transforms.append(Transform3D(
-			Basis(Vector3.UP, CoordinateUtil.node_yaw(float(r["yaw"]))),
-			CoordinateUtil.to_world(float(r["x"]), float(r["z"]), g + RIDER_GROUND_LIFT)))
+		# ⚠️ ebikes.glb 前向 -Z（见 _compute_bike_xf 的实测记录），用 MINUS_Z
+		var xf := Transform3D(
+			Basis(Vector3.UP, CoordinateUtil.node_yaw(float(r["yaw"]),
+					CoordinateUtil.ModelForward.MINUS_Z)),
+			CoordinateUtil.to_world(float(r["x"]), float(r["z"]), g + RIDER_GROUND_LIFT))
+		transforms.append(xf)
 		cloth_cols.append(_palette_colour(rider_palette, int(r["cloth"]), NO_TINT))
 		helmet_cols.append(_palette_colour(helmet_palette, int(r["helmet"]), NO_TINT))
+		var ti := int(r["type"])
+		if ti >= 0 and ti < _riding_by_type.size():
+			_riding_by_type[ti].append({"xf": xf, "paint": int(r["paint"])})
 	_riders_visible = transforms.size()
 	for entry in _rider_nodes:
 		var mm: MultiMesh = entry["mm"]
@@ -511,6 +552,7 @@ func _sync_riders(px: float, pz: float) -> void:
 		for i in transforms.size():
 			mm.set_instance_transform(i, transforms[i])
 			mm.set_instance_color(i, src[i] if not src.is_empty() else NO_TINT)
+	_flush_vehicles()
 
 
 func diagnostics() -> Dictionary:

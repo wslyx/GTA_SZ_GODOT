@@ -70,6 +70,10 @@ var _tank_model: Node3D
 ## 名称来自 GLB 的 node 表，导入后 Godot 保留原名。
 var _tank_turret: Node3D
 var _tank_barrel: Node3D
+## 炮口锚点（tank.glb 自带 tank_muzzle）：开炮原点用它的世界位置
+var _tank_muzzle: Node3D
+## 炮管的原始局部位置（GLB 实测 [0, 0.296, 1.884]），后坐回抽以此为基准
+var _tank_barrel_home := Vector3.ZERO
 ## 飞行导弹（原版 city-flight-missiles.ts）。首次起飞时才实例化，
 ## 6 个弹位 + 2 组爆炸的节点成本不进启动路径。
 var _missiles = null
@@ -199,6 +203,8 @@ const MISSILES_SCRIPT := preload("res://scripts/vehicles/flight_missiles.gd")
 ## 没有高度概念：飞多高都撞建筑投影，且 blocked() 对水面/非陆地返回 true，
 ## 海湾上空全是"墙"。见 world/flight_collision.gd 头部说明。
 const FLIGHT_COLLISION_SCRIPT := preload("res://scripts/world/flight_collision.gd")
+## 坦克炮弹（原版 city-tank.ts 的 tracer 池 + 命中爆炸）
+const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -214,6 +220,9 @@ func _load_vehicle_models() -> void:
 		_tank_model.visible = false
 		_tank_turret = _find_child_by_name(_tank_model, "tank_turret")
 		_tank_barrel = _find_child_by_name(_tank_model, "tank_barrel")
+		_tank_muzzle = _find_child_by_name(_tank_model, "tank_muzzle")
+		if _tank_barrel != null:
+			_tank_barrel_home = _tank_barrel.position
 		if _tank_turret == null or _tank_barrel == null:
 			push_warning("[MainGame] tank.glb 缺少炮塔/炮管节点，炮塔姿态不联动")
 	if _plane_model != null:
@@ -614,6 +623,9 @@ func _toggle_tank() -> void:
 			_car_model.visible = true
 		if _tank_model != null:
 			_tank_model.visible = false
+		# 切出坦克：收回在飞的炮弹与爆炸（原版 setActive(false) → clearEffects）
+		if _tank_shells != null:
+			_tank_shells.clear_effects()
 		camera.set_mode(ChaseCamera.Mode.DRIVING, true)
 		_camera_yaw = tank.yaw
 		hud.toast("切换为轿车")
@@ -666,6 +678,9 @@ func _apply_tank_pose() -> void:
 		_tank_turret.rotation.y = -tank.turret_yaw
 	if _tank_barrel != null:
 		_tank_barrel.rotation.x = -tank.barrel_pitch
+		# 后坐：炮管沿自身 -Z 回抽 tank.recoil（原版 home + (0,0,-recoil)），
+		# 回抽量由 tick_cooldown 里的 exp(−dt·12) 衰减
+		_tank_barrel.position = _tank_barrel_home + Vector3(0.0, 0.0, -tank.recoil)
 
 
 func _toggle_vehicle_entry() -> void:
@@ -682,6 +697,9 @@ func _toggle_vehicle_entry() -> void:
 		if mode == Mode.TANK:
 			if _tank_model != null:
 				_tank_model.visible = false
+			# 下车（坦克）：收回在飞的炮弹与爆炸
+			if _tank_shells != null:
+				_tank_shells.clear_effects()
 		elif _car_model != null:
 			_car_model.visible = false
 		_flush_speed()
@@ -750,6 +768,10 @@ func _enter_observer() -> void:
 		flight.stop()
 		if _plane_model != null:
 			_plane_model.visible = false
+	elif mode == Mode.TANK:
+		# 进观景：坦克停止操控，收走在飞的炮弹与爆炸
+		if _tank_shells != null:
+			_tank_shells.clear_effects()
 	var p := _player_position_data()
 	observer.begin(p.x, world.height_field.height_at(p.x, p.y) + 60.0, p.y, _camera_yaw)
 	observer.ground_height = func(x: float, z: float) -> float: return world.height_field.height_at(x, z)
@@ -1036,10 +1058,6 @@ func _step_tank(dt: float) -> void:
 		"barrel": _axis_key([KEY_PAGEUP], [KEY_PAGEDOWN]),
 	}, dt)
 	tank.tick_cooldown(dt)
-	if Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_ENTER):
-		var shot := tank.fire()
-		if not shot.is_empty():
-			hud.toast("开炮", 1.0)
 
 	# 车体碰撞子步（与汽车同一套 0.7m 步长规则）
 	var tank_steps := maxi(1, int(ceil(absf(tank.speed) * dt / COLLISION_STEP)))
@@ -1062,6 +1080,31 @@ func _step_tank(dt: float) -> void:
 			Basis(Vector3.UP, CoordinateUtil.node_yaw(tank.yaw)),
 			CoordinateUtil.to_world(tank.x, tank.z, g + 0.05))
 		_apply_tank_pose()
+	# 炮弹推进（原版 tank.step 后半段；先推进已有弹，再处理开火 ——
+	# 本帧刚射出的弹下一帧才开始飞，与原版一致）
+	if _tank_shells != null:
+		_tank_shells.step(dt, _flight_sweep)
+	# 开炮。放在姿态更新之后：tank_muzzle 的世界位置要用本帧的
+	# 炮塔/炮管变换，原版 fire() 里也是先 syncModel 再取炮口。
+	if Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_ENTER):
+		_ensure_tank_shells()
+		# 原版先确认 tracer 池有空位、再消耗装填（池满时按住空格不空转装填）
+		if _tank_shells.has_free() and tank.can_fire():
+			var shot := tank.fire()
+			if not shot.is_empty():
+				# 原版优先用 tank_muzzle 节点的世界位置当炮口原点
+				# （fallback 公式 dir·5 + 2.1 已在 TankSim.fire 里兜底）
+				if _tank_muzzle != null and _tank_model != null:
+					var wp: Vector3 = _tank_muzzle.global_position
+					var o: Dictionary = shot["origin"]
+					o["x"] = wp.x
+					o["y"] = wp.y
+					o["z"] = -wp.z          # 世界 → 数据（z = −北）
+				if _tank_shells.fire_shot(shot, _flight_sweep, tank.yaw + tank.turret_yaw):
+					hud.toast("开炮", 1.0)
+					# 原版 fire() 里的 onExplosion：炮口爆音
+					if audio != null:
+						audio.explosion()
 	_camera_yaw = lerp_angle(_camera_yaw, tank.yaw, 1.0 - exp(-dt * 3.0))
 	camera.yaw = _camera_yaw
 	camera.look_pitch = _look_pitch
@@ -1215,6 +1258,20 @@ func _ensure_missiles() -> void:
 	_missiles = MISSILES_SCRIPT.new()
 	_missiles.name = "FlightMissiles"
 	add_child(_missiles)
+
+
+## 首次开炮时建炮弹节点（4 发曳光弹 + 2 个共用的 FlightExplosion）
+var _tank_shells = null
+
+
+func _ensure_tank_shells() -> void:
+	if _tank_shells != null:
+		return
+	_tank_shells = TANK_SHELLS_SCRIPT.new()
+	_tank_shells.name = "TankShells"
+	if audio != null:
+		_tank_shells.on_explosion = audio.explosion
+	add_child(_tank_shells)
 
 
 ## 飞行 / 导弹共用的扫掠回调（原版 city-flight.ts 的 sweep + FlightCityCollision）。

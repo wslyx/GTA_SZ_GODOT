@@ -32,6 +32,8 @@ var distance := 0.0
 var turret_yaw := 0.0
 var barrel_pitch := 0.06
 var cooldown := 0.0
+## 炮管后坐量（0..0.42，指数衰减 exp(−dt·12)）；_apply_tank_pose 用它回抽炮管
+var recoil := 0.0
 var shots := 0
 var hits := 0
 
@@ -105,6 +107,7 @@ func fire() -> Dictionary:
 	var origin := Vector3(x, 0.0, z) + dir * 5.0
 	origin.y = 2.1
 	cooldown = RELOAD
+	recoil = 0.42
 	shots += 1
 	return {
 		"origin": {"x": origin.x, "y": origin.y, "z": origin.z},
@@ -114,6 +117,8 @@ func fire() -> Dictionary:
 
 func tick_cooldown(dt: float) -> void:
 	cooldown = maxf(0.0, cooldown - maxf(0.0, minf(0.05, dt)))
+	# 炮管后坐回位（原版 step：recoil *= exp(-dt*12)）
+	recoil *= exp(-maxf(0.0, minf(0.05, dt)) * 12.0)
 
 
 ## 原版 advanceTankShell：位置用二阶项、速度用一阶项
