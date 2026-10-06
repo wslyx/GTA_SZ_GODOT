@@ -26,18 +26,41 @@ shader_type sky;
 // （本世界 z = −北，原版 Babylon z = 北），此后所有常量与原版数字一致。
 // 夜间 IBL 同样按原版：**解析式中性深蓝环境**（原版 RawCubeTexture 生成式的
 // 逐方向复算），不再用 rooftop-night HDR —— 原版注释明说"夜间反射不能残留
-// 白天的红色日落"。日落/白天 IBL 仍是对应 HDR 全景 × base_energy。
+// 白天的红色日落"。
 //
-// IBL 标定：日落/白天一路与改造前完全一致；夜晚从 rooftop HDR × .55 换成
-// 原版中性立方图 × .55（原版 scene.environmentIntensity=.55 × 环境立方图）。
+// 日落 = 原版 city-sunset-environment.ts 的**摄影 HDR 分级链**：
+// belfast-sunset-4k.hdr 经 `gradeSunsetRadiance()`（火色半球 + 云掩码 + 局部
+// 对比）逐方向分级；可见天空再叠一次高光肩部滚降（`sunsetDisplayScale`，
+// knee 1.8 / 天花板 4.3）并乘原版 `skyMaterial.primaryColor`（.20）。
+// IBL 用的是**同一份分级后**的辐照度 —— 原版 `scene.environmentTexture` 就是
+// 这个分级立方图（肩部只加在显示纹理上），所以湿路/水面的天空倒影与头顶的
+// 天空同色。程序化 `sunset_sky()`（原版 szSky）在原版里只是 HDR 解码完之前的
+// 兜底，这里保留为日落 HDR 缺失时的兜底（`sunset_uses_hdr = false`）。
+//
+// IBL 标定：白天一路与改造前一致；夜晚从 rooftop HDR × .55 换成原版中性立方图
+// × .55（原版 scene.environmentIntensity=.55 × 环境立方图）；日落改用分级后的
+// belfast HDR × .40（原版 .40 × 分级立方图 —— 此前用的是**未分级**的原始 HDR）。
+//
+// HDR 全景的绕 Y 旋转：原版三套 HDR 各带一个 rotationY（白天 1.85 /
+// 日落 2.80 / 夜 0.65，见 city-daylight.ts:10、city-sunset-environment.ts:12、
+// city-cinematic.ts:234）。以前这里是**漏的** —— sky_system.gd 的 HDR_ROTATION
+// 常量定义了却零读取点，兜底路径的 PanoramaSkyMaterial.rotation 也从没赋值，
+// 于是三档全景一律按未旋转方向贴上去。现在由 hdr_rot_a / hdr_rot_b 显式传入，
+// 在 dir_to_panorama() 里以 −rot 旋转采样方向补偿（见 rotate_y 的说明）。
+//
+// ⚠️ 夜间槽**不采样 HDR**（走 night_environment），所以夜间那个0.65 没有
+// 对应纹理，hdr_rot_* 传 0 即可 —— 原版那个 0.65 是给 rooftop-night HDR 用的，
+// 而那张图在本移植里已不参与夜间 IBL。
 //
 // 太阳/月亮方向与原版一致：原版在 Babylon 空间（z = 北），本项目的世界是 z = −北。
 
 render_mode disable_fog;
 
-/// 连续档位轴：0 夜晚（星空）/ 1 日落（程序化）/ 2 白天（HDR 全景）
+/// 连续档位轴：0 夜晚（星空）/ 1 日落（摄影 HDR）/ 2 白天（HDR 全景）
 uniform float sky_mode : hint_range(0.0, 2.0) = 1.0;
-/// 程序化天空的显示增益（对两家 ACES 肩部差异的实测补偿，见 sky_system.gd）
+/// 程序化天空的显示增益（对两家 ACES 肩部差异的实测补偿，见 sky_system.gd）。
+/// ⚠️ 只作用于 `sunset_uses_hdr = false` 的兜底路径 —— 日落档默认走摄影 HDR，
+/// 那条路的显示增益是 `sunset_bg_gain`（原版 `skyMaterial.primaryColor`）。
 uniform float sky_gain : hint_range(0.0, 2.0) = 0.42;
 /// 辐照度立方图用的 HDR 全景（与改造前的 IBL 是同一张图）
 uniform sampler2D base_sky : source_color, hint_default_white;
@@ -51,6 +74,37 @@ uniform float env_blend : hint_range(0.0, 1.0) = 0.0;
 /// A/B 槽各自的档位（立方图槽按档位决定用 HDR 全景还是夜晚中性环境）
 uniform float mode_a : hint_range(0.0, 2.0) = 1.0;
 uniform float mode_b : hint_range(0.0, 2.0) = 1.0;
+/// A/B 槽各自的 HDR 绕 Y 旋转角（弧度）= 原版 HDRCubeTexture.rotationY
+/// （白天 1.85 / 日落 2.80，见 city-daylight.ts:10 与
+/// city-sunset-environment.ts:12）。夜间槽走解析式中性环境、不采样 HDR，
+/// 所以夜间没有旋转角（sky_system 里填 0）。
+///
+/// ⚠️ 这两个角以前是**死常量**（HDR_ROTATION 定义了但全项目零读取点，
+/// 兜底路径的 PanoramaSkyMaterial.rotation 也从没赋过值），于是三档 HDR
+/// 全景一直按未旋转的方向贴上去，与原版差一个固定角。
+uniform float hdr_rot_a = 0.0;
+uniform float hdr_rot_b = 0.0;
+/// 可见背景的白天档该读哪个槽 —— 由 sky_system 显式给出。
+///
+/// ⚠️ 以前这里是`m > 1.5 && mode_b > 1.5 && env_blend > 0.001`：
+/// 把「可见背景读哪张图」耦合到了「IBL 淡化进度」上，而这两件事本该各自
+/// 独立。env_blend 提前归零、或槽位下标与实际贴图错配时就会读错档。
+uniform bool day_uses_b = false;
+/// 日落档的摄影 HDR 全景（belfast-sunset-4k）。
+///
+/// 用**独立采样器**而不是 A/B 槽：`cycle_mode` 的 夜→白天 是直接过渡
+/// （sky_mode 0→2），中途会掠过日落档，而那时 A/B 槽里只有夜/白天两张图
+/// —— 日落图没有槽位可放。独立采样器只吃一张常驻贴图，随时可用。
+uniform sampler2D sunset_pano : source_color, hint_default_white;
+/// 该 HDR 自己的绕 Y 旋转角（弧度）= 原版 CITY_SUNSET_SOURCE.rotationY（2.80）。
+/// 分级是在 HDR **自身未旋转** 的空间里逐面做的，采样才用这个角（见 sunset_hdr_sky）。
+uniform float sunset_rot = 0.0;
+/// 日落**可见天空**的显示增益 = 原版 `skyMaterial.primaryColor`（.20,.20,.20）。
+/// 原版注释写明这是"天空独立曝光"：它只压可见天空，IBL 另有
+/// `scene.environmentIntensity`（.40），两条路的系数不可共用。
+uniform float sunset_bg_gain = 0.20;
+/// 日落 HDR 是否可用；不可用时退回程序化 szSky（保留 sky_gain 旧标定）。
+uniform bool sunset_uses_hdr = true;
 
 /// 月亮方向（Godot 世界空间；原版 CITY_MOON_DIRECTION=(.72,.48,−.5) 是
 /// Babylon 空间 z=北，本项目 z=−北 所以取 +.5。night_sky() 内部会转回原版空间）
@@ -110,7 +164,62 @@ float fbm_lod(vec2 p, float pixel) {
 }
 
 // ---------------------------------------------------------------------------
+// 日落档：摄影 HDR 的分级链（原版 city-sunset-environment.ts，逐行照搬）
+// ---------------------------------------------------------------------------
+
+/// 原版 city-sunset-environment.ts 的 smooth(lo,hi,value)（三次平滑阶跃）。
+float sunset_smooth(float lo, float hi, float value) {
+	float t = clamp((value - lo) / (hi - lo), 0.0, 1.0);
+	return t * t * (3.0 - 2.0 * t);
+}
+
+/// 火色半球权重（原版 sunsetFireWeight）：朝阳半球 → 1，背阳 → 0。
+float sunset_fire_weight(vec3 d) {
+	float len = max(length(d), 0.000001);
+	return sunset_smooth(-0.48, 0.25, (0.6 * d.x + 0.8 * d.z - 0.08 * d.y) / len);
+}
+
+/// 逐方向复算原版 gradeSunsetRadiance：火色半球 + 云掩码 + 局部对比。
+/// d 是**分级空间**方向（原版逐面做，与 rotationY 无关）；c 是该方向的原始
+/// HDR 辐照度。保留照片里的暗云底与橙色缝隙，反朝阳的天空压到深靛蓝。
+vec3 grade_sunset_radiance(vec3 d, vec3 c) {
+	float len = max(length(d), 0.000001);
+	float r = max(c.r, 0.0);
+	float g = max(c.g, 0.0);
+	float b = max(c.b, 0.0);
+	float hemisphere = sunset_fire_weight(d);
+	// 太阳眩光：朝阳方向 ^18 的窄峰，越靠地平线越强（exp(-y*6)）。
+	// 它是"这不是云、是太阳"的判据，用来把日轮从云掩码里剔掉。
+	float solarGlare = 1.0 + 9.0
+		* pow(max(0.0, (0.6 * d.x + 0.8 * d.z) / len), 18.0)
+		* exp(-max(0.0, d.y / len) * 6.0);
+	float luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+	// 云掩码用 r/b 比值（暖云 → 1）。局部曝光只进掩码，不改原始辐照度。
+	float cloud = sunset_smooth(0.56, 1.03, r / (b + 0.0001));
+	float lit = sunset_smooth(0.50, 1.45, luminance / solarGlare);
+	// 未点火那一支让反朝阳的天空停在"亮云亮度的一成"而不是全黑：
+	// 真实黄昏的背阳天空仍在发光，那份能量正是城市暗面的补光。
+	float fire = hemisphere * cloud * (0.06 + 0.94 * lit);
+	float contrast = 0.70 + 0.68 * lit;
+	return vec3(
+		((r * 0.28 + b * 0.11) * (1.0 - fire) + (r * 1.72 + g * 0.25) * fire) * contrast,
+		((g * 0.32 + b * 0.09) * (1.0 - fire) + (g * 0.58 + r * 0.10) * fire) * contrast,
+		((b * 0.72 + r * 0.15) * (1.0 - fire) + (b * 0.17 + r * 0.022) * fire) * contrast);
+}
+
+/// 仅显示用的高光滚降（原版 sunsetDisplayScale：knee 1.8 / 天花板 4.3）。
+/// 返回**乘子**：峰值 ≤1.8 时为 1，否则把峰值压进 [1.8, 4.3)。
+/// ⚠️ 只作用于可见天空，绝不能进 IBL —— 原版注释写明它不该压 PBR 能量。
+float sunset_display_scale(float peak) {
+	if (peak <= 1.8) {
+		return 1.0;
+	}
+	return (1.8 + 2.5 * (peak - 1.8) / (2.5 + peak - 1.8)) / peak;
+}
+
+// ---------------------------------------------------------------------------
 // 日落天色（原版 city-world.ts 的 szSky 片元，逐行照搬）
+//  ⚠️ 原版日落档露的是摄影 HDR；这一段只是 HDR 解码完之前的兜底。
 // ---------------------------------------------------------------------------
 
 vec3 sunset_sky(vec3 p) {
@@ -238,9 +347,26 @@ vec3 night_environment(vec3 d) {
 // 三种可见天空 + IBL
 // ---------------------------------------------------------------------------
 
+/// 绕 Y 轴旋转采样方向（弧度）。
+///
+/// 方向约定与 PanoramaSkyMaterial.rotation 一致：HDR 的 rotationY 转的是
+/// **贴图内容**，所以反查贴图时要用 −angle 旋转视线方向。
+/// 参考引擎 sky.glsl：`panorama_coords = atan2(x, −z)`，全景 UV 的 u 轴
+/// 随绕 Y 的旋转按同一方向平移。
+vec3 rotate_y(vec3 d, float angle) {
+	if (angle == 0.0) {
+		return d;
+	}
+	float c = cos(angle);
+	float s = sin(angle);
+	// 绕 +Y 的标准旋转（Godot 右手系：x' = x·cos + z·sin, z' = −x·sin + z·cos）
+	return vec3(d.x * c + d.z * s, d.y, -d.x * s + d.z * c);
+}
+
 /// 全景的 UV 约定照抄引擎源码（`environment/sky.glsl` 的 `panorama_coords`）：
 ///   u = atan2(x, −z)（负值加 2π）/ 2π，v = acos(y) / π
-vec2 dir_to_panorama(vec3 d) {
+/// d 必须是**已经转到该 HDR 自身空间**的方向（不再含旋转）。
+vec2 panorama_uv(vec3 d) {
 	float u = atan(d.x, -d.z);
 	if (u < 0.0) {
 		u += PI * 2.0;
@@ -248,21 +374,52 @@ vec2 dir_to_panorama(vec3 d) {
 	return vec2(u / (PI * 2.0), acos(clamp(d.y, -1.0, 1.0)) / PI);
 }
 
-/// 白天可见背景 = HDR 全景。过渡期间白天档来自 B 槽（A 槽还是旧档的全景）。
-vec3 panorama_sky(vec3 p, float m) {
-	if (m > 1.5 && mode_b > 1.5 && env_blend > 0.001) {
-		return texture(base_sky_b, dir_to_panorama(p)).rgb * base_energy_b;
-	}
-	return texture(base_sky, dir_to_panorama(p)).rgb * base_energy;
+/// rot 是该HDR 自己的绕 Y 旋转角（弧度）；用 −rot 旋转采样方向，
+/// 使贴图内容按 +rot 的方向呈现（见 rotate_y 的说明）。
+vec2 dir_to_panorama(vec3 d, float rot) {
+	return panorama_uv(rotate_y(d, -rot));
 }
 
-/// IBL 立方图的一个槽：夜晚 = 中性环境 × 能量；日落/白天 = HDR 全景 × 能量。
-/// d 必须是**原版 Babylon 空间**方向（night_environment 的约定）。
-vec3 env_slot(float m, vec3 d, sampler2D tex, float energy) {
+/// 日落档可见天空 = 摄影 HDR × 原版分级链 × 高光肩部 × primaryColor。
+///
+/// 分级是在 HDR **自身未旋转** 的空间里逐面做的（rotationY 只影响采样），
+/// 而 dir_to_panorama() 内部也对方向做 −rot 旋转 —— 两者是同一个方向，
+/// 所以这里把 hdr_dir 算出来喂给分级、再直接交给 panorama_uv()。
+vec3 sunset_hdr_sky(vec3 p) {
+	vec3 hdr_dir = rotate_y(p, -sunset_rot);
+	vec3 raw = texture(sunset_pano, panorama_uv(hdr_dir)).rgb;
+	vec3 graded = grade_sunset_radiance(hdr_dir, raw);
+	float peak = max(max(graded.r, graded.g), graded.b);
+	return graded * sunset_display_scale(peak) * sunset_bg_gain;
+}
+
+/// 白天可见背景 = HDR 全景。
+///
+/// ⚠️ 读哪个槽由 `day_uses_b` 显式决定（GDScript 侧知道当前白天档在A 还是 B），
+/// 不再靠 mode_b / env_blend 反推 —— 可见背景与 IBL 淡化是两件独立的事。
+vec3 panorama_sky(vec3 p) {
+	if (day_uses_b) {
+		return texture(base_sky_b, dir_to_panorama(p, hdr_rot_b)).rgb * base_energy_b;
+	}
+	return texture(base_sky, dir_to_panorama(p, hdr_rot_a)).rgb * base_energy;
+}
+
+/// IBL 立方图的一个槽：夜晚 = 中性环境；日落 = 分级后的摄影 HDR；白天 = 原始 HDR 全景。
+/// 三者都乘各自的能量（= 原版 scene.environmentIntensity）。
+/// d 是**世界空间**方向（不做 z 取反 —— 旋转在各自的 HDR 角度里处理）。
+vec3 env_slot(float m, vec3 d, sampler2D tex, float energy, float rot) {
 	if (m < 0.5) {
 		return night_environment(d) * energy;
 	}
-	return texture(tex, dir_to_panorama(d)).rgb * energy;
+	if (m < 1.5) {
+		// 日落档：原版 `scene.environmentTexture` 就是**分级后**的 belfast HDR
+		// （ShenzhenSunsetEnvironment 在解码时逐面跑 gradeSunsetRadiance）。
+		// 只有可见天空才叠肩部滚降，辐照度保持全动态范围。
+		vec3 hdr_dir = rotate_y(d, -rot);
+		vec3 raw = texture(tex, panorama_uv(hdr_dir)).rgb;
+		return grade_sunset_radiance(hdr_dir, raw) * energy;
+	}
+	return texture(tex, dir_to_panorama(d, rot)).rgb * energy;
 }
 
 /// 单档可见天空：0 夜晚 / 1 日落 / 2 白天（整数档的画面）
@@ -271,9 +428,9 @@ vec3 sky_look_at(float m, vec3 p) {
 		return night_sky(p);
 	}
 	if (m < 1.5) {
-		return sunset_sky(p) * sky_gain;
+		return sunset_uses_hdr ? sunset_hdr_sky(p) : sunset_sky(p) * sky_gain;
 	}
-	return panorama_sky(p, m);
+	return panorama_sky(p);
 }
 
 /// 屏幕上真正看到的天空：沿 夜0—日落1—白天2 的轴做相邻档混合。
@@ -294,14 +451,20 @@ void sky() {
 	// ⚠️ sky 处理器**不允许 `return`**（会报 "Using 'return' in the 'sky'
 	// processor function is incorrect"），所以这里必须用 if/else 层级，不能提前返回。
 	if (AT_CUBEMAP_PASS) {
-		// 辐照度立方图：夜晚档 = 原版中性环境 × 能量；日落/白天 = HDR 全景 × 能量。
-		// 静止时单槽单次采样；过渡期间 A/B 两槽按 env_blend 交叉淡化。
-		vec3 d = vec3(EYEDIR.x, EYEDIR.y, -EYEDIR.z);
-		vec3 a = env_slot(mode_a, d, base_sky, base_energy);
+		// 辐照度立方图：夜晚档 = 原版中性环境 × 能量；日落 = 分级后的摄影 HDR × 能量；
+		// 白天 = HDR 全景 × 能量。静止时单槽单次采样；过渡期间 A/B 两槽按 env_blend 交叉淡化。
+		//
+		// ⚠️ 这里用**世界空间**方向（不做 z 取反）。以前写的是
+		// `vec3(EYEDIR.x, EYEDIR.y, -EYEDIR.z)`，那是给 night_environment 的
+		// Babylon 空间约定准备的 —— 但它内部只读d.y，那个取反其实毫无作用；
+		// 而同一个取反却被顺手带给了 HDR 全景采样，导致**立方图里的 HDR 是
+		// 可见背景那张全景的镜像**（可见背景用未取反的 EYEDIR）。
+		// 表现：湿路/水面的天空倒影与头顶的天空左右相反。
+		vec3 a = env_slot(mode_a, EYEDIR, base_sky, base_energy, hdr_rot_a);
 		if (env_blend <= 0.001) {
 			COLOR = a;
 		} else {
-			vec3 b = env_slot(mode_b, d, base_sky_b, base_energy_b);
+			vec3 b = env_slot(mode_b, EYEDIR, base_sky_b, base_energy_b, hdr_rot_b);
 			COLOR = mix(a, b, env_blend);
 		}
 	} else {

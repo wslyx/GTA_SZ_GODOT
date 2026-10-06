@@ -180,7 +180,8 @@ func _late_env(overrides: Dictionary) -> void:
 ## 覆盖环境参数。键名直接对应 Environment 的属性名，另外支持几个快捷键：
 ##   sun_energy  → DirectionalLight3D.light_energy
 ##   sky_energy  → PanoramaSkyMaterial.energy_multiplier
-##   sky_gain    → 天空球着色器的显示增益
+##   sky_gain    → 天空球着色器的显示增益（只影响程序化兜底路径）
+##   sunset_bg_gain → 日落档摄影 HDR 可见天空的显示增益（原版 primaryColor）
 ##
 ## ⚠️ 每张图都会**先重置**再覆盖。否则覆盖是累积的：第 2 张关了太阳，
 ## 第 3 张只改天空时太阳仍然是关的，扫出来的曲线会互相污染。
@@ -355,9 +356,11 @@ func dump_ui() -> void:
 				var sh: Shader = (sm as ShaderMaterial).shader
 				mat_desc = "ShaderMaterial(%s)" % (sh.resource_path if sh != null else "null")
 				var sp: ShaderMaterial = sm as ShaderMaterial
-				print("[sky-uniform] sky_mode=%s sky_gain=%s env_blend=%s mode_a=%s mode_b=%s base_energy=%s" % [
+				print("[sky-uniform] sky_mode=%s sky_gain=%s sunset_bg_gain=%s sunset_uses_hdr=%s env_blend=%s mode_a=%s mode_b=%s base_energy=%s" % [
 					str(sp.get_shader_parameter("sky_mode")),
 					str(sp.get_shader_parameter("sky_gain")),
+					str(sp.get_shader_parameter("sunset_bg_gain")),
+					str(sp.get_shader_parameter("sunset_uses_hdr")),
 					str(sp.get_shader_parameter("env_blend")),
 					str(sp.get_shader_parameter("mode_a")),
 					str(sp.get_shader_parameter("mode_b")),

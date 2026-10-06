@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 ##
 ## 天空系统 —— 对应原版 city-world.ts 的 szSky 着色器 + city-night-sky.ts + 三套 HDR 环境。
 ##
@@ -9,6 +9,11 @@
 ##     （月亮方向 (.72,.48,-.5)，盘亮度 .0082）。
 ##   - 环境反射贴图（IBL）按模式换 HDR：日落 belfast-sunset-4k / 白天 rustig-blue-sky-4k /
 ##     夜晚 rooftop-night-2k，各自带一个绕 Y 的旋转角。
+##   - 日落档的**可见天空也是摄影 HDR**（city-sunset-environment.ts）：belfast HDR 经
+##     `gradeSunsetRadiance()` 分级，可见天空再叠一次高光肩部滚降并乘原版
+##     `skyMaterial.primaryColor`（.20）；程序化 szSky 只是 HDR 解码完之前的兜底。
+##     IBL 用的是**同一份分级后**的辐照度（原版 scene.environmentTexture 就是这个
+##     分级立方图），所以湿路/水面的天空倒影与头顶的天空同色。
 ##
 ## Godot 对应做法：
 ##   程序化天空仍用手写着色器（szSky 的 GLSL 逐行搬成 .gdshader）。
@@ -34,18 +39,45 @@ const SKY_SHADER := "res://shaders/sky_sky.gdshader"
 ##   y150-190  原版 #9f5c39 / 复刻 #a15c4c
 ##   y270-305  原版 #a8613b / 复刻 #b16349
 ## 取 0.42（略保守，避免暗部压过头）。
+## ⚠️ 只作用于**兜底路径**（日落 HDR 缺失时的程序化 szSky）。日落档默认走摄影
+## HDR，那条路的显示增益是 SUNSET_BG_GAIN。
 const SKY_GAIN := 0.42
 
+## 日落档**可见天空**的显示增益 = 原版 `skyMaterial.primaryColor`（.20,.20,.20）。
+##
+## 原版注释写明这是"天空独立曝光"：它只压可见天空，IBL 另有
+## `scene.environmentIntensity`（= ENV_INTENSITY[SUNSET] = .40）—— 两条路的系数
+## 是分开的，不能共用一个值。此前日落走程序化 szSky、用 SKY_GAIN = .42 标定；
+## 改用摄影 HDR 后那份标定作废，这一档直接回到原版的 primaryColor。
+const SUNSET_BG_GAIN := 0.20
+
 ## HDR 环境贴图（Poly Haven，见 data/licenses/daylight-environment.md）
+##
+## ⚠️ 夜间档**故意留空**（"" = 不加载）：着色器的夜间 IBL 走解析式
+## `night_environment()`，从不采样纹理；原版也明说"夜间反射不能残留白天的
+## 红色日落"。以前这里仍指向 rooftop-night-2k.hdr，于是每次进夜景都要白
+## 白 load 一张 2K HDR 进显存/texture cache，采样端却一次都没读过它。
+## 夜间若需要非null 的占位（保证 uniform 有效），由 _load_hdr 给一张1×1。
 const HDR := {
 	GameContent.LightMode.DAY: "res://data/city/environment/rustig-blue-sky-4k.hdr",
 	GameContent.LightMode.SUNSET: "res://data/city/environment/belfast-sunset-4k.hdr",
-	GameContent.LightMode.NIGHT: "res://data/city/environment/rooftop-night-2k.hdr",
+	GameContent.LightMode.NIGHT: "",
 }
+## 每档 HDR 绕 Y 的旋转角（弧度）—— 原版 HDRCubeTexture.rotationY。
+## 原值：白天 1.85（city-daylight.ts:10）/ 日落 2.80（city-sunset-environment.ts:12）
+## / 夜 0.65（city-cinematic.ts:234）。
+##
+## ⚠️ 这个常量以前是**死的**：定义了但全项目零读取点，兜底路径的
+## PanoramaSkyMaterial.rotation 也从没赋过值，于是三档全景一律按未旋转方向
+## 贴上去，白天档尤其明显（天空里的太阳位置与 sun_dir_data 对不上）。
+## 现在由 _apply_mode_sky 塞给着色器的 hdr_rot_a / hdr_rot_b。
+##
+## 夜间填 0：原版那个 0.65 是给 rooftop-night HDR 用的，而本移植的夜间 IBL
+## 已经换成解析式环境、根本不采样 HDR，那个角度没有对应纹理。
 const HDR_ROTATION := {
 	GameContent.LightMode.DAY: 1.85,
 	GameContent.LightMode.SUNSET: 2.80,
-	GameContent.LightMode.NIGHT: 0.65,
+	GameContent.LightMode.NIGHT: 0.0,
 }
 ## 环境全景能量 = 原版 CINEMATIC_LOOK 的 `environment`（0.78 / 0.40 / 0.55）。
 ##
@@ -79,6 +111,8 @@ var night_material: ShaderMaterial
 var mode: int = GameContent.LightMode.SUNSET
 var _built := false
 var _hdr_cache: Dictionary = {}
+## 夜间档的 1×1 占位纹理（见 _placeholder_tex）
+var _placeholder: ImageTexture = null
 ## 复用的 Sky / 材质（见 _apply_environment_hdr）
 var _sky_cache: Sky = null
 var _pano_cache: PanoramaSkyMaterial = null
@@ -100,6 +134,10 @@ var _env_blend := 0.0
 ## A/B 槽的档位（着色器据此决定该槽走 HDR 全景还是夜晚中性环境）
 var _slot_a_idx := 1.0
 var _slot_b_idx := 1.0
+## A/B 槽各自的 HDR 绕 Y 旋转角（弧度）—— 原版 HDRCubeTexture.rotationY。
+## 与贴图同生共死：槽位换代时必须跟着换，否则会拿A 的贴图配B 的角度。
+var _rot_a := 0.0
+var _rot_b := 0.0
 ## environment.sky 是否已挂接成功（启动顺序兜底用）
 var _env_bound := false
 
@@ -115,9 +153,19 @@ func setup(p_world: CityWorld) -> void:
 func _build_sky() -> void:
 	_sky_cache = Sky.new()
 	_sky_cache.radiance_size = Sky.RADIANCE_SIZE_512
-	# AUTOMATIC 让引擎自己决定何时重渲立方图：静止时本shader不用 TIME/POSITION，
-	# 立方图是静态的；过渡期间 uniform 每帧变化，引擎会自动逐帧重渲（过渡只有 ~2s）。
-	_sky_cache.process_mode = Sky.PROCESS_MODE_AUTOMATIC
+	# ⚠️ 这里**必须显式**设 PROCESS_MODE_INCREMENTAL，不能留AUTOMATIC。
+	# AUTOMATIC 的判定规则（见 Godot Sky 文档）是：用了 TIME/POSITION → REALTIME；
+	# 用了 LIGHT_* 或**任何自定义 uniform** → INCREMENTAL；否则才 QUALITY。
+	# 本着色器有sky_mode / sky_gain / env_blend 等 9 个自定义 uniform，所以
+	# AUTOMATIC 实际会落到 INCREMENTAL —— 但这是"碰巧对"，一旦有人给着色器
+	# 加了 TIME 就会静默切成 REALTIME，而 REALTIME 的快速滤波算法只支持 256
+	# 立方图，会把上面的 512 强制降级并打印警告。写死就没这个隐患。
+	#
+	# INCREMENTAL 与注释里描述的"过渡期间逐帧重渲"有细微差别：它把辐照度
+	# 更新**分摊到若干帧**（帧数 =rendering/reflections/sky_reflections/
+	# roughness_layers，项目未覆写、走引擎默认）。即环境光会比可见天空晚
+	# 约 1~2 帧跟上，过渡（1.8s）期间肉眼不可见；静止时仍然零开销。
+	_sky_cache.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	if ResourceLoader.exists(SKY_SHADER):
 		var sh := load(SKY_SHADER) as Shader
 		if sh != null:
@@ -209,11 +257,15 @@ func _apply_mode_sky(m: int) -> void:
 	var target_pos := float(MODE_POS.get(m, 1.0))
 	var tex := _load_hdr(m)
 	var energy := float(ENV_INTENSITY.get(m, 0.5))
+	var rot := float(HDR_ROTATION.get(m, 0.0))
 	# 过渡途中再次切换：环境槽先收尾到上一个目标（sky_mode 保持连续，不回跳）
 	if _trans_t < 1.0 and _mode_target != m:
 		if _env_tex_b != null:
 			_env_tex = _env_tex_b
 			_env_energy = _env_energy_b
+			# ⚠️ 旋转角必须跟贴图一起烘进 A 槽。以前没有这一层，A/B 槽的
+			# 角度是各自独立记的，中途打断就会留下"A 的贴图配B 的角度"。
+			_rot_a = _rot_b
 			_env_blend = 0.0
 	if _mode_target == m and _trans_t >= 1.0 and _env_tex == tex:
 		return  # 已在该档且静止：幂等返回
@@ -223,6 +275,8 @@ func _apply_mode_sky(m: int) -> void:
 		_env_energy = energy
 		_env_tex_b = tex
 		_env_energy_b = energy
+		_rot_a = rot
+		_rot_b = rot
 		_env_blend = 0.0
 		_sky_mode = target_pos
 		_sky_mode_from = target_pos
@@ -239,6 +293,7 @@ func _apply_mode_sky(m: int) -> void:
 		_trans_t = 0.0
 		_env_tex_b = tex
 		_env_energy_b = energy
+		_rot_b = rot
 		_slot_b_idx = target_pos
 	_sky_shader_mat.set_shader_parameter("sky_mode", _sky_mode)
 	_sky_shader_mat.set_shader_parameter("sky_gain", SKY_GAIN)
@@ -250,7 +305,33 @@ func _apply_mode_sky(m: int) -> void:
 	_sky_shader_mat.set_shader_parameter("env_blend", _env_blend)
 	_sky_shader_mat.set_shader_parameter("mode_a", _slot_a_idx)
 	_sky_shader_mat.set_shader_parameter("mode_b", _slot_b_idx)
+	# 原版每套 HDR 各带一个绕 Y 的 rotationY，必须一起换（见 HDR_ROTATION）。
+	_sky_shader_mat.set_shader_parameter("hdr_rot_a", _rot_a)
+	_sky_shader_mat.set_shader_parameter("hdr_rot_b", _rot_b)
+	# 可见背景的白天档在哪张贴图上—— 直接告诉着色器，不让它靠
+	# mode_b / env_blend 反推（那把两件独立的事耦合在了一起，见着色器注释）。
+	_sky_shader_mat.set_shader_parameter("day_uses_b", _slot_b_idx == 2.0)
+	_apply_sunset_hdr()
 	_ensure_env_sky()
+
+
+## 绑定日落档的摄影 HDR 采样器与它的分级参数（每次切档重设一遍，幂等）。
+##
+## ⚠️ 用**独立采样器**而不是 IBL 的 A/B 槽：cycle_mode 的 夜→白天 是直接过渡
+## （sky_mode 0→2），中途会掠过日落档，而那时 A/B 槽里只有夜/白天两张图 ——
+## 日落图没有槽位可放。独立采样器只吃一张常驻贴图（`_load_hdr` 已按路径缓存，
+## 而且默认档就是日落、启动时本来就会加载），任何时刻都可用。
+##
+## 着色器侧的对应：`sunset_pano` → 原版分级链 → 高光肩部 → `sunset_bg_gain`。
+func _apply_sunset_hdr() -> void:
+	var path: String = HDR.get(GameContent.LightMode.SUNSET, "")
+	var ok := not path.is_empty() and ResourceLoader.exists(path)
+	_sky_shader_mat.set_shader_parameter("sunset_pano", _load_hdr(GameContent.LightMode.SUNSET))
+	_sky_shader_mat.set_shader_parameter("sunset_rot",
+		float(HDR_ROTATION.get(GameContent.LightMode.SUNSET, 0.0)))
+	_sky_shader_mat.set_shader_parameter("sunset_bg_gain", SUNSET_BG_GAIN)
+	# HDR 缺失时退回程序化 szSky（着色器里那条分支仍在，见 sky_sky.gdshader）
+	_sky_shader_mat.set_shader_parameter("sunset_uses_hdr", ok)
 
 
 ## 把复用的 Sky 挂到 WorldEnvironment 上（幂等；对应旧 _apply_environment_hdr 的挂接）
@@ -280,24 +361,44 @@ func _advance_transition(delta: float) -> void:
 		if _env_tex_b != null:
 			_env_tex = _env_tex_b
 			_env_energy = _env_energy_b
+		# ⚠️ 旋转角要与贴图同步烘进 A 槽（否则 A 槽贴图换了、角度还停在旧档）。
+		_rot_a = _rot_b
 		_slot_a_idx = _slot_b_idx
 		_env_blend = 0.0
 		_sky_shader_mat.set_shader_parameter("base_sky", _env_tex)
 		_sky_shader_mat.set_shader_parameter("base_energy", _env_energy)
+		_sky_shader_mat.set_shader_parameter("hdr_rot_a", _rot_a)
 		_sky_shader_mat.set_shader_parameter("mode_a", _slot_a_idx)
 		_sky_shader_mat.set_shader_parameter("env_blend", 0.0)
+		# 白天档烘进 A 槽后，B 槽不再是白天图的来源
+		_sky_shader_mat.set_shader_parameter("day_uses_b", _slot_b_idx == 2.0)
 
 
+## 取该档的 HDR 全景。夜间档返回 1×1 占位（夜间 IBL 走解析式，不采样纹理，
+## 但 uniform 必须非 null —— 否则槽位判定会把"夜间"当成"尚未初始化"）。
 func _load_hdr(m: int) -> Texture2D:
 	var path: String = HDR.get(m, HDR[GameContent.LightMode.SUNSET])
+	if path.is_empty():
+		return _placeholder_tex()
 	if not ResourceLoader.exists(path):
-		push_warning("[SkySystem] 缺少 HDR：%s（环境反射保持上一档）" % path)
-		return null
+		push_warning("[SkySystem] 缺少 HDR：%s（该档退回 1×1 占位，IBL 无环境照明）" % path)
+		return _placeholder_tex()
 	var tex = _hdr_cache.get(path)
 	if tex == null:
 		tex = load(path)
 		_hdr_cache[path] = tex
 	return tex
+
+
+## 夜间档占位纹理：1×1 中性灰，构造一次后复用。
+## 它不会被采样（夜间 IBL 走 night_environment），只为保证 sampler2D 有效、
+## 以及 `_env_tex == null` 这类"未初始化"判定不被误触发。
+func _placeholder_tex() -> Texture2D:
+	if _placeholder == null:
+		var img := Image.create(1, 1, false, Image.FORMAT_RGB8)
+		img.fill(Color(0.043, 0.051, 0.078))  # 与 night_environment 的天顶色同量级
+		_placeholder = ImageTexture.create_from_image(img)
+	return _placeholder
 
 
 ## 环境反射与背景（IBL）：把对应 HDR 装进 WorldEnvironment 的 Sky。
@@ -309,18 +410,15 @@ func _apply_environment_hdr(m: int, env: Environment = null) -> void:
 	var environment := env if env != null else _environment()
 	if environment == null:
 		return
-	var path: String = HDR.get(m, HDR[GameContent.LightMode.SUNSET])
-	if not ResourceLoader.exists(path):
-		push_warning("[SkySystem] 缺少 HDR：%s（环境反射回退为程序化天空）" % path)
-		return
-	var tex = _hdr_cache.get(path)
-	if tex == null:
-		tex = load(path)
-		_hdr_cache[path] = tex
+	var tex := _load_hdr(m)
 	var energy := float(ENV_INTENSITY.get(m, 0.5))
 	if _pano_cache != null:
 		_pano_cache.panorama = tex
 		_pano_cache.energy_multiplier = energy
+		# ⚠️ 这一行以前根本不存在 —— HDR_ROTATION 定义了却零读取点，兜底路径
+		# 的全景也一直是未旋转的。PanoramaSkyMaterial.rotation 是 **float**
+		# （绕 Y 的弧度），不是 Vector3（见 tools/fix_runtime.py 的同类修补）。
+		_pano_cache.rotation = float(HDR_ROTATION.get(m, 0.0))
 	# Sky / 材质只建一次并复用。
 	# 之前每次切模式或切雨都 new 一对再赋给 environment.sky —— 换掉 Sky 对象会
 	# 让引擎重算 IBL 辐照度立方体贴图，而 set_raining()/apply_mode() 会频繁调用这里。
