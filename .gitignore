@@ -21,10 +21,13 @@
 *.log
 export_presets.cfg     # 含本机导出路径与签名密钥，不应入库
 
-# C# / Mono（本项目暂无 C#，保留以防后续接入）
+# C# / Mono（ALS 角色迁移接入后的 .NET 8 工程）
 .mono/
 mono_crash.*.json
 data_*/
+bin/
+obj/
+*.user
 
 # 构建与导出产物
 *.pck

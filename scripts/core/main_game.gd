@@ -98,6 +98,14 @@ var _game_time := 0.0
 const RIDER_SCRIPT := preload("res://scripts/vehicles/rider.gd")
 var _rider = null                   ## RIDER_SCRIPT 实例（untyped：全局类名未注册）
 var _rider_yaw := 0.0               ## 角色 yaw 平滑跟随移动方向（原版 riderYaw）
+## ALS 步行角色（Godot-Locomotion 迁移的 C# 运行时，见 GtaSzAlsPlayerHost.cs）。
+## ⚠️ C# 脚本用 load() 而非 preload：.NET 程序集未编译时 preload 会让整个
+## main_game.gd 加载失败；load() 返回 null 则整体回退到 CityWalk 步行。
+const ALS_HOST_SCRIPT_PATH := "res://src/Als.Godot/Locomotion/GtaSzAlsPlayerHost.cs"
+const ALS_GROUND_SCRIPT := preload("res://scripts/world/als_physics_ground.gd")
+var _als_host = null               ## GtaSzAlsPlayerHost（C#，untyped：可能未编译）
+var _als_ground = null             ## AlsPhysicsGround（角色周围的动态物理代理）
+var _als_walk_active := false      ## 本轮步行是否由 ALS 角色驱动
 var _pending_level_up_dialogue := {}
 
 
@@ -127,6 +135,26 @@ func _build_world() -> void:
 	walk = CityWalk.new(
 		func(x: float, z: float) -> bool: return world.collision.blocked(x, z),
 		func(x: float, z: float) -> float: return world.height_field.height_at(x, z))
+
+	# ALS 步行角色：物理地面代理（角色周围的动态 StaticBody）+ C# 角色宿主。
+	# 宿主 _Ready 里预热动画资源 —— 此刻还在加载画面后面，玩家无感。
+	# C# 方案未编译时 load 返回 null → 步行照旧走 CityWalk，不影响其它模式。
+	var host_script = load(ALS_HOST_SCRIPT_PATH)
+	if host_script != null:
+		_als_ground = ALS_GROUND_SCRIPT.new()
+		_als_ground.name = "AlsPhysicsGround"
+		add_child(_als_ground)
+		_als_ground.setup(world)
+		_als_host = host_script.new()
+		_als_host.name = "AlsPlayerHost"
+		add_child(_als_host)
+		# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
+		# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
+		# 之后每次下车取现成角色（EnterWorld 检测到已配置会跳过构造）。
+		var prewarm_feet := CoordinateUtil.to_world(0.0, 0.0, 0.0)
+		_als_ground.update_around(prewarm_feet)   # 地面代理（含首批建筑体）随加载预铺
+		_als_host.EnterWorld(prewarm_feet, 0.0)
+		_als_host.ExitWorld()
 
 	# 子系统（用 preload 而非 set_script，确保脚本一定被解析）
 	world.sky = _add_system(SKY_SCRIPT, "SkySystem")
@@ -445,8 +473,12 @@ func _on_key(k: InputEventKey) -> void:
 			paused = panels.settings_visible
 		KEY_C:
 			if mode == Mode.WALKING:
-				_walk_first_person = not _walk_first_person
-				hud.toast("步行 · 第一人称" if _walk_first_person else "步行 · 第三人称")
+				# ALS 角色暂无第一人称入口：给个提示而不是撒谎的切换 toast
+				if _als_walk_active and _als_available():
+					hud.toast("ALS 步行为第三人称，暂不支持第一人称")
+				else:
+					_walk_first_person = not _walk_first_person
+					hud.toast("步行 · 第一人称" if _walk_first_person else "步行 · 第三人称")
 			else:
 				camera.next_view()
 		KEY_F:
@@ -715,8 +747,12 @@ func _toggle_vehicle_entry() -> void:
 		# 原版 riderYaw = walk.yaw：模型先朝向下车时的视线方向，走起来再转向移动方向
 		_rider_yaw = walk.yaw
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
+		# ALS 角色可用时接管步行（轨道相机换 Current；不可用时照旧 CityWalk）
+		_als_enter_world()
 		hud.toast("%s · WASD 行走 / Shift 跑步 / 拖动环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
 	elif mode == Mode.WALKING:
+		# 先把 ALS 角色位置写回 walk（上车判定按 walk.x/z 到车门的距离）
+		_als_exit_world()
 		# 回到下车前那一台（判据是 _last_ground_vehicle，不是模型的 visible）
 		var want_tank := _last_ground_vehicle == Mode.TANK and _tank_model != null
 		var v2: Dictionary
@@ -757,11 +793,49 @@ func _flush_speed() -> void:
 	tank.steer = 0.0
 	_keys.clear()
 
+## —— ALS 步行角色衔接（GtaSzAlsPlayerHost 的 enter/exit 契约）——
+##
+## enter_world：下车/退出观景时把角色放到 CityWalk 记录的落脚点，接管步行模式
+## （轨道相机换 Current、隐藏旧 Rider 模型）；exit_world：上车/进观景前把马达
+## 位置写回 CityWalk（x/z/yaw），再停用角色、交还 ChaseCamera。
+## 坐标契约：GTA 数据 yaw = -Godot 节点 yaw（见 coordinate_util.gd）。
+
+func _als_available() -> bool:
+	return _als_host != null and _als_host.RuntimeReady
+
+
+func _als_enter_world() -> void:
+	if not _als_available() or _als_walk_active:
+		return
+	var ground_y := world.height_field.height_at(walk.x, walk.z)
+	var feet := CoordinateUtil.to_world(walk.x, walk.z, ground_y)
+	if _als_ground != null:
+		_als_ground.update_around(feet)   # 先把地面瓦片铺到落脚点，避免首帧下坠
+	# ⚠️ GDScript 调 C# 方法用 C# 原名（PascalCase），不做 snake_case 转换。
+	_als_host.EnterWorld(feet, walk.yaw)
+	_als_walk_active = true
+	if _rider != null:
+		_rider.set_enabled(false)
+
+
+func _als_exit_world() -> void:
+	if not _als_walk_active:
+		return
+	var motor: Vector3 = _als_host.MotorPosition
+	var d := CoordinateUtil.from_world(motor)
+	walk.x = d.x
+	walk.z = d.y
+	walk.yaw = -_als_host.ViewYaw
+	_als_host.ExitWorld()
+	_als_walk_active = false
+	camera.current = true
+
 func _enter_observer() -> void:
 	_pre_observer_mode = mode
 	# 步行进观景：角色本体要收起来。_step_walk 是唯一管理 _rider 的地方，
 	# 切到 OBSERVER 后它不再跑，不在这里显式隐藏的话角色会一直杵在地面上。
 	if mode == Mode.WALKING:
+		_als_exit_world()      # 马达位置写回 walk，停用 ALS 角色
 		walk.active = false
 		if _rider != null:
 			_rider.set_enabled(false)
@@ -808,6 +882,8 @@ func _exit_observer() -> void:
 			if _rider != null:
 				_rider.set_enabled(true)
 			camera.set_mode(ChaseCamera.Mode.WALKING, true)
+			# ALS 角色可用时重新接管步行（内部会把 _rider 重新藏起来）
+			_als_enter_world()
 		_:
 			mode = Mode.CAR
 			if _car_model != null:
@@ -904,6 +980,11 @@ func _process(delta: float) -> void:
 	var dt := clampf(delta, 0.0, 0.05)
 	# 原版 update() 第一行：this.time += dt（暂停也不停表）
 	_game_time += dt
+
+	# ALS 宿主有自己的 _PhysicsProcess，不吃 _update_modes 的 `if paused` 守卫
+	# —— 暂停期间禁用其处理（含子节点轨道相机），恢复时再放开。
+	if _als_host != null:
+		_als_host.process_mode = Node.PROCESS_MODE_DISABLED if paused else Node.PROCESS_MODE_INHERIT
 
 	_update_modes(dt)
 	_check_manual_arrival()
@@ -1117,6 +1198,20 @@ func _step_tank(dt: float) -> void:
 	lights.place(_tank_model.global_transform if _tank_model != null else camera.global_transform)
 
 func _step_walk(dt: float) -> void:
+	# ALS 角色驱动：物理地面跟随马达；CityWalk 只做状态镜像（HUD/地图/上车判定
+	# 继续读 walk.x/z）。宿主静默降级（RuntimeReady=false）时走老 CityWalk 路径。
+	if _als_walk_active and _als_host != null and _als_host.RuntimeReady:
+		var motor: Vector3 = _als_host.MotorPosition
+		if _als_ground != null:
+			_als_ground.update_around(motor)
+		var d := CoordinateUtil.from_world(motor)
+		walk.x = d.x
+		walk.z = d.y
+		walk.yaw = -_als_host.ViewYaw
+		walk.speed = _als_host.HorizontalSpeed
+		walk.moving = walk.speed > 0.1
+		walk_eye_world = motor
+		return
 	var before := Vector2(walk.x, walk.z)
 	walk.step({
 		"forward": Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP),

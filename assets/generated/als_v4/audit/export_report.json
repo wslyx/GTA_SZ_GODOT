@@ -1,0 +1,8 @@
+{
+  "status": "complete",
+  "assetCount": 273,
+  "fileCount": 141,
+  "errorCount": 0,
+  "warningCount": 0,
+  "normalizedFbxKeys": ["CreationTimeStamp.Day", "CreationTimeStamp.Hour", "CreationTimeStamp.Millisecond", "CreationTimeStamp.Minute", "CreationTimeStamp.Month", "CreationTimeStamp.Second", "CreationTimeStamp.Year", "DocumentUrl", "ExternalTextureObject", "ObjectId", "SrcDocumentUrl"]
+}

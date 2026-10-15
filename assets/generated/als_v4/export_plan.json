@@ -1,0 +1,3658 @@
+{
+	"schemaVersion": 1,
+	"assets": [
+		{
+			"id": "006ec21c33b4f45b44699bc3c89016bdcf512aad",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/VelocityBlend.VelocityBlend",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/VelocityBlend",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "029ff8f936bf1ba2227098bae50be8eb1f39e13b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/AnimCurveCreationData.AnimCurveCreationData",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/AnimCurveCreationData",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "02e5b725fbe617afc766013edf7f69d6b95b81a4",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_RF.ALS_N_JumpWalk_RF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_RF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_RF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0454e237f827fbb8d63b04b90d2f5ccf6441fcc1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_RH.ALS_N_LandRoll_F_Montage_RH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_RH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "06205e86a4ddf982dcda158c3710fe19d68845ef",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses.ALS_Props_Bow_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0748450294e7a7d02c46fffbc6be42b6e5cdb747",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/DiagonalScaleAmount.DiagonalScaleAmount",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/DiagonalScaleAmount",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "086a09a79f10411e6ab19e9b9c9b1898db4585fc",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_M9.M_Prop_M9",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_M9",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "086f91432460173ea467e63fb1d9ddd7a8bef4e2",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F.ALS_Props_M4A1_Sprint_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "098c8748864e1958ca27759b3c5d24a33f988226",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Animation_BPI.ALS_Animation_BPI",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Animation_BPI",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"0a8d1b7d3f208b09fd657d4d2ec40a8ad6d3fbb6"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "09f7bfbe19b0e83741abae7d4ef1fde307ac1c82",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FL.ALS_N_WalkRun_FL",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FL",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0dafe631fa4b80aec354839565d39a0c2fe4768c",
+				"300d88125a434aff588e661ef27abf1878d51e2c",
+				"44a7f89b2c1dac832ca63753c131a037420f9d7e",
+				"8ae1b9703a7d0144e570247d88629530b376885f",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0a8d1b7d3f208b09fd657d4d2ec40a8ad6d3fbb6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/GroundedEntryState.GroundedEntryState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/GroundedEntryState",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "0b439429cf3a3692eaea77a81b275ae96eab937f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_LF.ALS_N_JumpRun_LF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_LF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_LF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0b7e427dad0194de69f86d88f940236c06508c08",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP.ALS_AnimBP",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_AnimBP",
+			"classPath": "/Script/Engine.AnimBlueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"006ec21c33b4f45b44699bc3c89016bdcf512aad",
+				"02e5b725fbe617afc766013edf7f69d6b95b81a4",
+				"06205e86a4ddf982dcda158c3710fe19d68845ef",
+				"0748450294e7a7d02c46fffbc6be42b6e5cdb747",
+				"098c8748864e1958ca27759b3c5d24a33f988226",
+				"09f7bfbe19b0e83741abae7d4ef1fde307ac1c82",
+				"0a8d1b7d3f208b09fd657d4d2ec40a8ad6d3fbb6",
+				"0b439429cf3a3692eaea77a81b275ae96eab937f",
+				"0ea33c35b3929aedcbce55be96de6b266f22197c",
+				"146fff5000e151a3790ba5aca8a5bfee4363e909",
+				"14b8ebe1894df18291324b3fe6d5197e3f1391c9",
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"1770840df822b84d42ac2b693142174ef698e8dc",
+				"179d156aad0a32c44d6bf3ee662d0eebc637f124",
+				"19998bac1f393df801f1e61b60dfd1eb976d396d",
+				"19c0187833782797fd6364d2d9d59cb306a8cc28",
+				"1d4bd0f5919851b1d8d6beaad2e9f8495c1c7bd8",
+				"1f6188f2d1ced1329443c23a95816e38d8534aac",
+				"1f79ab2beef76714e2ed751035d7d021b0da547b",
+				"21c24bd7df5192db2e2a860457f2b7b0681de41d",
+				"2422929f8ca29b601b8b67cdc343b01a789a3fb8",
+				"24e8830b43c78b318932dc2fc6680fdf3452b9e2",
+				"25c4719468f9779052bd8279992bb7bf2ead8572",
+				"27dd455abfeada763de3fc0026d74618f7f37eb7",
+				"310b992c1a30d10675842924f95353905f659382",
+				"32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+				"331da5c90eb69e8d5c4ef90225207ca7a92f17ed",
+				"37344754320eaee2005a4a6dab5ecc84ff136919",
+				"39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+				"3e0c9a05b5a8e6c567f563431654b299d27d315b",
+				"3e23712571d6bbea8744fc94dad0904a6a0a0b5d",
+				"3ff3885338ff0ec616a922166a249fc35ffdbc79",
+				"40e3e08f95a2620e1712562b618fc361509a2a80",
+				"41f071898a1aefb25572721af8c890a8c7fc0f86",
+				"44a7f89b2c1dac832ca63753c131a037420f9d7e",
+				"4677f1239a2057a65a5daeaf6ebbbf4f6a997060",
+				"48c434a2ee8e7e8e23bfa10890a0cc29357ca3c8",
+				"48fca5aeb2b3f33c7bc01c3b711a41b89e9f75fe",
+				"4da4f0f9ce5d2b4d56c61655a3cc75b449763a09",
+				"4e8bf1b38cd8d67f7b891c447cdb868f11b632c0",
+				"4ec40f5759f47deb5b6d03810c58b99f9f8bca03",
+				"4feaf2edfa913aedfa651dac00ec36b9bc5391a3",
+				"512d3e7359dd13d89457f90e68cceac1408c940f",
+				"5424c7d119568dace5551a83aad3bdbb9c780b78",
+				"57ba9bc36b45aad5fa0a3351b8caf21deb44d08e",
+				"59f469970639c759780278d7ffc8ea717e715207",
+				"59f521b6abdb95915f8a419fe3bef92696f63bff",
+				"5a1b2ea64555866d60e90e67456d2a5522286c96",
+				"5aee9a410ea44118c404e68877d1fa09c2c9d0b9",
+				"5ccb5c681b06598b33ab76785f709358ece86a5a",
+				"5dd27edde6fdf9edf5078f29166920d819fb1ce2",
+				"5f9eb6d3f1793245780aa6cd57c05da8443458bf",
+				"6124eafdcbeaaf04bca366add34c821faa0e4963",
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"62508043098864e937ab7d1c8d1c30b575b02c23",
+				"6720aef9e99e694137281bcbf2a1df9cfb1abd83",
+				"67e28a265355dd85f22a10fe3e622c60f6aabe2c",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"69aee04ffca72356fef27d5183d67578dcad93e6",
+				"6cdc10621a632cfe5aae96e76a82b37da26891e3",
+				"6f4c9999621f662d825bc05d9e46263c360fed93",
+				"74fae9958ca8fc1e28329c581038e55a4840c2c1",
+				"7b4cd34c8da5697e4bfa5e23f2330f4998670999",
+				"8112aef4c58ef102e76e697b84af68b86263529c",
+				"8a6fb8d8eb88047a9b40f43b714967277653b789",
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"8bd6ad52ad04a2ad23b47187886c630701df5260",
+				"8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+				"8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+				"9007409ec6ea7144881f6d865363399896dc2b91",
+				"92e0d292db977093c0ad02b5490c241609032e38",
+				"97cc3ceaeea17275e1684d19ce02cc248fb29b6b",
+				"97d46bf9858376893c1c34a128c27044b4467d82",
+				"9a04c94cbdf6a02f426768f49c789cb8341e253a",
+				"9cf40933f81b9ccce915fc572ca3162cf1d0241c",
+				"a20c9d988632a569157541f0d6fd8c309ac8ae09",
+				"a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+				"a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+				"a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+				"a80cfd64d43bdfd5a1c08cf133d8a94c9cef87cf",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"ab6308b7e0305e8dd4a01e63e2b5033e0e52072d",
+				"af884becb88db54364a1b01d46921106c23eafaf",
+				"b084f74d4087d0fa215618550fadd29ebc2b01a0",
+				"b1b9302cbf29b5978f4b8c5768a94dd227982e40",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"b4bf2befd979de45f53f300dc0e60c702fc3a686",
+				"b567e2ed58e879f63621211fa48ab6155e1260e0",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b78c3380910591a5e418b59937b0d8f86b33ec09",
+				"bd603ea3ba08e7c0c4df0acc92f9c9e6ba3d5ab2",
+				"bf827e8773890767df2c42df9208d461dc9e3ece",
+				"c01a52b670f16e72cf55d31eb18231a774429234",
+				"c075b5a1310e1d46c380287f92e36a460501a7cd",
+				"c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+				"c23d8f29828aceb875f40d7cf904473fb15971fa",
+				"c4ec8d67334933779b73d577b8e2e206505da592",
+				"c8bdfd06fd17e5ee222e97b542d44e1e9ca38b95",
+				"c93eef98837ba6e46755780bf9cca9f6f9bf44bb",
+				"d6d9eb028ac8461ea9ed4bc12d6effaa23719d5e",
+				"da7ca3cbd8b535e49ff04a6f72c30cc14598bae1",
+				"db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+				"dc1e155fe8b8f411029a0fa3a67968fa03ec2247",
+				"ddfa1a6737182bddb3134e78d0460c3ef49f93e1",
+				"de7501b7a9bcc519438eb278019e51e3f8a6bf02",
+				"deda874944d28720dda32eac369723b3362af20d",
+				"e1b9ca21b517ff5c0ee608e9e18f297800b5883f",
+				"e21ae782c4c15660e8e68fe6de81c151c083865e",
+				"e2d92a77e2e5fd2de0b4f2987652523ec87c061f",
+				"e36e48b2b343c7cc6c8f3337af79cb9f453f45fa",
+				"e5ab3d8d72b370fa5c85f28c2c02eaae9a88fa55",
+				"e6a8d9512c49fa05c1f9e89f899ca6e406fbdf51",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"eb84a748fee4615754ce3cbcd3c259b33918b935",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919",
+				"f68538a704f796bb5ccc6b168794ea3a7ad04eb8",
+				"f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+				"f9ec8804e251f03c57e04dde4db9bd921457bae4",
+				"fc1b3c52caea40b1ebbefb03026d4dbfd7b46262",
+				"fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+				"fcbab94ebb8eb39744f1973e98311c413660b9bc",
+				"fdfae8af1f8b9425e630ecd25ad389991e3eb99e",
+				"fed8555576fff79dc806356e0ddd96c87a05a733"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_F.ALS_N_RunPose_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_F.fbx",
+			"dependencies": [
+				"884e066fdd67c229620998a80ec332ecd15feee9",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0dafe631fa4b80aec354839565d39a0c2fe4768c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_L.ALS_N_RunPose_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_L.fbx",
+			"dependencies": [
+				"884e066fdd67c229620998a80ec332ecd15feee9",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0ea33c35b3929aedcbce55be96de6b266f22197c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched.ALS_Props_Pistol_1H_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"1094fc4ec63926d1188bab751b7ef1b18c28fcfb",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_R.ALS_N_RunPose_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_RunPose_R.fbx",
+			"dependencies": [
+				"884e066fdd67c229620998a80ec332ecd15feee9",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1094fc4ec63926d1188bab751b7ef1b18c28fcfb",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses_NoCurves.ALS_Props_Pistol_1H_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses_NoCurves.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "11664e3f4d435580bf57b4f7b3ecf83f1653678b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_Asset.Mantle_Asset",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_Asset",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "146fff5000e151a3790ba5aca8a5bfee4363e909",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose.ALS_CLF_Pose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_CLF_Pose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "14b8ebe1894df18291324b3fe6d5197e3f1391c9",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy.ALS_N_Land_Heavy",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "151f0b79a243d0badb67e71be41db10405526ff5",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/Camera.Camera",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/Camera",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/Blueprints/CameraSystem/Camera.fbx",
+			"dependencies": [
+				"e27f10ae780a585dddeadb15aec6d581c4d4837f"
+			],
+			"externalDependencies": [
+				"/Engine/BasicShapes/BasicShapeMaterial"
+			]
+		},
+		{
+			"id": "15448801e639286305e4da05cfc67925e737e43b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses_NoCurves.ALS_Props_M4A1_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses_NoCurves.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "15d6284bb8404d8015e3d35c704a0097f54bb1e3",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_B.ALS_N_LeanPose_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_B.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1624bfe19eff475cd06a7d3e5b5a445be80bc598",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses_NoCurves.ALS_Props_Binoculars_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses_NoCurves.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "16b90e6e68b859e65716fb790073c8750f6fa3dd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_Gait.ALS_Gait",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_Gait",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "1752fae56b3cf26eec6d5a145284867661834bdd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Walk_V.StrideBlend_N_Walk_V",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Walk_V",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "1770840df822b84d42ac2b693142174ef698e8dc",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep.ALS_Props_Torch_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep.fbx",
+			"dependencies": [
+				"a3231a9b5f07ddae18cc061ec0aa7c8a0fddd6cd",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "179d156aad0a32c44d6bf3ee662d0eebc637f124",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched.ALS_Props_Binoculars_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"1624bfe19eff475cd06a7d3e5b5a445be80bc598",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "17e4571368a6a2ccfeacf927b8deece8864a142b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/EarlyBlendOut_NotifyState.EarlyBlendOut_NotifyState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/EarlyBlendOut_NotifyState",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"25c4719468f9779052bd8279992bb7bf2ead8572",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "19998bac1f393df801f1e61b60dfd1eb976d396d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses.ALS_Props_Torch_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "19c0187833782797fd6364d2d9d59cb306a8cc28",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched.ALS_Props_Bow_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"a9130fb81cde85feb0c30091facf77763b15711f",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1a73f66279c200a5853da9f42e600488a1a74c26",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_2H.ALS_CLF_GetUp_Front_Montage_2H",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_2H",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"f1f32681f007156c8b5fedd996422c2f89c1e559"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1d176a6f635d3e73dcbd7670751c22612bc727ff",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/AnimMan_PhysicsAsset.AnimMan_PhysicsAsset",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/AnimMan_PhysicsAsset",
+			"classPath": "/Script/Engine.PhysicsAsset",
+			"kind": "PhysicsAsset",
+			"outputPath": null,
+			"dependencies": [
+				"46af0861049be0ecfdbeddd54096fd10662242b2"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1d4bd0f5919851b1d8d6beaad2e9f8495c1c7bd8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses.ALS_Props_Barrel_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Barrel/ALS_Props_Barrel_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1dcb394f92d084307c7cbef9031f2853ecca1f35",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_AnimMan_CharacterBP.ALS_AnimMan_CharacterBP",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_AnimMan_CharacterBP",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"0454e237f827fbb8d63b04b90d2f5ccf6441fcc1",
+				"0b7e427dad0194de69f86d88f940236c06508c08",
+				"11664e3f4d435580bf57b4f7b3ecf83f1653678b",
+				"1a73f66279c200a5853da9f42e600488a1a74c26",
+				"2516ba17950769f5845f00f6c17c6d6ac913f475",
+				"2d9341182885d90ad666fff32c025937438b1827",
+				"35b984a2215f8d238fed23d8322bea3267dfd93f",
+				"399a1e91c27674d6ac4e3f4958be5f038400ae64",
+				"46af0861049be0ecfdbeddd54096fd10662242b2",
+				"473700a82be72a1e85aa02fce2f4dadb52815538",
+				"4a782c0ab962e23fd0008b296bced34b17e91389",
+				"5657e37ac49745e09e5a7c4ad1c46aaa6491cb7f",
+				"568072d15dc7a527e15f1e1acd7354dff8406dcd",
+				"570a4b91e06e0a1843f6a3dfd151baf3bf18de39",
+				"585adff489920aaae88366a0a9dd82580e4f0143",
+				"5be2a581a1eaa0b7dce3cda61166b789f16a0e92",
+				"601cf9ada4f872d1f248b769cfdbe319d2788ee5",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"6691c274d56466d10311066e2ecd6285a00a709a",
+				"6ee84ce89fabaef80f173802ecb268037a81e3ea",
+				"72308eaae4573d01664aae945ba423a6eb084735",
+				"7d3d3f1e0f341eb76b3233c535305c182eb91ed4",
+				"86d98d8177feb473c8a5f406c5b42f8c2a2f7b07",
+				"8777353e0beb566f4bc0a1129de1d68b56b3a9e6",
+				"96304d81ece808c8202bb6472f580c0e3af84037",
+				"98e7884cd73b3fd7fe547d1da783ff0c5eb4fa0c",
+				"9e326c440d1441edfb89e17b50c39571d100b93c",
+				"a826b9522e2c847faa5c39f41e0a13b80525d36e",
+				"ae92864f7fb79dfa50846bb6c1624020b7ef0152",
+				"afa5bd7d21e61da48e825cff467341e4c9674a29",
+				"b9f71fc54fbe7dae65cd93db240a5ba54aad7c3b",
+				"bdd3a837e71e99a240b9484b351605e3b4888070",
+				"d2c99014982aa14180002127354ee3fc83d25b86",
+				"d920d75acaa0540b8ca3832ae894047f9554449a",
+				"ddd05cc5b8600fdae3fb8a21ea4f82c9b55c2bb9",
+				"e1c9c7ee940b51f61e775b7ef11187a4e173a7f6",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ff9b7d6c520fcb306b1f0857fac06c2504f77808"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "1f6188f2d1ced1329443c23a95816e38d8534aac",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpLoop.ALS_N_JumpLoop",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpLoop",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpLoop.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1f6b45a03c08e2eadcf81012b004557bde6f52cf",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/Mannequin_PhysicsAsset.Mannequin_PhysicsAsset",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/PhysicsAssets/Mannequin_PhysicsAsset",
+			"classPath": "/Script/Engine.PhysicsAsset",
+			"kind": "PhysicsAsset",
+			"outputPath": null,
+			"dependencies": [
+				"86d98d8177feb473c8a5f406c5b42f8c2a2f7b07"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "1f79ab2beef76714e2ed751035d7d021b0da547b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_R.ALS_CRF_Walk_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_R.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "21c24bd7df5192db2e2a860457f2b7b0681de41d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.ALS_CLF_Walk_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_L.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "237a5971d1176a3f1874b0ee743e8912fcf3125a",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_TraceSettings.Mantle_TraceSettings",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_TraceSettings",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "2422929f8ca29b601b8b67cdc343b01a789a3fb8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BR.ALS_N_WalkRun_BR",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BR",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0dafe631fa4b80aec354839565d39a0c2fe4768c",
+				"245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+				"300d88125a434aff588e661ef27abf1878d51e2c",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"eb84a748fee4615754ce3cbcd3c259b33918b935"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "245ea51e30449a60b7d2b783ec0f6d24ec3bacc0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RB.ALS_N_Run_RB",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RB",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RB.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "24e8830b43c78b318932dc2fc6680fdf3452b9e2",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses.ALS_Props_Binoculars_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "2516ba17950769f5845f00f6c17c6d6ac913f475",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/M4A1.M4A1",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/M4A1",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/Props/Meshes/M4A1.fbx",
+			"dependencies": [
+				"3027c92df8bfa9e7f88b17cbf2f4394d89e5d8ce",
+				"b9b6098fb325f0033c9158ec18a61f89e0ab7902"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "25c4719468f9779052bd8279992bb7bf2ead8572",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Character_BPI.ALS_Character_BPI",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Character_BPI",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "27dd455abfeada763de3fc0026d74618f7f37eb7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/ChangeStance.ChangeStance",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/ChangeStance",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "29fdef69db9ccaf97d4a78eaeb05591285cb67c7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch2.M_Prop_Torch2",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch2",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "2a42bf77ba980473c47039a80501ef656a032535",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_AnimMan_Eyes.M_AnimMan_Eyes",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_AnimMan_Eyes",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "2c80369a615b9a7978ea28a3348c618178bdb368",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings.MovementSettings",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "2d9341182885d90ad666fff32c025937438b1827",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default.ALS_N_LandRoll_F_Montage_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_Default",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "300d88125a434aff588e661ef27abf1878d51e2c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_L.ALS_N_WalkPose_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_L.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3027c92df8bfa9e7f88b17cbf2f4394d89e5d8ce",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/M4A1_Skeleton.M4A1_Skeleton",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/M4A1_Skeleton",
+			"classPath": "/Script/Engine.Skeleton",
+			"kind": "Skeleton",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "305d49e245142bac8ae9a7ec9ef14f6224ae95e6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Copy_Curves.Copy_Curves",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Copy_Curves",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "310b992c1a30d10675842924f95353905f659382",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90.ALS_CLF_Rotate_L90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_L90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "32e7c873dcf8fafd51e1140b17fa35081a941126",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_R.ALS_N_LeanPose_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_R.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B.ALS_N_Walk_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_B.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "331da5c90eb69e8d5c4ef90225207ca7a92f17ed",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/DynamicMontageParams.DynamicMontageParams",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/DynamicMontageParams",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "35b984a2215f8d238fed23d8322bea3267dfd93f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_Default.ALS_CLF_GetUp_Front_Montage_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_Default",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"f1f32681f007156c8b5fedd996422c2f89c1e559"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "37344754320eaee2005a4a6dab5ecc84ff136919",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Walk.StrideBlend_N_Walk",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Walk",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "384610523831bb4375f31205c029838400af6a78",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4Man_Logo_N.UE4Man_Logo_N",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4Man_Logo_N",
+			"classPath": "/Script/Engine.Texture2D",
+			"kind": "Texture",
+			"outputPath": "textures/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4Man_Logo_N.png",
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "399a1e91c27674d6ac4e3f4958be5f038400ae64",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/M9.M9",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/M9",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/Props/Meshes/M9.fbx",
+			"dependencies": [
+				"086a09a79f10411e6ab19e9b9c9b1898db4585fc",
+				"cd7b93160f1e5020725bfeb72a5cb8cec94cea33"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.ALS_N_LandRoll_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F.fbx",
+			"dependencies": [
+				"a9f9d723a1de7d587cbc023a78beb527a7bdfd8d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"c1d84431535a9bc052a9a61a4ca6508c17f14963",
+				"ebe6309a07829c3c3920c9b5b4572b43b6161df6"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementState.ALS_MovementState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementState",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "3bf7d526912bb1906b6ff1f3ee1234e9cbe5b1e8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Mannequin_Body.M_Mannequin_Body",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Mannequin_Body",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [
+				"59a915fa8e44c6c8b0c34b3383c642696c23b59a",
+				"f8af9c4e2e365928561d3295a8dadf76093130c1"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3c285f6df704e8e73cdfd0fd9bb147c1e5338ef1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90.ALS_CLF_Rotate_R90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_Rotate_R90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3c7efe09469508fd9e40015b3bf593dde39c540b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_0.ALS_N_LeanPose_0",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_0",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_0.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3e0c9a05b5a8e6c567f563431654b299d27d315b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/TurnInPlace_Asset.TurnInPlace_Asset",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/TurnInPlace_Asset",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "3e23712571d6bbea8744fc94dad0904a6a0a0b5d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.ALS_N_Transition_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_L.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3f4e663ded4d9e224701baf4af3457942cf6934f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Mannequin_Logo.M_Mannequin_Logo",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Mannequin_Logo",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [
+				"384610523831bb4375f31205c029838400af6a78",
+				"fe8e73bfbc8e848a483a603aab4c8faeab6fe32e"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "3ff3885338ff0ec616a922166a249fc35ffdbc79",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/MovementDirection.MovementDirection",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/MovementDirection",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "40e3e08f95a2620e1712562b618fc361509a2a80",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep.ALS_Props_Pistol_2H_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep.fbx",
+			"dependencies": [
+				"6aec8ac8ee0999c72a71fc2e74ed4e713f2c1a2e",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "41f071898a1aefb25572721af8c890a8c7fc0f86",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LeanInAirAmount.LeanInAirAmount",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LeanInAirAmount",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "44a7f89b2c1dac832ca63753c131a037420f9d7e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LF.ALS_N_Walk_LF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4677f1239a2057a65a5daeaf6ebbbf4f6a997060",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.ALS_N_Rotate_L90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_L90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "46af0861049be0ecfdbeddd54096fd10662242b2",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/AnimMan.AnimMan",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/AnimMan",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/CharacterAssets/MannequinSkeleton/Meshes/AnimMan.fbx",
+			"dependencies": [
+				"1d176a6f635d3e73dcbd7670751c22612bc727ff",
+				"2a42bf77ba980473c47039a80501ef656a032535",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"db76a1f7db09e7b542922409078b0bbb4a4f5849"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "473700a82be72a1e85aa02fce2f4dadb52815538",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Binoculars.Binoculars",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Binoculars",
+			"classPath": "/Script/Engine.StaticMesh",
+			"kind": "StaticMesh",
+			"outputPath": "meshes/static/Props/Meshes/Binoculars.fbx",
+			"dependencies": [
+				"c7ea9ff65a63c8141344f24c26a540e873670358"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "48c434a2ee8e7e8e23bfa10890a0cc29357ca3c8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_L.ALS_CRF_Walk_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_L.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "48fca5aeb2b3f33c7bc01c3b711a41b89e9f75fe",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/LeanAmount.LeanAmount",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/LeanAmount",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "499cda9ebb0bad7100435003b172317e577aa54b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/ResponsiveMovement.ResponsiveMovement",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/ResponsiveMovement",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "4a62810735360da4f17b88b701897cf6299587d7",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_F.ALS_N_WalkPose_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4a782c0ab962e23fd0008b296bced34b17e91389",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Barrel.Barrel",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Barrel",
+			"classPath": "/Script/Engine.StaticMesh",
+			"kind": "StaticMesh",
+			"outputPath": "meshes/static/Props/Meshes/Barrel.fbx",
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4da4f0f9ce5d2b4d56c61655a3cc75b449763a09",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_L.ALS_N_LocoDetail_Accel_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_L.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_R.ALS_N_Falling_LeanPose_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_R.fbx",
+			"dependencies": [
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4e8bf1b38cd8d67f7b891c447cdb868f11b632c0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep.ALS_Props_Binoculars_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Binoculars/ALS_Props_Binoculars_Aim_Sweep.fbx",
+			"dependencies": [
+				"1624bfe19eff475cd06a7d3e5b5a445be80bc598",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4ec40f5759f47deb5b6d03810c58b99f9f8bca03",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy_Additive.ALS_N_Land_Heavy_Additive",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy_Additive",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Heavy_Additive.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "4feaf2edfa913aedfa651dac00ec36b9bc5391a3",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched.ALS_Props_M4A1_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"15448801e639286305e4da05cfc67925e737e43b",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "50cb3a4538d674f83c1253791cea97ad9c0af462",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Create_LayeringCurves.Create_LayeringCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Create_LayeringCurves",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "512d3e7359dd13d89457f90e68cceac1408c940f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses.ALS_Props_Pistol_2H_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5424c7d119568dace5551a83aad3bdbb9c780b78",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses.ALS_Props_Box_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Box/ALS_Props_Box_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "54bacbba11d3942d4f2b5dffb96871bec5f73381",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F.ALS_Props_M4A1_Run_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "552198b373c14b6ef38b20c53ab08e9060cc55b7",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.ALS_N_Look_U_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_U_Sweep.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5657e37ac49745e09e5a7c4ad1c46aaa6491cb7f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_Default.ALS_CLF_GetUp_Back_Montage_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_Default",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b9afe2269ecbc754762fd66f34c7663a05cffe48"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "568072d15dc7a527e15f1e1acd7354dff8406dcd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_Base_CharacterBP.ALS_Base_CharacterBP",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_Base_CharacterBP",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"098c8748864e1958ca27759b3c5d24a33f988226",
+				"11664e3f4d435580bf57b4f7b3ecf83f1653678b",
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"237a5971d1176a3f1874b0ee743e8912fcf3125a",
+				"25c4719468f9779052bd8279992bb7bf2ead8572",
+				"2c80369a615b9a7978ea28a3348c618178bdb368",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"585adff489920aaae88366a0a9dd82580e4f0143",
+				"5b54317bd7c4f036b4b37f117c1cb73074efb018",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"6a3b9b6179887718e27ceedc060fa82d99253d06",
+				"9e326c440d1441edfb89e17b50c39571d100b93c",
+				"a826b9522e2c847faa5c39f41e0a13b80525d36e",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"afa5bd7d21e61da48e825cff467341e4c9674a29",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"ceaee439c71c2ef5f8779602f2cd0a4f44ea3612",
+				"d470aaa2976d368e2a1583f26d62136936f6d819",
+				"ddd05cc5b8600fdae3fb8a21ea4f82c9b55c2bb9",
+				"e6a8d9512c49fa05c1f9e89f899ca6e406fbdf51",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919",
+				"f1034fce0c62e1ea7672cf83a706edbf0ffc5661",
+				"f3d9a193ee1066443b0d5978729de6855faf3a05"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "570a4b91e06e0a1843f6a3dfd151baf3bf18de39",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_RH.ALS_CLF_GetUp_Back_Montage_RH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_RH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b9afe2269ecbc754762fd66f34c7663a05cffe48"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "572c3c83c9007964c233db4c7288ae38e20c3dec",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_F.ALS_N_Run_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "57ba9bc36b45aad5fa0a3351b8caf21deb44d08e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep.ALS_Props_Bow_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Aim_Sweep.fbx",
+			"dependencies": [
+				"a9130fb81cde85feb0c30091facf77763b15711f",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "585adff489920aaae88366a0a9dd82580e4f0143",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/ALS_ComponentAndTransform.ALS_ComponentAndTransform",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/ALS_ComponentAndTransform",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "58cd97e7a870ed0a16b8da728c63c4f91df54389",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings_State.CameraSettings_State",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings_State",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [
+				"777033c983ac178e5e787862e493d6b1a6740119"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "59a915fa8e44c6c8b0c34b3383c642696c23b59a",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin__normals.UE4_Mannequin__normals",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin__normals",
+			"classPath": "/Script/Engine.Texture2D",
+			"kind": "Texture",
+			"outputPath": "textures/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin__normals.png",
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "59c6b48109bab7ffcd187cec52f931e56e4873d7",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_L.ALS_N_LeanPose_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_L.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "59f469970639c759780278d7ffc8ea717e715207",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180.ALS_N_TurnIP_R180",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R180.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "59f521b6abdb95915f8a419fe3bef92696f63bff",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light_Additive.ALS_N_Land_Light_Additive",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light_Additive",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light_Additive.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5a1b2ea64555866d60e90e67456d2a5522286c96",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Run.StrideBlend_N_Run",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Run",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "5aee9a410ea44118c404e68877d1fa09c2c9d0b9",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AimingInCurve.AimingInCurve",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AimingInCurve",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "5b54317bd7c4f036b4b37f117c1cb73074efb018",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/DataTables/MovementModelTable.MovementModelTable",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/DataTables/MovementModelTable",
+			"classPath": "/Script/Engine.DataTable",
+			"kind": "DataTable",
+			"outputPath": null,
+			"dependencies": [
+				"499cda9ebb0bad7100435003b172317e577aa54b",
+				"6b485ee17a0b019fa910fff641ba9b14c53e2401",
+				"d2de602b4a68ba22e29ead83e83508633aaa4593",
+				"d87d34d640f5f7c866e3dba48446442cbed5a314",
+				"e474e01b6c263aedc0c7088d6b6b0628ccb5b98b",
+				"f1034fce0c62e1ea7672cf83a706edbf0ffc5661",
+				"f3d9a193ee1066443b0d5978729de6855faf3a05"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5be2a581a1eaa0b7dce3cda61166b789f16a0e92",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_2m_Montage_Default.ALS_N_Mantle_2m_Montage_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_2m_Montage_Default",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"dcdb8b9c5fbe45acd77de5747ce1af4a82b1f369"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5c0f718da651311d539b76fcd178dc6467839df6",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_LH.ALS_N_Mantle_1m_LH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_LH",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_LH.fbx",
+			"dependencies": [
+				"305d49e245142bac8ae9a7ec9ef14f6224ae95e6",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b646bffbea4ae1723586ea2c11522a955ad1b349",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5ccb5c681b06598b33ab76785f709358ece86a5a",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/YawOffset_FB.YawOffset_FB",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/YawOffset_FB",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "5dd27edde6fdf9edf5078f29166920d819fb1ce2",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_WalkPose.ALS_CLF_WalkPose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_WalkPose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_WalkPose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "5f9eb6d3f1793245780aa6cd57c05da8443458bf",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_B.ALS_N_LocoDetail_Accel_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_B.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "601cf9ada4f872d1f248b769cfdbe319d2788ee5",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_AnimBP.Bow_AnimBP",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_AnimBP",
+			"classPath": "/Script/Engine.AnimBlueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"74f6a17dae89985d23a541506e329865124747b0",
+				"e75389d521100d34c1b586d5c04761b385846515"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6124eafdcbeaaf04bca366add34c821faa0e4963",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.ALS_N_Walk_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/OverlayOverride_NotifyState.OverlayOverride_NotifyState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/OverlayOverride_NotifyState",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"098c8748864e1958ca27759b3c5d24a33f988226"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "621a81bf492cb9120b45cfd91b685854afb7dc75",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.ALS_N_Pose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/BasePoses/ALS_N_Pose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Controller_BPI.ALS_Controller_BPI",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Controller_BPI",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "62508043098864e937ab7d1c8d1c30b575b02c23",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine.ALS_StanceVariation_Masculine",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Masculine.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6691c274d56466d10311066e2ecd6285a00a709a",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_LH.ALS_CLF_GetUp_Front_Montage_LH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_LH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"f1f32681f007156c8b5fedd996422c2f89c1e559"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6720aef9e99e694137281bcbf2a1df9cfb1abd83",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms.ALS_Props_M4A1_Sprint_F_Impulse_Arms",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse_Arms.fbx",
+			"dependencies": [
+				"305d49e245142bac8ae9a7ec9ef14f6224ae95e6",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"e2d92a77e2e5fd2de0b4f2987652523ec87c061f"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "67e28a265355dd85f22a10fe3e622c60f6aabe2c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F_Impulse.ALS_N_Sprint_F_Impulse",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F_Impulse",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F_Impulse.fbx",
+			"dependencies": [
+				"a9f9d723a1de7d587cbc023a78beb527a7bdfd8d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"c1d84431535a9bc052a9a61a4ca6508c17f14963",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6904dfde70135fcf612a5731cb39d32da9009ecf",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_Stance.ALS_Stance",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_Stance",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_0.ALS_N_Falling_LeanPose_0",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_0",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_0.fbx",
+			"dependencies": [
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "69aee04ffca72356fef27d5183d67578dcad93e6",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion.ALS_N_SecondaryMotion",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Shared/ALS_N_SecondaryMotion.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6a3b9b6179887718e27ceedc060fa82d99253d06",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Proxy.Proxy",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Proxy",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/CharacterAssets/MannequinSkeleton/Meshes/Proxy.fbx",
+			"dependencies": [
+				"2a42bf77ba980473c47039a80501ef656a032535",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"db76a1f7db09e7b542922409078b0bbb4a4f5849"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6aec8ac8ee0999c72a71fc2e74ed4e713f2c1a2e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses_NoCurves.ALS_Props_Pistol_2H_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Poses_NoCurves.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6b485ee17a0b019fa910fff641ba9b14c53e2401",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/ResponsiveRotation.ResponsiveRotation",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/ResponsiveRotation",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "6cdc10621a632cfe5aae96e76a82b37da26891e3",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Lean.ALS_N_Lean",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Lean",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+				"15d6284bb8404d8015e3d35c704a0097f54bb1e3",
+				"32e7c873dcf8fafd51e1140b17fa35081a941126",
+				"3c7efe09469508fd9e40015b3bf593dde39c540b",
+				"59c6b48109bab7ffcd187cec52f931e56e4873d7",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"bbee3b8e0605aecaa74a14b1e60765c5a1c8d455"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6ecd119dd21d87759a9454b0655130cd0b6e1d62",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_1.CameraLerp_1",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_1",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "6ee84ce89fabaef80f173802ecb268037a81e3ea",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Torch.Torch",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Torch",
+			"classPath": "/Script/Engine.StaticMesh",
+			"kind": "StaticMesh",
+			"outputPath": "meshes/static/Props/Meshes/Torch.fbx",
+			"dependencies": [
+				"29fdef69db9ccaf97d4a78eaeb05591285cb67c7",
+				"7e648b50d4534acdbd7a8fa6e321f8ac58b5a630",
+				"d962b5618168de8d73a982fbe3b21ff988e9871c"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "6f4c9999621f662d825bc05d9e46263c360fed93",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep.ALS_Props_Pistol_1H_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Aim_Sweep.fbx",
+			"dependencies": [
+				"1094fc4ec63926d1188bab751b7ef1b18c28fcfb",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "72308eaae4573d01664aae945ba423a6eb084735",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_Default.ALS_N_Mantle_1m_Montage_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_Default",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b646bffbea4ae1723586ea2c11522a955ad1b349"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "738ab1919ae807788b9ced11dbe477d65f5f0df7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/ALS_PlayerCameraManager.ALS_PlayerCameraManager",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/ALS_PlayerCameraManager",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"151f0b79a243d0badb67e71be41db10405526ff5",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"8d453da9b8d147efeedc0d6e984cbe8ed874924b",
+				"a826b9522e2c847faa5c39f41e0a13b80525d36e"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "74f6a17dae89985d23a541506e329865124747b0",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_Skeleton.Bow_Skeleton",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_Skeleton",
+			"classPath": "/Script/Engine.Skeleton",
+			"kind": "Skeleton",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "74fae9958ca8fc1e28329c581038e55a4840c2c1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses.ALS_Props_Pistol_1H_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_1H_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "753c38b632e8c76a6b534967602e03998d44bb23",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow3.M_Prop_Bow3",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow3",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "777033c983ac178e5e787862e493d6b1a6740119",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings_Gait.CameraSettings_Gait",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings_Gait",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [
+				"916243bdfdec7aae0f3bf16dafedf22f3d6235f6"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "7a7e547765e90fa451518d834a8bd485e3e431d7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow2.M_Prop_Bow2",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow2",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "7b4cd34c8da5697e4bfa5e23f2330f4998670999",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched.ALS_Props_Pistol_2H_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Pistol/ALS_Props_Pistol_2H_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"6aec8ac8ee0999c72a71fc2e74ed4e713f2c1a2e",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "7b82799b915a45fb994e39925c869d2e8dd1cb35",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_L.ALS_N_Falling_LeanPose_L",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_L",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_L.fbx",
+			"dependencies": [
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "7d3d3f1e0f341eb76b3233c535305c182eb91ed4",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Box.Box",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Box",
+			"classPath": "/Script/Engine.StaticMesh",
+			"kind": "StaticMesh",
+			"outputPath": "meshes/static/Props/Meshes/Box.fbx",
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "7d4611749951833120bfe71fd26904f74f15a1c8",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/FootstepType.FootstepType",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/FootstepType",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "7e648b50d4534acdbd7a8fa6e321f8ac58b5a630",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch1.M_Prop_Torch1",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch1",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "80308cec965d9e966722b44d288209305f424c7f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_B.ALS_CRF_Walk_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_B.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8112aef4c58ef102e76e697b84af68b86263529c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_F.ALS_N_LocoDetail_Accel_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_F.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8151479671d553ee126d305e8e0afc3a929d25df",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_F.ALS_N_Falling_LeanPose_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_F.fbx",
+			"dependencies": [
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "859f8a49c55747e7382a1ae15970b23cc12f3f85",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_B.ALS_N_Run_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_B.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "86d98d8177feb473c8a5f406c5b42f8c2a2f7b07",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.Mannequin",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Meshes/Mannequin",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/CharacterAssets/MannequinSkeleton/Meshes/Mannequin.fbx",
+			"dependencies": [
+				"1f6b45a03c08e2eadcf81012b004557bde6f52cf",
+				"3bf7d526912bb1906b6ff1f3ee1234e9cbe5b1e8",
+				"3f4e663ded4d9e224701baf4af3457942cf6934f",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8777353e0beb566f4bc0a1129de1d68b56b3a9e6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow.Bow",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow",
+			"classPath": "/Script/Engine.SkeletalMesh",
+			"kind": "SkeletalMesh",
+			"outputPath": "meshes/skeletal/Props/Meshes/Bow.fbx",
+			"dependencies": [
+				"74f6a17dae89985d23a541506e329865124747b0",
+				"753c38b632e8c76a6b534967602e03998d44bb23",
+				"7a7e547765e90fa451518d834a8bd485e3e431d7",
+				"cc0f1cd82bc009c1a3fbc0e8c882ba0f72925dd7"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "884e066fdd67c229620998a80ec332ecd15feee9",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Create_Curves.Create_Curves",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Create_Curves",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"029ff8f936bf1ba2227098bae50be8eb1f39e13b",
+				"b7e2249b18db98fde306f44beb6536f2bea52cf7"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "8a6fb8d8eb88047a9b40f43b714967277653b789",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms.ALS_Props_M4A1_Sprint_F_Arms",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Arms.fbx",
+			"dependencies": [
+				"305d49e245142bac8ae9a7ec9ef14f6224ae95e6",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"e2d92a77e2e5fd2de0b4f2987652523ec87c061f"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8ae1b9703a7d0144e570247d88629530b376885f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LF.ALS_N_Run_LF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8b1315b68336709c4a00bcd18871f0b3ba44308a",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop.ALS_N_FallLoop",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8b4814c20474cc172f4f0245c8c1e69ecdea503e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse.ALS_Props_M4A1_Sprint_F_Impulse",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Sprint_F_Impulse.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8bd6ad52ad04a2ad23b47187886c630701df5260",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F.ALS_N_Sprint_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Sprint_F.fbx",
+			"dependencies": [
+				"a9f9d723a1de7d587cbc023a78beb527a7bdfd8d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"c1d84431535a9bc052a9a61a4ca6508c17f14963",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8d453da9b8d147efeedc0d6e984cbe8ed874924b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/ALS_PlayerCameraBehavior.ALS_PlayerCameraBehavior",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/ALS_PlayerCameraBehavior",
+			"classPath": "/Script/Engine.AnimBlueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"25c4719468f9779052bd8279992bb7bf2ead8572",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"6ecd119dd21d87759a9454b0655130cd0b6e1d62",
+				"a826b9522e2c847faa5c39f41e0a13b80525d36e",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"d53cacec6da93ebabe516d480e91be201af79652",
+				"e27f10ae780a585dddeadb15aec6d581c4d4837f",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8e23008795aa766a761798e916907dd97aee6506",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Run_BasePose.ALS_N_Run_BasePose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Run_BasePose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_Run_BasePose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8e310a7484f5a1fda4a549e1b80fd0405b1d4f35",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light.ALS_N_Land_Light",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_Land_Light.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "8eb8837c9f32973628b83ed2b98f7d68a0e82aa9",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_F.ALS_CLF_Walk_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9007409ec6ea7144881f6d865363399896dc2b91",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LookOut.LookOut",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LookOut",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "916243bdfdec7aae0f3bf16dafedf22f3d6235f6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings.CameraSettings",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/CameraSettings",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "92e0d292db977093c0ad02b5490c241609032e38",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180.ALS_CLF_TurnIP_R180",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R180.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9455f7d6294a58d4491a6c6c34f433f01414b64d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_B.ALS_N_Falling_LeanPose_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Falling_LeanPose_B.fbx",
+			"dependencies": [
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "945bdda63e8a379694c792c3545fe11dd166b724",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RF.ALS_N_Run_RF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_RF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "96304d81ece808c8202bb6472f580c0e3af84037",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_2H.ALS_CLF_GetUp_Back_Montage_2H",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_2H",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b9afe2269ecbc754762fd66f34c7663a05cffe48"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9793dc1bd387aa1199142da89cac584d6eedb8e6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_Player_Controller.ALS_Player_Controller",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CharacterLogic/ALS_Player_Controller",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"568072d15dc7a527e15f1e1acd7354dff8406dcd",
+				"62369fab4feedf3ffa8d0752fa80646b4e572dbc",
+				"738ab1919ae807788b9ced11dbe477d65f5f0df7",
+				"e6a8d9512c49fa05c1f9e89f899ca6e406fbdf51"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "97cc3ceaeea17275e1684d19ce02cc248fb29b6b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_R.ALS_N_LocoDetail_Accel_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LocoDetail_Accel_R.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "97d46bf9858376893c1c34a128c27044b4467d82",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.ALS_N_Transition_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Transition_R.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "98e7884cd73b3fd7fe547d1da783ff0c5eb4fa0c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_LH.ALS_N_Mantle_1m_Montage_LH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_LH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"5c0f718da651311d539b76fcd178dc6467839df6",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9a04c94cbdf6a02f426768f49c789cb8341e253a",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90.ALS_N_Rotate_R90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_Rotate_R90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9a6a4d063d2ce7c185fe9c4bd25009fa62ac4cd2",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_3.CameraLerp_3",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_3",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "9cf40933f81b9ccce915fc572ca3162cf1d0241c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_LF.ALS_N_JumpWalk_LF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_LF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpWalk_LF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "9e326c440d1441edfb89e17b50c39571d100b93c",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/MantleCurves/Mantle_2m.Mantle_2m",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/MantleCurves/Mantle_2m",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "a019ca714fe2a9c1cbbf41a3f3a7de3b3c25d0d9",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Cape.M_Cape",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_Cape",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "a20c9d988632a569157541f0d6fd8c309ac8ae09",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180.ALS_CLF_TurnIP_L180",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L180.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a3231a9b5f07ddae18cc061ec0aa7c8a0fddd6cd",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses_NoCurves.ALS_Props_Torch_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Poses_NoCurves.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a3c722afa7c416d15d8c61ed614d4def5b5b758c",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180.ALS_N_TurnIP_L180",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L180.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LB.ALS_N_Walk_LB",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LB",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_LB.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a73b6e3c8aac55396058a7cb7c65b1afe6a539fa",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.ALS_N_TurnIP_L90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_L90.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a764efe316d2857f0da5e993b8d09f9a9ab78133",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Calculate_RotationAmount.Calculate_RotationAmount",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/Calculate_RotationAmount",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "a80cfd64d43bdfd5a1c08cf133d8a94c9cef87cf",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_F.ALS_N_WalkRun_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_F",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+				"4a62810735360da4f17b88b701897cf6299587d7",
+				"572c3c83c9007964c233db4c7288ae38e20c3dec",
+				"6124eafdcbeaaf04bca366add34c821faa0e4963",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a826b9522e2c847faa5c39f41e0a13b80525d36e",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Camera_BPI.ALS_Camera_BPI",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Interfaces/ALS_Camera_BPI",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "a9130fb81cde85feb0c30091facf77763b15711f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses_NoCurves.ALS_Props_Bow_Poses_NoCurves",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses_NoCurves",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Bow/ALS_Props_Bow_Poses_NoCurves.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState.MovementAction_NotifyState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/MovementAction_NotifyState",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"16b90e6e68b859e65716fb790073c8750f6fa3dd",
+				"25c4719468f9779052bd8279992bb7bf2ead8572",
+				"3ab3f0065e3b1b668f494ffd6e3014ebd98ac174",
+				"6904dfde70135fcf612a5731cb39d32da9009ecf",
+				"ab15f5ee200f1d5ff17172997deec01904c3e25d",
+				"b30745e07c90a953fe35f6f5d219098290dd15fd",
+				"e83e2ea329535742c3df4dcc99face8476d20d1e",
+				"ec7e2b514f2fd08663cb09c0039660d8dfe28919"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "a9f9d723a1de7d587cbc023a78beb527a7bdfd8d",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Misc/Sprint_CameraShake.Sprint_CameraShake",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Misc/Sprint_CameraShake",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "aa28147ea74172a5b78be2b3db405610a7e4b753",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/AnimFeatureExample.AnimFeatureExample",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/AnimFeatureExample",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "ab15f5ee200f1d5ff17172997deec01904c3e25d",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementAction.ALS_MovementAction",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_MovementAction",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "ab6308b7e0305e8dd4a01e63e2b5033e0e52072d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_L_Down.ALS_N_Stop_L_Down",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_L_Down",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_L_Down.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "ae92864f7fb79dfa50846bb6c1624020b7ef0152",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_RH.ALS_CLF_GetUp_Front_Montage_RH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front_Montage_RH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"f1f32681f007156c8b5fedd996422c2f89c1e559"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "af884becb88db54364a1b01d46921106c23eafaf",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LandPredictionBlend.LandPredictionBlend",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LandPredictionBlend",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "afa5bd7d21e61da48e825cff467341e4c9674a29",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/MantleCurves/Mantle_1m.Mantle_1m",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/MantleCurves/Mantle_1m",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LB.ALS_N_Run_LB",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LB",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Run_LB.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b084f74d4087d0fa215618550fadd29ebc2b01a0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured.ALS_StanceVariation_Injured",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Injured.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b1b9302cbf29b5978f4b8c5768a94dd227982e40",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal.ALS_StanceVariation_Normal",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Normal.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b30745e07c90a953fe35f6f5d219098290dd15fd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_ViewMode.ALS_ViewMode",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_ViewMode",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "b4bf2befd979de45f53f300dc0e60c702fc3a686",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look.ALS_N_Look",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look",
+			"classPath": "/Script/Engine.BlendSpace1D",
+			"kind": "AimOffset",
+			"outputPath": null,
+			"dependencies": [
+				"552198b373c14b6ef38b20c53ab08e9060cc55b7",
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"c4bba06be47ce74153c2048d0de7b30a6465a84f",
+				"fcbab94ebb8eb39744f1973e98311c413660b9bc"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b567e2ed58e879f63621211fa48ab6155e1260e0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FR.ALS_N_WalkRun_FR",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_FR",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22",
+				"945bdda63e8a379694c792c3545fe11dd166b724",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"bab34f5bf1379ae9ccba9b86a2113022051aeb82",
+				"fc2d3a4142a1bd82d20877d806c783ff56dfe688"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_Skeleton.ALS_Mannequin_Skeleton",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_Skeleton",
+			"classPath": "/Script/Engine.Skeleton",
+			"kind": "Skeleton",
+			"outputPath": null,
+			"dependencies": [
+				"46af0861049be0ecfdbeddd54096fd10662242b2",
+				"86d98d8177feb473c8a5f406c5b42f8c2a2f7b07"
+			],
+			"externalDependencies": [
+				"/Engine/EngineMeshes/Humanoid"
+			]
+		},
+		{
+			"id": "b646bffbea4ae1723586ea2c11522a955ad1b349",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_RH.ALS_N_Mantle_1m_RH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_RH",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_RH.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b78c3380910591a5e418b59937b0d8f86b33ec09",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BL.ALS_N_WalkRun_BL",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_BL",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0ebb17fc0eb021c590cbb3e691d9aabe5f6bcf22",
+				"a4c6e0e455e7be7355cdd7c3ce49272d07773b18",
+				"b07a51bbab122c81679ac30d3f2f78f45ac14dc8",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"bab34f5bf1379ae9ccba9b86a2113022051aeb82"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b7e2249b18db98fde306f44beb6536f2bea52cf7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/AnimCurveCreationParams.AnimCurveCreationParams",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimModifiers/AnimCurveCreationParams",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [
+				"029ff8f936bf1ba2227098bae50be8eb1f39e13b"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b8259ad53c0b722222cc94f916e2139915c14b73",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_T_Pose.ALS_Mannequin_T_Pose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/ALS_Mannequin_T_Pose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/ALS_Mannequin_T_Pose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b9afe2269ecbc754762fd66f34c7663a05cffe48",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back.ALS_CLF_GetUp_Back",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b9b6098fb325f0033c9158ec18a61f89e0ab7902",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_M4A1.M_Prop_M4A1",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_M4A1",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "b9f71fc54fbe7dae65cd93db240a5ba54aad7c3b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_Box.ALS_N_Mantle_1m_Montage_Box",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_Box",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b646bffbea4ae1723586ea2c11522a955ad1b349"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "bab34f5bf1379ae9ccba9b86a2113022051aeb82",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_R.ALS_N_WalkPose_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkPose_R.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "bbee3b8e0605aecaa74a14b1e60765c5a1c8d455",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_F.ALS_N_LeanPose_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/Detail/ALS_N_LeanPose_F.fbx",
+			"dependencies": [
+				"8e23008795aa766a761798e916907dd97aee6506",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "bc6afbfd775157c8261e2e5e2409b93955b4bcfd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Run_V.StrideBlend_N_Run_V",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/StrideBlend_N_Run_V",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "bd603ea3ba08e7c0c4df0acc92f9c9e6ba3d5ab2",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop_Fast.ALS_N_FallLoop_Fast",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop_Fast",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_FallLoop_Fast.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "bd9f81923daf6b05fb32d5717d9118339e729533",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop.M_Prop",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "bdd3a837e71e99a240b9484b351605e3b4888070",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_2H.ALS_N_Mantle_1m_Montage_2H",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_2H",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b646bffbea4ae1723586ea2c11522a955ad1b349"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "bf827e8773890767df2c42df9208d461dc9e3ece",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses.ALS_Props_M4A1_Poses",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Poses.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "c01a52b670f16e72cf55d31eb18231a774429234",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Lean_Falling.ALS_N_Lean_Falling",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/Detail/ALS_N_Lean_Falling",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"4e5dc654c0355b51d2f0a3989adf497f8ab0dc8f",
+				"69667d9c1ffb6d3f2892c9f3e16b4b52bafc9bcc",
+				"7b82799b915a45fb994e39925c869d2e8dd1cb35",
+				"8151479671d553ee126d305e8e0afc3a929d25df",
+				"8b1315b68336709c4a00bcd18871f0b3ba44308a",
+				"9455f7d6294a58d4491a6c6c34f433f01414b64d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "c075b5a1310e1d46c380287f92e36a460501a7cd",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LookIn.LookIn",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/LookIn",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "c13f1b18a24a33a01827ee93b9b1bdcd64295a0d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90.ALS_CLF_TurnIP_R90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_R90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "c1d84431535a9bc052a9a61a4ca6508c17f14963",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/CameraShake_Notify.CameraShake_Notify",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/CameraShake_Notify",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "c23d8f29828aceb875f40d7cf904473fb15971fa",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/RotateInPlace_Asset.RotateInPlace_Asset",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/RotateInPlace_Asset",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "c4bba06be47ce74153c2048d0de7b30a6465a84f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.ALS_N_Look_D_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_D_Sweep.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "c4ec8d67334933779b73d577b8e2e206505da592",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AO_SwitchSidesIn.AO_SwitchSidesIn",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AO_SwitchSidesIn",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "c7ea9ff65a63c8141344f24c26a540e873670358",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Binoculars.M_Prop_Binoculars",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Binoculars",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "c8bdfd06fd17e5ee222e97b542d44e1e9ca38b95",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AO_SwitchSidesOut.AO_SwitchSidesOut",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AO_SwitchSidesOut",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "c93eef98837ba6e46755780bf9cca9f6f9bf44bb",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/HipsDirection.HipsDirection",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/HipsDirection",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "cc0f1cd82bc009c1a3fbc0e8c882ba0f72925dd7",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow1.M_Prop_Bow1",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Bow1",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "cd7b93160f1e5020725bfeb72a5cb8cec94cea33",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/M9_Skeleton.M9_Skeleton",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/M9_Skeleton",
+			"classPath": "/Script/Engine.Skeleton",
+			"kind": "Skeleton",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "ceaee439c71c2ef5f8779602f2cd0a4f44ea3612",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_Params.Mantle_Params",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/Mantle_Params",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "cf536fca9f20df133e4946cb3905aa3c4ff033ef",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Editor.Editor",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Editor",
+			"classPath": "/Script/Engine.AnimBlueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "d276b5483293bc7f635432bdd72ba8f6564c496d",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify.Footstep_AnimNotify",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/Footstep_AnimNotify",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"7d4611749951833120bfe71fd26904f74f15a1c8"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "d2c99014982aa14180002127354ee3fc83d25b86",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_2H.ALS_N_LandRoll_F_Montage_2H",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_2H",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "d2de602b4a68ba22e29ead83e83508633aaa4593",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/SluggishRotation.SluggishRotation",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/SluggishRotation",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "d470aaa2976d368e2a1583f26d62136936f6d819",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings_Stance.MovementSettings_Stance",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings_Stance",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [
+				"2c80369a615b9a7978ea28a3348c618178bdb368"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "d53cacec6da93ebabe516d480e91be201af79652",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_2.CameraLerp_2",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CameraBlendCurves/CameraLerp_2",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "d6d9eb028ac8461ea9ed4bc12d6effaa23719d5e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_RF.ALS_N_JumpRun_RF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_RF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_N_JumpRun_RF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "d87d34d640f5f7c866e3dba48446442cbed5a314",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/SluggishMovement.SluggishMovement",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/SluggishMovement",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "d920d75acaa0540b8ca3832ae894047f9554449a",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_RH.ALS_N_Mantle_1m_Montage_RH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_1m_Montage_RH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"17e4571368a6a2ccfeacf927b8deece8864a142b",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b646bffbea4ae1723586ea2c11522a955ad1b349"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "d962b5618168de8d73a982fbe3b21ff988e9871c",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch3.M_Prop_Torch3",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Materials/M_Prop_Torch3",
+			"classPath": "/Script/Engine.MaterialInstanceConstant",
+			"kind": "MaterialInstance",
+			"outputPath": null,
+			"dependencies": [
+				"bd9f81923daf6b05fb32d5717d9118339e729533"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "da7ca3cbd8b535e49ff04a6f72c30cc14598bae1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_to_CLF.ALS_N_to_CLF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_to_CLF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_to_CLF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "db60b2c35ce5ef5216c782fc1f33549cbcf8278d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.ALS_CLF_Walk_R",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_R.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "db76a1f7db09e7b542922409078b0bbb4a4f5849",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_AnimMan_Default.M_AnimMan_Default",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/M_AnimMan_Default",
+			"classPath": "/Script/Engine.Material",
+			"kind": "Material",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "dc1e155fe8b8f411029a0fa3a67968fa03ec2247",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail.ALS_Flail",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/InAir/ALS_Flail.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "dcdb8b9c5fbe45acd77de5747ce1af4a82b1f369",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_2m.ALS_N_Mantle_2m",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_2m",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_Mantle_2m.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "ddd05cc5b8600fdae3fb8a21ea4f82c9b55c2bb9",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/MantleType.MantleType",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/MantleType",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "ddfa1a6737182bddb3134e78d0460c3ef49f93e1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90.ALS_CLF_TurnIP_L90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_CLF_TurnIP_L90.fbx",
+			"dependencies": [
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "de7501b7a9bcc519438eb278019e51e3f8a6bf02",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_B.ALS_N_WalkRun_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_WalkRun_B",
+			"classPath": "/Script/Engine.BlendSpace",
+			"kind": "BlendSpace",
+			"outputPath": null,
+			"dependencies": [
+				"0bfca04ba8155882fc763f8275bb5c7e6e694ec0",
+				"32fe18c71ccb860fe35c01d6b2b10fa2e4d98297",
+				"4a62810735360da4f17b88b701897cf6299587d7",
+				"859f8a49c55747e7382a1ae15970b23cc12f3f85",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "deda874944d28720dda32eac369723b3362af20d",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine.ALS_StanceVariation_Feminine",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_Feminine.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e1b9ca21b517ff5c0ee608e9e18f297800b5883f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_R_Down.ALS_N_Stop_R_Down",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_R_Down",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_N_Stop_R_Down.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e1c9c7ee940b51f61e775b7ef11187a4e173a7f6",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_LH.ALS_N_LandRoll_F_Montage_LH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_N_LandRoll_F_Montage_LH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"39eecd72ffdddb8ba0eb2bb0683f1c958d68fdd9",
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e21ae782c4c15660e8e68fe6de81c151c083865e",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/ChangeDirection.ChangeDirection",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/ChangeDirection",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "e27f10ae780a585dddeadb15aec6d581c4d4837f",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/Camera_Skeleton.Camera_Skeleton",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/CameraSystem/Camera_Skeleton",
+			"classPath": "/Script/Engine.Skeleton",
+			"kind": "Skeleton",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "e2d92a77e2e5fd2de0b4f2987652523ec87c061f",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms.ALS_Props_M4A1_Run_F_Arms",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Run_F_Arms.fbx",
+			"dependencies": [
+				"50cb3a4538d674f83c1253791cea97ad9c0af462",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e36e48b2b343c7cc6c8f3337af79cb9f453f45fa",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep.ALS_Props_M4A1_Aim_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/M4A1/ALS_Props_M4A1_Aim_Sweep.fbx",
+			"dependencies": [
+				"15448801e639286305e4da05cfc67925e737e43b",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e474e01b6c263aedc0c7088d6b6b0628ccb5b98b",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/NormalRotation.NormalRotation",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/NormalRotation",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "e535d416f57f6dd5e564ce6a7971d8bc6019ec96",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_WalkPose.ALS_CRF_WalkPose",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_WalkPose",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_WalkPose.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e5ab3d8d72b370fa5c85f28c2c02eaae9a88fa55",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AimingOutCurve.AimingOutCurve",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/AimingOutCurve",
+			"classPath": "/Script/Engine.CurveFloat",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "e6a8d9512c49fa05c1f9e89f899ca6e406fbdf51",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/Libraries/ALS_MacroLibrary.ALS_MacroLibrary",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/Libraries/ALS_MacroLibrary",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"585adff489920aaae88366a0a9dd82580e4f0143"
+			],
+			"externalDependencies": [
+				"/Engine/EditorBlueprintResources/StandardMacros"
+			]
+		},
+		{
+			"id": "e75389d521100d34c1b586d5c04761b385846515",
+			"objectPath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_Draw.Bow_Draw",
+			"packagePath": "/Game/AdvancedLocomotionV4/Props/Meshes/Bow_Draw",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/Props/Meshes/Bow_Draw.fbx",
+			"dependencies": [
+				"74f6a17dae89985d23a541506e329865124747b0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "e83e2ea329535742c3df4dcc99face8476d20d1e",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_OverlayState.ALS_OverlayState",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_OverlayState",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "eb84a748fee4615754ce3cbcd3c259b33918b935",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RB.ALS_N_Walk_RB",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RB",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RB.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "ebe6309a07829c3c3920c9b5b4572b43b6161df6",
+			"objectPath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/GroundedEntryState_AnimNotify.GroundedEntryState_AnimNotify",
+			"packagePath": "/Game/AdvancedLocomotionV4/Blueprints/AnimNotifys/GroundedEntryState_AnimNotify",
+			"classPath": "/Script/Engine.Blueprint",
+			"kind": "Blueprint",
+			"outputPath": null,
+			"dependencies": [
+				"098c8748864e1958ca27759b3c5d24a33f988226",
+				"0a8d1b7d3f208b09fd657d4d2ec40a8ad6d3fbb6"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "ec7e2b514f2fd08663cb09c0039660d8dfe28919",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_RotationMode.ALS_RotationMode",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Enums/ALS_RotationMode",
+			"classPath": "/Script/Engine.UserDefinedEnum",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "f1034fce0c62e1ea7672cf83a706edbf0ffc5661",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/NormalMovement.NormalMovement",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/CharacterMovementCurves/NormalMovement",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "f1f32681f007156c8b5fedd996422c2f89c1e559",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front.ALS_CLF_GetUp_Front",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Front.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "f3d9a193ee1066443b0d5978729de6855faf3a05",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings_State.MovementSettings_State",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Structs/MovementSettings_State",
+			"classPath": "/Script/Engine.UserDefinedStruct",
+			"kind": "OtherConfig",
+			"outputPath": null,
+			"dependencies": [
+				"d470aaa2976d368e2a1583f26d62136936f6d819"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "f4f16d55423629ed0293701963ea3651cf5a12d6",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_F.ALS_CRF_Walk_F",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_F",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CRF_Walk_F.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "f68538a704f796bb5ccc6b168794ea3a7ad04eb8",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_CLF_to_N.ALS_CLF_to_N",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_CLF_to_N",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Transitions/ALS_CLF_to_N.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "f699b8f36ff252d0e0e07c50e59b7493eb5a0e8b",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.ALS_N_TurnIP_R90",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/TurnInPlace/ALS_N_TurnIP_R90.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"a764efe316d2857f0da5e993b8d09f9a9ab78133",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "f8af9c4e2e365928561d3295a8dadf76093130c1",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin_MAT_MASKA.UE4_Mannequin_MAT_MASKA",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin_MAT_MASKA",
+			"classPath": "/Script/Engine.Texture2D",
+			"kind": "Texture",
+			"outputPath": "textures/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_Mannequin_MAT_MASKA.png",
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "f9ec8804e251f03c57e04dde4db9bd921457bae4",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_B.ALS_CLF_Walk_B",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_B",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_CLF_Walk_B.fbx",
+			"dependencies": [
+				"46af0861049be0ecfdbeddd54096fd10662242b2",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "fc1b3c52caea40b1ebbefb03026d4dbfd7b46262",
+			"objectPath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/YawOffset_LR.YawOffset_LR",
+			"packagePath": "/Game/AdvancedLocomotionV4/Data/Curves/AnimationBlendCurves/YawOffset_LR",
+			"classPath": "/Script/Engine.CurveVector",
+			"kind": "Curve",
+			"outputPath": null,
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "fc2d3a4142a1bd82d20877d806c783ff56dfe688",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RF.ALS_N_Walk_RF",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RF",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Base/Locomotion/ALS_N_Walk_RF.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"d276b5483293bc7f635432bdd72ba8f6564c496d"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "fcbab94ebb8eb39744f1973e98311c413660b9bc",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.ALS_N_Look_F_Sweep",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/AimOffsets/ALS_N_Look_F_Sweep.fbx",
+			"dependencies": [
+				"621a81bf492cb9120b45cfd91b685854afb7dc75",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "fdfae8af1f8b9425e630ecd25ad389991e3eb99e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied.ALS_StanceVariation_HandsTied",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/StanceVariations/ALS_StanceVariation_HandsTied.fbx",
+			"dependencies": [
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "fe8e73bfbc8e848a483a603aab4c8faeab6fe32e",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_LOGO_CARD.UE4_LOGO_CARD",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_LOGO_CARD",
+			"classPath": "/Script/Engine.Texture2D",
+			"kind": "Texture",
+			"outputPath": "textures/CharacterAssets/MannequinSkeleton/Materials/Textures/UE4_LOGO_CARD.png",
+			"dependencies": [],
+			"externalDependencies": []
+		},
+		{
+			"id": "fed8555576fff79dc806356e0ddd96c87a05a733",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched.ALS_Props_Torch_Aim_Sweep_Crouched",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched",
+			"classPath": "/Script/Engine.AnimSequence",
+			"kind": "AnimationSequence",
+			"outputPath": "animations/CharacterAssets/MannequinSkeleton/AnimationExamples/Overlay/Torch/ALS_Props_Torch_Aim_Sweep_Crouched.fbx",
+			"dependencies": [
+				"a3231a9b5f07ddae18cc061ec0aa7c8a0fddd6cd",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0"
+			],
+			"externalDependencies": []
+		},
+		{
+			"id": "ff9b7d6c520fcb306b1f0857fac06c2504f77808",
+			"objectPath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_LH.ALS_CLF_GetUp_Back_Montage_LH",
+			"packagePath": "/Game/AdvancedLocomotionV4/CharacterAssets/MannequinSkeleton/AnimationExamples/Actions/ALS_CLF_GetUp_Back_Montage_LH",
+			"classPath": "/Script/Engine.AnimMontage",
+			"kind": "AnimMontage",
+			"outputPath": null,
+			"dependencies": [
+				"61d92e12316f57b7d38f9e4bf5f233c09e6d0cea",
+				"a9a6c47d090326c1d6da4c25aa1290456e77e37d",
+				"b5b52715012cad50bf7a625ddf01e4335bb4fcf0",
+				"b9afe2269ecbc754762fd66f34c7663a05cffe48"
+			],
+			"externalDependencies": []
+		}
+	],
+	"summary":
+	{
+		"assetCount": 273,
+		"exportableCount": 141
+	}
+}
