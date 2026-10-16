@@ -61,6 +61,50 @@ static func json(rel: String) -> Variant:
 	return parsed
 
 
+## 把某个路径的缓存条目丢掉。两个用途：
+##   1. 大 JSON 的嵌套字典已被调用方转成紧凑类型（PackedVector2Array 等）后，
+##      丢掉原始结构 —— Variant 嵌套字典的内存开销是文件体积的 5~15 倍，
+##      城市级数据不释放的话常驻 RSS 相当可观（见 CityData.load_core）。
+##   2. 忘掉文本缓存。
+## 注意：forget 之后的 json() 调用会重新读盘解析并**重新入缓存** ——
+## 如果读取方不需要缓存（一次性转换读取），改用 json_nocache()。
+static func forget(rel: String) -> void:
+	var p := path_for(rel)
+	_cache.erase(p)
+
+
+## 只忘掉文本缓存（哈希校验这类「读全文用完即弃」的场景）。
+static func forget_text(rel: String) -> void:
+	_text_cache.erase(path_for(rel))
+
+
+## 读取并解析 JSON，但**不进缓存**：返回的结构只由调用方持有，
+## 调用方局部变量出栈后，未被引用的部分即可被 GC。
+## 适用场景：只需要其中一小部分结构的大文件（走 json() 会把整份原始结构
+## 塞回缓存常驻，读取方只用一小部分时纯属浪费）。
+## 失败同样返回 null，警告仍按路径去重（_missing）。
+static func json_nocache(rel: String) -> Variant:
+	var p := path_for(rel)
+	if _missing.has(p):
+		return null
+	if not FileAccess.file_exists(p):
+		_missing[p] = true
+		push_warning("[DataLoader] 缺少数据文件: %s" % p)
+		return null
+	var f := FileAccess.open(p, FileAccess.READ)
+	if f == null:
+		_missing[p] = true
+		push_warning("[DataLoader] 无法打开: %s" % p)
+		return null
+	var parsed = JSON.parse_string(f.get_as_text())
+	f.close()
+	if parsed == null:
+		_missing[p] = true
+		push_warning("[DataLoader] JSON 解析失败: %s" % p)
+		return null
+	return parsed
+
+
 ## 原始文本
 static func text(rel: String) -> String:
 	var p := path_for(rel)

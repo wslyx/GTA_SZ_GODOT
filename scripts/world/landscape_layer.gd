@@ -53,6 +53,18 @@ const OPEN_NEAR_LIMIT := 24
 const ROAD_LIFT := 0.12
 const DETAIL_LIFT := 0.05
 
+## —— 树模型替换（assets/tree_modern.glb，同 scenery_system.gd 的常量）——
+## 模型为抽稀版（7.1 万面 / 4.6MB，原始 143 万面在 assets/raw/ 不进导入）。
+## 全套统一 modern 树：近端原型（NEAR_DIST ≤150m / open 全量原型）用
+## tree_modern；"-lod" 远端原型用同源抽稀变体 tree_modern-lod（~1.8 万面 /
+## 1.0MB，顶点负载降约一个数量级），中远距离成千实例不再爆面数，且近远成色
+## 一致（原版 -lod 低模是"另一种树"的观感）。
+const TREE_MODEL_OVERRIDE := "res://assets/tree_modern.glb"
+const TREE_MODEL_LOD_OVERRIDE := "res://assets/tree_modern-lod.glb"
+const TREE_MODEL_SCALE := 2.0
+const TREE_MODEL_FOLIAGE := Color(0.30, 0.52, 0.22)
+const TREE_MODEL_TRUNK := Color(0.40, 0.32, 0.24)
+
 var world: CityWorld
 var enabled := true
 
@@ -149,7 +161,39 @@ func _load_landscape() -> void:
 			})
 
 	# ---- 装载原型（每个 GLB 的每个 mesh 一个 MultiMesh）----
+	# 树模型替换：近端树原型用 tree_modern，"-lod" 远端原型用抽稀变体
+	# tree_modern-lod（load_tree_model 已展开根节点容器缩放并染色；Mesh 在
+	# 常驻 load 缓存里只有一份，与林冠层共享不重复占显存）
+	var tree_override := GlbLoader.load_tree_model(TREE_MODEL_OVERRIDE, TREE_MODEL_SCALE,
+		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
+	var tree_lod := GlbLoader.load_tree_model(TREE_MODEL_LOD_OVERRIDE, TREE_MODEL_SCALE,
+		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
 	for pm in proto_list:
+		var pname := str(pm["name"])
+		var is_lod_proto := pname.ends_with("-lod")
+		# 近端原型（TREE_NAMES + open 全量原型）→ tree_modern；"-lod" 原型 → tree_modern-lod
+		var use_override := (not tree_override.is_empty()) \
+			and (not is_lod_proto) and (TREE_NAMES.has(pname) or OPEN_TREE_NAMES.has(pname))
+		var use_lod_override := (not tree_lod.is_empty()) and is_lod_proto
+		var nodes: Array = []
+		if use_override or use_lod_override:
+			var proto: Array = tree_lod if use_lod_override else tree_override
+			for entry in proto:
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.mesh = entry["mesh"]
+				var node := MultiMeshInstance3D.new()
+				node.multimesh = mm
+				node.name = "ls-%s-%d" % [pname, nodes.size()]
+				# 原版 casters 只包含近端（非 -lod）的树原型，替换后保持一致
+				node.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+					if use_override else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+				add_child(node)
+				# 替换模型没有 COLOR_0 顶点色，逐实例颜色必须关掉（MultiMesh 对
+				# use_colors 有网格格式校验），树的成色已经烘进材质 albedo
+				nodes.append({"mm": mm, "local": entry["local"], "colors": false})
+			_protos[pname] = {"nodes": nodes}
+			continue
 		var path: String = pm["path"]
 		if not ResourceLoader.exists(path):
 			push_warning("[LandscapeLayer] 缺少模型 %s" % path)
@@ -158,29 +202,27 @@ func _load_landscape() -> void:
 		if scene == null:
 			continue
 		var inst := scene.instantiate()
-		var nodes: Array = []
 		for mi in GlbLoader.meshes_of(inst):
 			if mi.mesh == null or mi.mesh.get_surface_count() == 0:
 				continue
 			# 逐实例颜色（原版 thinInstanceSetBuffer('color')）。ebikes 的教训：
 			# Godot 默认不把顶点色乘进 albedo，不打开这个开关着色是静默无效的。
 			_enable_instance_tint(mi.mesh)
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.use_colors = true
-			mm.mesh = mi.mesh
-			var node := MultiMeshInstance3D.new()
-			node.multimesh = mm
-			node.name = "ls-%s-%d" % [str(pm["name"]), nodes.size()]
+			var mm2 := MultiMesh.new()
+			mm2.transform_format = MultiMesh.TRANSFORM_3D
+			mm2.use_colors = true
+			mm2.mesh = mi.mesh
+			var node2 := MultiMeshInstance3D.new()
+			node2.multimesh = mm2
+			node2.name = "ls-%s-%d" % [pname, nodes.size()]
 			# 原版 casters 只包含近端（非 -lod）的树原型；细节与路面细节都不投影
-			var pname := str(pm["name"])
 			var can_cast := (TREE_NAMES.has(pname) or OPEN_TREE_NAMES.has(pname))
-			node.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if can_cast
+			node2.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if can_cast
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-			add_child(node)
-			nodes.append({"mm": mm, "local": _relative_transform(inst, mi)})
+			add_child(node2)
+			nodes.append({"mm": mm2, "local": _relative_transform(inst, mi), "colors": true})
 		inst.queue_free()
-		_protos[str(pm["name"])] = {"nodes": nodes}
+		_protos[pname] = {"nodes": nodes}
 
 	_load_planting()
 	print("[LandscapeLayer] 种植树 %d 棵 / 细节 %d / 路面细节 %d / 原型 %d / open 对账 %s（%d 棵）"
@@ -202,7 +244,10 @@ func _verify_planting_hash(open_man: Dictionary) -> bool:
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
 	ctx.update(text.to_utf8_buffer())
-	return ctx.finish().hex_encode().to_lower() == expect
+	var ok := ctx.finish().hex_encode().to_lower() == expect
+	# 文本只为哈希对账服务，用完即弃（2.6MB 全文常驻不值得）
+	DataLoader.forget_text("/city/landscape/planting.json")
+	return ok
 
 
 static func _relative_transform(root: Node, n: Node3D) -> Transform3D:
@@ -427,7 +472,9 @@ func _write_groups(groups: Dictionary) -> void:
 			for i in n:
 				var p: Dictionary = plants[i]
 				mm.set_instance_transform(i, _plant_xf(p, lift) * local)
-				mm.set_instance_color(i, _plant_col(p))
+				# 替换模型（colors=false）没有顶点色通道，set_instance_color 会被拒
+				if bool(nd.get("colors", true)):
+					mm.set_instance_color(i, _plant_col(p))
 
 
 ## 一棵植物/一个细节的世界变换。

@@ -46,6 +46,9 @@ var spawn_road := ""
 
 # --- 环数据（碰撞 / 地图）---------------------------------------------------
 var land_rings: Array = []
+## 未拍平的 land 分组（每组 = [外环, 洞...]）—— ObserverDestination 的水面判定
+## 需要「外环 + 洞」结构，land_rings 拍平后洞的信息就丢了。
+var land_groups: Array = []
 var coast_rings: Array = []
 var green: Array = []      ## [{name, rings}]
 var water: Array = []      ## [{name, rings}]
@@ -80,28 +83,50 @@ func load_core() -> void:
 	var t0 := Time.get_ticks_msec()
 
 	metadata = DataLoader.json_dict(METADATA_JSON)
-	var city = DataLoader.json(CITY_JSON)
-	if city == null:
-		push_error("[CityData] 无法加载 city.json，城市无法构建")
-		return
-	meta = city.get("meta", {})
 
-	var ext: Array = meta.get("extent", [-6788.1, -2604.89, 6788.1, 2604.89])
-	extent = Rect2(ext[0], ext[1], ext[2] - ext[0], ext[3] - ext[1])
+	# city.json（28.5MB）的 JSON.parse 会产生 ~300MB 瞬时 Variant 字典峰值，
+	# 是启动内存峰值的最大单项。优先走二进制快照（_cache_load / _cache_save）：
+	# 命中时完全不解析 JSON，瞬时峰值从 ~300MB 降到快照本身的几十 MB；
+	# 未命中走原路径，转换完成后写快照，下次启动生效。
+	var city_md5 := FileAccess.get_md5(DataLoader.path_for(CITY_JSON))
+	var snap := _cache_load(city_md5)
+	if snap.is_empty():
+		var city = DataLoader.json(CITY_JSON)
+		if city == null:
+			push_error("[CityData] 无法加载 city.json，城市无法构建")
+			return
+		meta = city.get("meta", {})
 
-	var sp: Dictionary = city.get("spawn", {})
-	spawn_pos = Vector2(float(sp.get("x", 0.0)), float(sp.get("z", 0.0)))
-	spawn_yaw = float(sp.get("yaw", 0.0))
-	spawn_road = str(sp.get("road", ""))
+		var ext: Array = meta.get("extent", [-6788.1, -2604.89, 6788.1, 2604.89])
+		extent = Rect2(ext[0], ext[1], ext[2] - ext[0], ext[3] - ext[1])
 
-	land_rings = _flatten_ring_groups(city.get("land", []))
-	coast_rings = city.get("coast", [])
-	green = city.get("green", [])
-	water = city.get("water", [])
-	landmarks = city.get("landmarks", [])
+		var sp: Dictionary = city.get("spawn", {})
+		spawn_pos = Vector2(float(sp.get("x", 0.0)), float(sp.get("z", 0.0)))
+		spawn_yaw = float(sp.get("yaw", 0.0))
+		spawn_road = str(sp.get("road", ""))
 
-	_build_roads(city.get("roads", []))
-	_build_buildings(city.get("buildings", []))
+		land_groups = city.get("land", [])
+		land_rings = _flatten_ring_groups(land_groups)
+		coast_rings = city.get("coast", [])
+		green = city.get("green", [])
+		water = city.get("water", [])
+		landmarks = city.get("landmarks", [])
+
+		_build_roads(city.get("roads", []))
+		_build_buildings(city.get("buildings", []))
+
+		# 快照必须写在路名生成 / 地标剔除 / 生活驿站并入**之前**：
+		# 缓存内容是 city.json 的纯函数，下游派生步骤在命中路径上原样重跑。
+		_cache_save(city_md5)
+		# 原始 city.json 的嵌套字典结构已全部转成紧凑类型（roads/buildings →
+		# PackedVector2Array）。Godot 的嵌套 Array/Dictionary 是 Variant 哈希表，
+		# 内存开销是文件体积的 5~15 倍 —— roads/buildings 的原始 [x,y] 嵌套数组
+		# 是常驻 RSS 的大头，转换完就地释放。land 分组原样保留在本对象
+		# （land_groups，ObserverDestination 的「外环 + 洞」判定要用）。
+		DataLoader.forget(CITY_JSON)
+	else:
+		_apply_snapshot(snap)
+
 	# 原版 city-world.ts:250 在拿到 city.json 后**立刻**跑一遍路名生成，
 	# HUD / 大地图 / 自动驾驶都吃这份 display_name。
 	_assign_road_names()
@@ -118,11 +143,128 @@ func load_core() -> void:
 	_apply_landmark_exclusions()
 	_append_life_sites()
 
+	# 原始 city.json 的嵌套字典结构已全部转成紧凑类型（roads/buildings →
+	# PackedVector2Array，land/coast/green/water/landmarks 由本对象按引用持有）。
+	# Godot 的嵌套 Array/Dictionary 是 Variant 哈希表，内存开销是文件体积的
+	# 5~15 倍 —— roads/buildings 的原始 [x,y] 嵌套数组是常驻 RSS 的大头，
+	# 转换完就地释放。observer_destination 只取 land 分组，用 json_nocache
+	# 直读（不入缓存，见 data_loader.gd），不会把整份结构塞回来。
+	DataLoader.forget(CITY_JSON)
+
 	_loaded = true
 	var ms := Time.get_ticks_msec() - t0
 	print("[CityData] 核心数据加载完成 %d ms：道路 %d / 建筑 %d / 绿地 %d / 水域 %d / 地标 %d"
 		% [ms, roads.size(), buildings.size(), green.size(), water.size(), landmarks.size()])
 	core_loaded.emit()
+
+
+# --- city.json 二进制快照 ---------------------------------------------------
+## 头部布局：4 字节魔数 + 4 字节未压缩长度（s32）+ 32 字节 city.json MD5
+## （hex 文本），其后是 var_to_bytes 产物经 ZSTD 压缩的正文。
+const CACHE_VERSION := 1
+const CACHE_MAGIC := "CDC1"
+const CACHE_PATH := "user://cache/city_core.bin"
+
+## 校验并读取快照。返回空 Dictionary 表示未命中，调用方回退 JSON 路径。
+## 失效条件（任一不满足即未命中，下次启动会用 JSON 路径重建快照）：
+##   - city.json 的 MD5 与头部一致（数据变了自动失效）
+##   - 快照格式版本一致（转换逻辑有改动时手工 bump CACHE_VERSION）
+func _cache_load(city_md5: String) -> Dictionary:
+	if city_md5.is_empty() or not FileAccess.file_exists(CACHE_PATH):
+		return {}
+	var f := FileAccess.open(CACHE_PATH, FileAccess.READ)
+	if f == null:
+		return {}
+	var head := f.get_buffer(40)
+	var body := f.get_buffer(f.get_length() - 40)
+	f.close()
+	if head.size() < 40 or head.slice(0, 4).get_string_from_ascii() != CACHE_MAGIC:
+		return {}
+	var raw_size := head.decode_s32(4)
+	if raw_size <= 0 or raw_size > (1 << 30):
+		return {}
+	if head.slice(8, 40).get_string_from_ascii() != city_md5:
+		return {}  # city.json 变了
+	var bin := body.decompress(raw_size, FileAccess.COMPRESSION_ZSTD)
+	if bin.is_empty():
+		return {}
+	var v = bytes_to_var(bin)
+	if v is Dictionary and int(v.get("v", -1)) == CACHE_VERSION:
+		print("[CityData] 命中二进制快照（%.1f MB），跳过 city.json 解析"
+			% [body.size() / 1048576.0])
+		return v
+	return {}
+
+
+## 把当前转换产物写成快照。内容必须是 city.json 的纯函数 —— 调用点在
+## _assign_road_names / _apply_landmark_exclusions / _append_life_sites 之前。
+## 写失败只告警不阻塞：下次启动走 JSON 路径照常能跑。
+func _cache_save(city_md5: String) -> void:
+	var t0 := Time.get_ticks_msec()
+	var snap := {
+		"v": CACHE_VERSION,
+		"meta": meta,
+		"extent": extent,
+		"spawn_pos": spawn_pos,
+		"spawn_yaw": spawn_yaw,
+		"spawn_road": spawn_road,
+		"land_groups": land_groups,
+		"coast_rings": coast_rings,
+		"green": green,
+		"water": water,
+		"landmarks": landmarks,
+		"roads": roads,
+		"buildings": buildings,
+	}
+	var bin := var_to_bytes(snap)
+	var comp := bin.compress(FileAccess.COMPRESSION_ZSTD)
+	if comp.is_empty():
+		push_warning("[CityData] 快照压缩失败，跳过缓存写入")
+		return
+	# 头部 40 字节：魔数(0..4) + 未压缩长度 s32(4..8) + MD5 hex 文本(8..40)。
+	# ⚠️ 不能先 resize(40) 再 append_array —— append 是追加到当前末尾，
+	# MD5 会落到偏移 40 造成错位（正文起点也随之错位），必须逐段拼接。
+	var size_bytes := PackedByteArray()
+	size_bytes.resize(4)
+	size_bytes.encode_s32(0, bin.size())
+	var out := PackedByteArray()
+	out.append_array(CACHE_MAGIC.to_ascii_buffer())
+	out.append_array(size_bytes)
+	out.append_array(city_md5.to_ascii_buffer())
+	out.append_array(comp)
+	var dir := DirAccess.open("user://")
+	if dir != null:
+		dir.make_dir_recursive("cache")
+	var f := FileAccess.open(CACHE_PATH, FileAccess.WRITE)
+	if f == null:
+		push_warning("[CityData] 快照写入失败（err %d）" % FileAccess.get_open_error())
+		return
+	f.store_buffer(out)
+	f.close()
+	print("[CityData] 已写二进制快照 %.1f MB（打包+压缩 %d ms，%s），下次启动免解析 city.json"
+		% [out.size() / 1048576.0, Time.get_ticks_msec() - t0, CACHE_PATH])
+
+
+## 把快照套回成员变量并重建派生索引。
+## land_rings 由 land_groups 拍平派生（与未命中路径同一函数，保证一致）；
+## building_index 不用管：_apply_landmark_exclusions 每次启动都会无条件重建。
+func _apply_snapshot(snap: Dictionary) -> void:
+	meta = snap.get("meta", {})
+	extent = snap.get("extent", Rect2())
+	spawn_pos = snap.get("spawn_pos", Vector2.ZERO)
+	spawn_yaw = float(snap.get("spawn_yaw", 0.0))
+	spawn_road = str(snap.get("spawn_road", ""))
+	land_groups = snap.get("land_groups", [])
+	land_rings = _flatten_ring_groups(land_groups)
+	coast_rings = snap.get("coast_rings", [])
+	green = snap.get("green", [])
+	water = snap.get("water", [])
+	landmarks = snap.get("landmarks", [])
+	roads = snap.get("roads", [])
+	buildings = snap.get("buildings", [])
+	road_index.clear()
+	for i in roads.size():
+		road_index[roads[i]["id"]] = i
 
 
 ## 把生活驿站并入地标表（原版 main.ts boot 里对 world.data.landmarks 的 push）。
@@ -329,6 +471,10 @@ func load_navigation() -> void:
 	nav_edges.resize(e.size())
 	for i in e.size():
 		nav_edges[i] = Vector2i(int(e[i][0]), int(e[i][1]))
+	# 42829 节点 / 47218 边的原始嵌套数组已转成 PackedVector2Array / Vector2i，
+	# 全项目只有这里读 navigation.json（road_graph 用 nav_nodes / nav_edges），
+	# 原始结构就地释放，不留双份。
+	DataLoader.forget(NAVIGATION_JSON)
 	print("[CityData] 导航图：%d 节点 / %d 边" % [nav_nodes.size(), nav_edges.size()])
 
 

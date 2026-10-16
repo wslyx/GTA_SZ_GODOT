@@ -17,8 +17,9 @@ class_name ChunkStreamer
 ## 区块文件：res://data/city/blocks/<i>_<j>.glb（由 tools/split_city_blocks.py 从 monolithic
 ##       buildings.glb 切出；不含被地标替换掉的楼体 mesh）。
 ##
-## 与 FacadeStreamer 同构：严格串行、冷却、失败重试；额外用 CACHE_MODE_IGNORE 让
-## 卸载时 PackedScene 引用归零即被 GC，真正回收显存（见 glb_loader.gd）。
+## 与 FacadeStreamer 同构：严格串行、冷却、失败重试；用 CACHE_MODE_IGNORE 加载
+##（不命中资源缓存）+ 不持有 PackedScene + 内嵌贴图跨块共享（glb_loader
+## dedup_chunk_textures），让区块卸载时资源引用归零即被 GC，真正回收显存。
 ##
 ## 回退：若 manifest 或区块文件缺失，CityWorld 走 monolithic 老路径，本模块 inactive，
 ##       绝不破坏现有工程。
@@ -31,12 +32,18 @@ const BLOCK_SIZE := 640.0
 const LOAD_RADIUS := 3000.0
 ## 卸载半径 > 加载半径，形成迟滞带，避免玩家在 3km 线上来回时区块反复加载/卸载。
 const UNLOAD_RADIUS := 3600.0
+## 启动预载半径：只先铺近场（开局玩家实际能看到的范围），1.2km 外交给
+## update 循环按距离串行排队补齐。之前一次铺满 LOAD_RADIUS(3km) 会在加载期
+## 同时驻留 ~68 块 GLB，是启动内存峰值的最大单项；出生点 1.2km 外本来就有
+## distant_city 的简化楼壳兜底（中距离是"远景楼"观感），开车几分钟内真楼
+## 陆续补齐，无空洞感。加载期驻留峰值 ~68 块 → ~11 块。
+const PRELOAD_RADIUS := 1200.0
 const LOAD_RADIUS_AERIAL := 6000.0
 const UNLOAD_RADIUS_AERIAL := 7200.0
 const AERIAL_LOAD_DELAY_MS := 250.0
 ## 运行时串行加载冷却：每块建筑 GLB 较小（数百 KB~数 MB），尖峰比立面瓦片轻，冷却可更短。
 const LOAD_COOLDOWN := 0.12
-## 出生点预加载冷却：加载界面里一次性铺满 3km，冷却压到极小，尽快出加载条。
+## 出生点预加载冷却：加载界面里一次性铺满 PRELOAD_RADIUS，冷却压到极小，尽快出加载条。
 const PRELOAD_COOLDOWN := 0.02
 ## 加载/卸载扫描降频：640m 粒度，4~5Hz 足够。
 const VIS_INTERVAL := 0.2
@@ -133,7 +140,7 @@ func begin_preload(focus_data: Vector2) -> int:
 			continue
 		var dx := float(e["x"]) - fx
 		var dz := float(e["z"]) - fz
-		if dx * dx + dz * dz <= LOAD_RADIUS * LOAD_RADIUS:
+		if dx * dx + dz * dz <= PRELOAD_RADIUS * PRELOAD_RADIUS:
 			_preload_keys.append("%d_%d" % [e["i"], e["j"]])
 	if _preload_keys.is_empty():
 		return 0
@@ -142,7 +149,8 @@ func begin_preload(focus_data: Vector2) -> int:
 		var e: Dictionary = _by_key[key]
 		e["state"] = "loading"
 		_loader.enqueue(e["file"], world.chunks_root, key, ResourceLoader.CACHE_MODE_IGNORE)
-	print("[ChunkStreamer] 预加载出生点 %.0fm 内建筑区块 %d 块" % [LOAD_RADIUS, _preload_total])
+	print("[ChunkStreamer] 预加载出生点 %.0fm 内建筑区块 %d 块（%.0fm 外由运行时流式补齐）"
+		% [PRELOAD_RADIUS, _preload_total, LOAD_RADIUS])
 	return _preload_total
 
 
@@ -279,7 +287,7 @@ func _unload_chunk(e: Dictionary) -> void:
 	stats_unloaded += 1
 
 
-func _on_loaded(_path: String, node: Node3D, meta: Variant, scene: Resource) -> void:
+func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) -> void:
 	var key := str(meta)
 	_current_key = ""
 	var e: Dictionary = _by_key.get(key, {})
@@ -289,6 +297,9 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, scene: Resource) -> 
 			node.queue_free()
 		return
 	GlbLoader.configure_meshes(GlbLoader.meshes_of(node), true, false)
+	# 跨块共享内嵌贴图（office/residential 4 张）：所有材质重挂共享实例，
+	# 块内副本引用归零即被 GC（~68 块常驻 × 4 张 1024² S3TC ≈ 190MB → ≈3MB）。
+	GlbLoader.dedup_chunk_textures(node)
 	# 阴影投在玩家附近（与 city_world 旧 _cull_chunks 一致）
 	var dx := float(e["x"]) - world.focus.x
 	var dz := float(e["z"]) - (-world.focus.z)
@@ -298,7 +309,10 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, scene: Resource) -> 
 			GeometryInstance3D.SHADOW_CASTING_SETTING_ON if near
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 	e["node"] = node
-	e["scene"] = scene
+	# ⚠️ 不持有 PackedScene：实例化后网格/材质已直接引用资源，节点释放即全链回收；
+	# 更关键的是场景捆绑着块内**原始**贴图 —— 贴图刚被 dedup_chunk_textures 重映射
+	# 到共享实例，保留 scene 引用会让每块 4 张 1024² S3TC 的副本永不回收。
+	e["scene"] = null
 	e["state"] = "loaded"
 	stats_loaded += 1
 	# 维护 world.blocks，供 traffic / pedestrian / scenery 的 place() 就绪判断

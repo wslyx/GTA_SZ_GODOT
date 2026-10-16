@@ -92,7 +92,12 @@ func poll() -> bool:
 			_fail(p, "资源不存在（是否没经过 glTF 导入？）")
 			_current = {}
 			return true
-		var err := ResourceLoader.load_threaded_request(p, "PackedScene", true)
+		# ⚠️ cache_mode 是第 4 参：曾经写成 load_threaded_request(p, "PackedScene", true)
+		# 而把 enqueue 传入的 cache_mode 静默丢弃（第 3 参其实是 use_sub_threads），
+		# 导致区块实际按默认 CACHE_MODE_REUSE 进全局缓存 —— 卸载后场景/贴图被缓存
+		# 强引用永不释放，「流式回收显存」从未真正生效，开车越远内存越涨。
+		var err := ResourceLoader.load_threaded_request(p, "PackedScene", true,
+			_current["cache_mode"])
 		if err != OK:
 			_fail(p, "load_threaded_request 失败 code=%d" % err)
 			_current = {}
@@ -178,6 +183,81 @@ static func meshes_of(root: Node) -> Array[MeshInstance3D]:
 	return out
 
 
+## 加载一个"树原型"替换模型，返回 [{mesh, local}]：
+##   mesh   —— 场景里的 MeshInstance3D 网格（场景实例已释放，Mesh 资源仍被引用）
+##   local  —— 相对场景根的容器变换 * scale（glTF 根节点常带 0.001 之类的导出缩放，
+##             不展开的话实例会被放到 4369m 高空，见 tree_modern.glb 的根节点）
+##
+## 材质染色：无贴图灰模（albedo 0.5 灰）直接用是一排灰树，这里按
+## 「网格底边相对整体高度」二分 —— 底边高于整体 25% 的是树冠、其余是树干。
+## 重复调用是幂等的（绝对赋值不是乘法），林冠/种植两层各调一次不冲突。
+## 结果按 path 缓存：73MB 的场景 instantiate 一次就够，两层共享同一份条目。
+static var _tree_model_cache: Dictionary = {}
+static func load_tree_model(path: String, scale: float, foliage: Color, trunk: Color) -> Array[Dictionary]:
+	if _tree_model_cache.has(path):
+		return _tree_model_cache[path]
+	var out: Array[Dictionary] = []
+	if not ResourceLoader.exists(path):
+		push_warning("[GlbLoader] 树替换模型不存在/未导入：%s（打开一次 Godot 编辑器完成导入，导入前回退原版树）" % path)
+		return out
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return out
+	var inst := scene.instantiate()
+	var mi_list := meshes_of(inst)
+	# 先扫一遍算整体高度（各网格 AABB 经容器变换后的最高点）
+	var top := 0.0
+	for mi in mi_list:
+		if mi.mesh == null:
+			continue
+		var waabb := _xf_aabb(_relative_xf(inst, mi), mi.mesh.get_aabb())
+		top = maxf(top, waabb.position.y + waabb.size.y)
+	for mi in mi_list:
+		if mi.mesh == null or mi.mesh.get_surface_count() == 0:
+			continue
+		var xf := _relative_xf(inst, mi)
+		var waabb2 := _xf_aabb(xf, mi.mesh.get_aabb())
+		var tint := foliage if (top > 0.0 and waabb2.position.y > top * 0.25) else trunk
+		for s in mi.mesh.get_surface_count():
+			var mat: Material = mi.mesh.surface_get_material(s)
+			if mat is StandardMaterial3D:
+				var std := mat as StandardMaterial3D
+				std.albedo_color = tint
+				std.roughness = maxf(std.roughness, 0.85)
+		out.append({"mesh": mi.mesh, "local": xf * Transform3D(
+			Basis().scaled(Vector3.ONE * scale), Vector3.ZERO)})
+	inst.queue_free()
+	_tree_model_cache[path] = out
+	return out
+
+
+## 节点相对场景根的累积变换（容器节点的平移/缩放会被带出来）。
+static func _relative_xf(root: Node, n: Node3D) -> Transform3D:
+	var xf := n.transform
+	var p: Node = n.get_parent()
+	while p != null and p != root:
+		if p is Node3D:
+			xf = (p as Node3D).transform * xf
+		p = p.get_parent()
+	return xf
+
+
+## AABB 经 Transform3D 变换后的包围盒（8 角点取 min/max）。
+## 不用 `Transform3D * AABB`：该运算符版本支持不一致，8 角点是零 API 风险写法。
+static func _xf_aabb(xf: Transform3D, aabb: AABB) -> AABB:
+	var mn := Vector3.INF
+	var mx := -Vector3.INF
+	for i in 8:
+		var c := Vector3(
+			aabb.position.x + (aabb.size.x if (i & 1) != 0 else 0.0),
+			aabb.position.y + (aabb.size.y if (i & 2) != 0 else 0.0),
+			aabb.position.z + (aabb.size.z if (i & 4) != 0 else 0.0))
+		var w := xf * c
+		mn = mn.min(w)
+		mx = mx.max(w)
+	return AABB(mn, mx - mn)
+
+
 ## 统一设置阴影与可见层，等价于原版 load() 里对每个 mesh 做的事。
 ##
 ## 参数 receive_shadows 仅为兼容调用方而保留：**Godot 4 没有**
@@ -196,6 +276,70 @@ static func configure_meshes(meshes: Array, receive_shadows := true, cast_shadow
 		)
 		if vertex_colors:
 			enable_vertex_colors([mi])
+
+
+# ---------------------------------------------------------------------------
+# 区块内嵌贴图跨块共享（chunk_streamer 专用，见 dedup_chunk_textures）
+# ---------------------------------------------------------------------------
+
+## 共享贴图注册表："residential.jpg" 等后缀键 → 首个登记的纹理实例。
+## static 持有：区块卸载后共享实例继续存活，重载的块直接重挂上来。
+static var _chunk_tex_cache: Dictionary = {}
+static var _chunk_tex_re: RegEx = null
+
+
+## 把区块内嵌贴图重映射到**跨块共享**的实例，返回重映射的引用数。
+##
+## 背景：split_city_blocks.py 切分时把同一套建筑贴图逐块复制内嵌
+## （data/city/blocks/<i>_<j>_<名>.jpg，150 块 × 4 张，MD5 实证同后缀同内容）。
+## 区块用 CACHE_MODE_IGNORE 加载（卸载即 GC 的前提），不命中资源缓存，
+## 于是每个常驻块都各自实例化整套贴图：~68 块 × 4 张 1024² S3TC ≈ 190MB 显存。
+## 加载后把材质的 albedo/emission 贴图引用重挂到共享实例，块内副本引用归零
+## 即被 GC，常驻开销降到 ≈ 4 张 ≈ 3MB。
+##
+## ⚠️ 配套条件：调用方（chunk_streamer._on_loaded）加载后**不得**再持有
+## PackedScene 引用 —— 场景捆绑着块内原始贴图，保留它副本就永不回收。
+static func dedup_chunk_textures(root: Node) -> int:
+	var n := 0
+	for mi in meshes_of(root):
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var mat: Material = mi.mesh.surface_get_material(s)
+			if mat is StandardMaterial3D:
+				n += _remap_shared_textures(mat as StandardMaterial3D)
+	return n
+
+
+static func _remap_shared_textures(m: StandardMaterial3D) -> int:
+	var n := 0
+	for prop in ["albedo_texture", "emission_texture"]:
+		var t: Texture2D = m.get(prop)
+		if t == null or t.resource_path == "":
+			continue
+		var key := _chunk_tex_key(t.resource_path)
+		if key == "":
+			continue
+		var shared: Texture2D = _chunk_tex_cache.get(key)
+		if shared != null and is_instance_valid(shared):
+			if shared != t:
+				m.set(prop, shared)
+				n += 1
+		else:
+			_chunk_tex_cache[key] = t
+	return n
+
+
+## res://data/city/blocks/<i>_<j>_<名>.jpg → "<名>.jpg"；
+## 不带 blocks 目录或不符合块前缀命名的路径返回 ""（不去重，保守处理）。
+static func _chunk_tex_key(path: String) -> String:
+	if not path.contains("/blocks/"):
+		return ""
+	if _chunk_tex_re == null:
+		_chunk_tex_re = RegEx.new()
+		_chunk_tex_re.compile("^-?\\d+_-?\\d+_(.+)$")
+	var m: RegExMatch = _chunk_tex_re.search(path.get_file())
+	return m.get_string(1) if m != null else ""
 
 
 ## 建筑的颜色**全部**烘焙在 COLOR_0 顶点色里：blocks/*.glb 与 buildings.glb 的

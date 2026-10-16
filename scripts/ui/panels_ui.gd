@@ -80,18 +80,27 @@ func setup(p_world: CityWorld, p_player, p_career: CareerSystem, p_story: StoryS
 	career = p_career
 	story = p_story
 	layer = 12
+	MemProbe.mark("panels 入口")
 	_build()
+	MemProbe.mark("panels _build 后")
 	_build_pause()
+	MemProbe.mark("panels _build_pause 后")
 
 
-func _font(size: int) -> Font:
-	var sf := SystemFont.new()
-	sf.font_names = PackedStringArray(["Microsoft YaHei", "微软雅黑", "SimHei",
-		"PingFang SC", "Noto Sans CJK SC", "sans-serif"])
-	sf.allow_system_fallback = true
-	# SystemFont 没有 font_size 属性（那是 Label 的主题字号），删掉
-	# 由 add_theme_font_size_override / Label3D.font_size 控制
-	return sf
+## 全面板共用的中文字体。⚠️ 绝不能每次调用都 new：本函数在几十个 Label 的构建
+## 里各调一次，而 TextServer 会为每个 SystemFont 实例独立加载并缓存系统字体
+## 数据（雅黑 TTC 每份几十 MB），实测把启动资源堆顶出 ~3.2GB —— map_ui._font
+## 踩过同一个坑（见其「字号 → 字体缓存」注释）。字号由 Label 的
+## add_theme_font_size_override 控制，与 Font 实例无关，全局共享一份即可。
+var _font_shared: SystemFont
+
+func _font(_size: int) -> Font:
+	if _font_shared == null:
+		_font_shared = SystemFont.new()
+		_font_shared.font_names = PackedStringArray(["Microsoft YaHei", "微软雅黑",
+			"SimHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif"])
+		_font_shared.allow_system_fallback = true
+	return _font_shared
 
 
 func _panel(title: String, size: Vector2, pos: Vector2) -> Dictionary:
@@ -1262,6 +1271,7 @@ const SETTINGS_ROWS := [
 	{"key": "trees", "name": "植被密度", "opts": ["低 (4000)", "中 (9000)", "高 (16000)"]},
 	{"key": "exposure", "name": "曝光补偿", "opts": ["-30%", "-15%", "标准", "+15%", "+30%"]},
 	{"key": "fps", "name": "帧率显示", "opts": ["关", "开"]},
+	{"key": "max_fps", "name": "帧率上限", "opts": ["不限", "30", "60", "90", "120", "144", "165"]},
 ]
 
 var settings_root: Control
@@ -1385,6 +1395,12 @@ func _setting_current_index(key: String) -> int:
 			if GraphicsQuality.overrides.has("fps"):
 				return 1 if bool(GraphicsQuality.overrides["fps"]) else 0
 			return 0
+		"max_fps":
+			var fv := int(GraphicsQuality.overrides.get("max_fps", 0))
+			for i in GraphicsQuality.FPS_STEPS.size():
+				if int(GraphicsQuality.FPS_STEPS[i]) == fv:
+					return i
+			return 0
 	return 0
 
 
@@ -1429,6 +1445,10 @@ func _apply_setting(key: String, idx: int) -> void:
 			GraphicsQuality.set_override("fps", on)
 			if hud != null and hud.has_method("set_fps_visible"):
 				hud.set_fps_visible(on)
+		"max_fps":
+			GraphicsQuality.set_override("max_fps",
+				int(GraphicsQuality.FPS_STEPS[clampi(idx, 0, GraphicsQuality.FPS_STEPS.size() - 1)]))
+			GraphicsQuality.apply_max_fps()
 	GraphicsQuality.save()
 
 

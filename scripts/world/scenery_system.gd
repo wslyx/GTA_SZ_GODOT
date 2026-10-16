@@ -23,6 +23,20 @@ const FURNITURE_LIMIT := 12
 
 ## 原版树木总量上限（三级 LOD 各自的实例预算）
 const TREE_BUDGET := {"low": 4000, "medium": 9000, "high": 16000}
+
+## —— 树模型替换（assets/tree_modern.glb，外部提供模型的抽稀版）——
+## 原始 73MB / 143 万面，编辑器直接导入会假死；已用 gltfpack -si 0.05 -sa
+## 抽稀到 7.1 万面 / 4.6MB（原始文件保留在 assets/raw/，有 .gdignore 不进导入）。
+## 无贴图灰模，运行时按树冠/树干自动染色；根节点带 0.001 容器缩放，已展开。
+## 全套统一 modern 树：近端 full 用 tree_modern（7.1 万面），中远端 mid/far 用
+## 同源抽稀变体 tree_modern-lod（gltf-transform simplify，~1.8 万面 / 1.0MB，
+## 顶点负载降约一个数量级，避免 7 万面 × 全城几万实例的远端面数爆炸）。
+## 模型落地高约 8.7m（原版林冠树 11–30m），TREE_MODEL_SCALE 补到 ~17m。
+const TREE_MODEL_OVERRIDE := "res://assets/tree_modern.glb"
+const TREE_MODEL_LOD_OVERRIDE := "res://assets/tree_modern-lod.glb"
+const TREE_MODEL_SCALE := 2.0
+const TREE_MODEL_FOLIAGE := Color(0.30, 0.52, 0.22)
+const TREE_MODEL_TRUNK := Color(0.40, 0.32, 0.24)
 ## 生效中的林冠实例预算（set_quality / 设置页可覆盖）
 var _tree_budget := 9000
 
@@ -42,7 +56,7 @@ var _canopy_instances: Array = []
 ## 林冠空间索引：40927 棵全量扫 + 排序（每 2s）太重
 var _canopy_points := PackedVector2Array()
 var _canopy_grid: PointGrid
-var _canopy_nodes: Dictionary = {}   ## "species|lod" → MeshInstance3D
+var _canopy_nodes: Dictionary = {}   ## "species|lod" → {node: MultiMeshInstance3D, local: Transform3D}
 var _furniture_nodes: Array = []
 var _timer := 0.0
 var _built := false
@@ -115,8 +129,33 @@ func _load_canopy_asset() -> void:
 		var key := "full" if lod == 0 else ("mid" if lod == 1 else "far")
 		sp["lods"][key] = str(m.get("file", ""))
 
+	# 树模型替换：近端 full 用 tree_modern，中远端 mid/far 用 tree_modern-lod
+	# （load_tree_model 已展开根节点容器缩放并染色；常驻 load 缓存里 Mesh 只有一份，
+	# 各 LOD 共享同一份数据不重复占显存）
+	var tree_override := GlbLoader.load_tree_model(TREE_MODEL_OVERRIDE, TREE_MODEL_SCALE,
+		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
+	var tree_lod := GlbLoader.load_tree_model(TREE_MODEL_LOD_OVERRIDE, TREE_MODEL_SCALE,
+		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
 	for sp in _species:
 		for key in sp["lods"]:
+			var proto: Array = tree_override if key == "full" else tree_lod
+			var use_override := not proto.is_empty()
+			if use_override:
+				for mi_idx in proto.size():
+					var entry: Dictionary = proto[mi_idx]
+					var mm := MultiMesh.new()
+					mm.transform_format = MultiMesh.TRANSFORM_3D
+					mm.mesh = entry["mesh"]
+					var node := MultiMeshInstance3D.new()
+					node.multimesh = mm
+					node.name = "canopy-%s-%s-modern%d" % [sp["id"], key, mi_idx]
+					node.cast_shadow = (
+						GeometryInstance3D.SHADOW_CASTING_SETTING_ON if key == "full"
+						else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+					add_child(node)
+					_canopy_nodes["%s|%s|%s" % [sp["id"], key, mi_idx]] = {
+						"node": node, "local": entry["local"]}
+				continue
 			var rel: String = sp["lods"][key]
 			var path := "res://data/city/landscape/" + rel
 			if not ResourceLoader.exists(path):
@@ -127,17 +166,19 @@ func _load_canopy_asset() -> void:
 			var inst := scene.instantiate()
 			var mi_list := GlbLoader.meshes_of(inst)
 			for mi in mi_list:
-				var mm := MultiMesh.new()
-				mm.transform_format = MultiMesh.TRANSFORM_3D
-				mm.mesh = mi.mesh
-				var node := MultiMeshInstance3D.new()
-				node.multimesh = mm
-				node.name = "canopy-%s-%s" % [sp["id"], key]
-				node.cast_shadow = (
+				var mm2 := MultiMesh.new()
+				mm2.transform_format = MultiMesh.TRANSFORM_3D
+				mm2.mesh = mi.mesh
+				var node2 := MultiMeshInstance3D.new()
+				node2.multimesh = mm2
+				node2.name = "canopy-%s-%s" % [sp["id"], key]
+				node2.cast_shadow = (
 					GeometryInstance3D.SHADOW_CASTING_SETTING_ON if key == "full"
 					else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-				add_child(node)
-				_canopy_nodes["%s|%s|%s" % [sp["id"], key, mi.name]] = node
+				add_child(node2)
+				# 原版模型的容器变换历来被忽略（GLB 本身是单位变换），保持 identity
+				_canopy_nodes["%s|%s|%s" % [sp["id"], key, mi.name]] = {
+					"node": node2, "local": Transform3D()}
 			inst.queue_free()
 
 	var trees: Array = CityData.canopy_trees().get("trees", [])
@@ -261,7 +302,9 @@ func _canopy_step(focus: Vector3) -> void:
 		var written := 0
 		while int(job["node_idx"]) < job["node_list"].size() and written < chunk:
 			var nk: String = job["node_list"][int(job["node_idx"])]
-			var node: MultiMeshInstance3D = _canopy_nodes[nk]
+			var nd: Dictionary = _canopy_nodes[nk]
+			var node: MultiMeshInstance3D = nd["node"]
+			var local: Transform3D = nd["local"]
 			var parts: Array = nk.split("|")
 			var bucket_key := "%s|%s" % [parts[0], parts[1]]
 			var list: Array = job["buckets"].get(bucket_key, [])
@@ -269,7 +312,9 @@ func _canopy_step(focus: Vector3) -> void:
 			if int(job["write_i"]) == 0:
 				mm.instance_count = list.size()
 			while int(job["write_i"]) < list.size() and written < chunk:
-				mm.set_instance_transform(int(job["write_i"]), list[int(job["write_i"])])
+				# local 是替换模型的容器变换 * 补高缩放（原版为 identity）
+				mm.set_instance_transform(int(job["write_i"]),
+					list[int(job["write_i"])] * local)
 				job["write_i"] = int(job["write_i"]) + 1
 				written += 1
 			# 只显示已写入的有效实例（未写入的暂留在原点不能显示），随写入平滑增长
@@ -373,10 +418,10 @@ func update_system(delta: float, focus: Vector3) -> void:
 func diagnostics() -> Dictionary:
 	var counts := {}
 	for k in _canopy_nodes:
-		# _canopy_nodes 里存的是 MultiMeshInstance3D（见 _build_canopy）。
-		# 它和 MeshInstance3D 是 GeometryInstance3D 下的**兄弟类**，不是继承关系，
-		# `as MeshInstance3D` 恒为 null，再取 .multimesh 就是空引用崩溃。
-		var mmi: MultiMeshInstance3D = _canopy_nodes[k] as MultiMeshInstance3D
+		# _canopy_nodes 里存的是 {node, local}（见 _load_canopy_asset）。
+		# MultiMeshInstance3D 和 MeshInstance3D 是 GeometryInstance3D 下的**兄弟类**，
+		# 不是继承关系，`as MeshInstance3D` 恒为 null，再取 .multimesh 就是空引用崩溃。
+		var mmi: MultiMeshInstance3D = _canopy_nodes[k]["node"] as MultiMeshInstance3D
 		if mmi == null or mmi.multimesh == null:
 			continue
 		counts[k] = mmi.multimesh.instance_count

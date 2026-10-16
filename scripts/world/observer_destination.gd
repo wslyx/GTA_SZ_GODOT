@@ -46,9 +46,11 @@ func setup(p_collision: CityCollision, p_ground_height: Callable) -> void:
 	ground_height = p_ground_height
 	_extent = CityData.extent
 	# land / water 的多边形结构要保留「外环 + 洞」——CityData.land_rings 是拍平过的，
-	# 用它会丢掉洞，于是洞里的点会被误判成陆地。所以这里直接读 city.json。
-	var city: Dictionary = DataLoader.json_dict("/city/city.json")
-	for g in city.get("land", []):
+	# 用它会丢掉洞，于是洞里的点会被误判成陆地。所以 CityData 额外保留了未拍平的
+	# land_groups（二进制快照直接带出来）。这里不再直读 city.json —— 之前
+	# json_nocache 会把 28.5MB 全量解析一遍（roads/buildings 的嵌套数组也在场），
+	# 是启动内存峰值的第二大来源。
+	for g in CityData.land_groups:
 		var rings := _normalize_group(g)
 		if rings.is_empty():
 			continue

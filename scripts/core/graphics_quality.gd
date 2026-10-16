@@ -28,6 +28,10 @@ const TREE_STEPS := [4000, 9000, 16000]
 ## 曝光补偿档位（乘在 tonemap_exposure 上）
 const EXPOSURE_STEPS := [0.7, 0.85, 1.0, 1.15, 1.3]
 
+## 帧率上限档位（0 = 不限制）。设置页 ←→ 循环选择，
+## 经 Engine.max_fps 生效；配合垂直同步可在高刷屏上压 GPU 功耗。
+const FPS_STEPS := [0, 30, 60, 90, 120, 144, 165]
+
 ## 原版 PROFILE 表
 ## shadows：0 关 / 1 低（1024, 2-split）/ 2 高（2048, 4-split）
 ## lamps：夜间路灯池数量；tree_budget：林冠重建实例预算
@@ -123,6 +127,7 @@ var _tier := "medium"
 ##   tree_budget: int      林冠实例预算
 ##   exposure: float       曝光补偿（乘在 tonemap_exposure 上）
 ##   fps: bool             帧率显示
+##   max_fps: int          帧率上限（0 = 不限制，下标进 FPS_STEPS）
 var overrides := {}
 
 
@@ -136,6 +141,7 @@ func _ready() -> void:
 		GameState.graphics_tier = t
 		_tier = t
 	apply_aa()
+	apply_max_fps()
 
 
 ## 曝光补偿系数（设置页可调；光照 apply_mode 每次套用时乘上去）
@@ -272,6 +278,15 @@ func apply_aa() -> void:
 		else Viewport.SCREEN_SPACE_AA_DISABLED)
 
 
+## 帧率上限：Engine.max_fps = 0 表示不限制。
+## 存档白名单已把 max_fps 归一成 int，越界值一律夹回 FPS_STEPS 表内。
+func apply_max_fps() -> void:
+	var v := int(overrides.get("max_fps", 0))
+	if not FPS_STEPS.has(v):
+		v = 0
+	Engine.max_fps = v
+
+
 ## 把生效参数套到世界节点上。world 需提供 light / environment 等引用。
 func apply_to_world(world: Node) -> void:
 	if world == null:
@@ -281,6 +296,7 @@ func apply_to_world(world: Node) -> void:
 		world.on_quality_changed(p)
 	apply_resolution_scale()
 	apply_aa()
+	apply_max_fps()
 
 
 ## 持久化（设置页每次改动都会调）

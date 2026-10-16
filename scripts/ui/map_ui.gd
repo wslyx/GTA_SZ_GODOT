@@ -152,16 +152,18 @@ func setup(p_world: CityWorld, p_player) -> void:
 	# 取 11：高于 HUD(10)，低于 PanelsUI(12)（手账/设置页/加载画面仍在其上）。
 	layer = 11
 	_build()
+	MemProbe.mark("mapui _build 后")
 	# 静态图层烘焙：一次性把水域/绿地/道路画进贴图（约 100ms）。
 	# 放在 setup 里 —— 此时主循环还在加载画面后面，玩家看不到这一下停顿。
 	_bake_static_map()
+	MemProbe.mark("mapui bake 调度后")
 
 
 func _build() -> void:
 	# 预热字体缓存。⚠️ 必须赶在**第一次绘制之前**建好，原因见 _font() 的注释：
 	# 当帧 new 出来的 SystemFont 当帧拿去 draw_string，画出来是一排实心方块。
-	for s in FONT_SIZES:
-		_font(s)
+	_font(12)
+	MemProbe.mark("mapui 字体预热后")
 
 	# 圆形小地图（原版 #minimap：bottom 49px、left calc(--hud-edge − 10px)、
 	# 直径 = 表盘 × 0.865、border-radius 50%）。位置与尺寸由 HUD 通过
@@ -227,7 +229,9 @@ func _build() -> void:
 	big_map.mouse_filter = Control.MOUSE_FILTER_STOP
 	big_map.visible = false
 	add_child(big_map)
+	MemProbe.mark("mapui 小地图控件后")
 	_build_atlas_shell()
+	MemProbe.mark("mapui atlas 壳后")
 
 
 ## 原版 city-map.ts:93 —— 选好地点后地图面板底部出现两个按钮：
@@ -961,9 +965,9 @@ func hide_route_choice() -> void:
 	_refresh_destination_panel()
 
 
-## 字号 → 字体缓存。
+## 全字号共享的**单个** SystemFont。
 ##
-## ⚠️ 必须缓存，而且必须在**真正拿它画之前至少一帧**就建好。
+## ⚠️ 必须在**真正拿它画之前至少一帧**就建好。
 ##
 ## 实测（Godot 4.7.1，最小工程逐条对照）：
 ##   ① 本帧 `SystemFont.new()` + 设 font_names，本帧就 draw_string → **一整排实心方块**
@@ -981,25 +985,22 @@ func hide_route_choice() -> void:
 ## 里一次性建好、隔了很多帧才绘制的，所以从来不出问题（这正是"只有大地图上的
 ## 文字乱码"的原因）。
 ##
-## 顺带把开销也降下来了：原来每次重绘都要重新枚举一遍系统字体。
-var _font_cache := {}
-## `_draw_big_map()` 与路线按钮用到的全部字号，在 `_build()` 里一次性预热
-## 小地图叠加层的字号（N 标记 10、路名 13）也要预热
-const FONT_SIZES := [9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 21, 22, 25, 29]
+## ⚠️ 内存：**每个 SystemFont 实例都会各自加载一份系统字体文件**（微软雅黑
+## ttc ≈ 19MB），TextServer 不做跨实例去重。曾按字号缓存 14 个实例，
+## MemProbe 实测字体预热一步 +265MB。而 SystemFont 与字号无关 —— 字号由
+## add_theme_font_size_override / draw_string 的 size 参数决定 —— 所以全部
+## 字号共享这 1 个实例即可，预热一次（1 份字体）服务所有 draw 与 Label。
+var _font_shared: Font = null
 
 
-func _font(size: int) -> Font:
-	var hit: Font = _font_cache.get(size)
-	if hit != null:
-		return hit
-	var sf := SystemFont.new()
-	sf.font_names = PackedStringArray(["Microsoft YaHei", "微软雅黑", "SimHei",
-		"PingFang SC", "Noto Sans CJK SC", "sans-serif"])
-	sf.allow_system_fallback = true
-	# SystemFont 没有 font_size 属性（那是 Label 的主题字号），删掉
-	# 由 add_theme_font_size_override / Label3D.font_size 控制
-	_font_cache[size] = sf
-	return sf
+func _font(_size: int) -> Font:
+	if _font_shared == null:
+		var sf := SystemFont.new()
+		sf.font_names = PackedStringArray(["Microsoft YaHei", "微软雅黑", "SimHei",
+			"PingFang SC", "Noto Sans CJK SC", "sans-serif"])
+		sf.allow_system_fallback = true
+		_font_shared = sf
+	return _font_shared
 
 
 # ---------------------------------------------------------------------------
@@ -1151,10 +1152,13 @@ func _draw_minimap_plane() -> void:
 	# —— 静态图层：水域 + 绿地 + 道路，一次性烘焙好，这里只贴一次 ——
 	# 烘焙贴图按**平面单位**（1:1）生成，所以这里的 0.75 变换对位置与线宽
 	# 的作用与原先逐条 draw_polyline 完全一致。
+	# 用 draw_texture_rect 显式给**逻辑足迹**（_map_size，烘焙像素空间）——
+	# 贴图实际分辨率与足迹解耦（烘焙清理会把贴图降采样一半，足迹不变）。
 	if _map_tex != null:
-		_plane_draw.draw_texture(_map_tex, Vector2(
-			(_map_origin.x - pos.x) * MINIMAP_SCALE,
-			-(_map_origin.y - pos.y) * MINIMAP_SCALE))
+		_plane_draw.draw_texture_rect(_map_tex, Rect2(
+			Vector2((_map_origin.x - pos.x) * MINIMAP_SCALE,
+				-(_map_origin.y - pos.y) * MINIMAP_SCALE),
+			Vector2(_map_size)), false)
 	else:
 		_draw_static_direct(pos)
 
@@ -1188,7 +1192,8 @@ func _draw_static_direct(pos: Vector2) -> void:
 ## 把全城静态图层画进一张贴图。**只在 setup 时跑一次**（约 100ms，藏在加载画面后面）。
 ##
 ## 贴图分辨率取 1:1 平面分辨率（MINIMAP_SCALE px/m）：最左 6788m → 约 2580px，
-## 全城约 5160×1980，约 40MB 显存 —— 换来每次重绘只剩一次 blit。
+## 全城约 5160×1980。烘焙完成后 `_free_bake_after_render()` 会把 RT 转成
+## 半分辨率独立贴图并释放整个烘焙视口（见该函数注释）。
 func _bake_static_map() -> void:
 	if _map_baked or world == null:
 		return
@@ -1217,8 +1222,41 @@ func _bake_static_map() -> void:
 	_map_painter.draw.connect(_draw_static_map)
 	_map_vp.add_child(_map_painter)
 	_map_tex = _map_vp.get_texture()
+	# UPDATE_ONCE：视口在本帧末才真正渲染，画笔的绘制几何也要到那时才构建。
+	_free_bake_after_render()
 	print("[MapUI] 小地图静态图层已烘焙：%dx%d（外扩 %.0fpx）" % [
 		_map_size.x, _map_size.y, BAKE_MARGIN])
+
+
+## 烘焙收尾：等渲染真正发生（跨 2 帧）后 ——
+##   1. 把 RT 读回 CPU，双线性降采样到**一半**（显示端采样率只有烘焙分辨率的
+##      ~0.23 倍：1024 plane 缩到 320 输出再乘 0.75 变换，再降一半无感），
+##      转成独立 ImageTexture：RT 5287×2108 ≈ 45MB → 半分辨率 ≈ 11MB；
+##   2. **释放整个烘焙视口** —— 画笔上 2.4 万条抗锯齿折线的命令几何会永久
+##      驻留（MemProbe 实测窗口化下这项是烘焙开销的大头），视口没了几何也没了；
+##   3. headless 等无真实渲染的环境拿不到像素：退而只释放画笔几何，保留
+##      视口纹理引用（dummy 纹理，不影响后续 draw 调用）。
+func _free_bake_after_render() -> void:
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	if _map_vp == null:
+		return
+	var img: Image = null
+	if _map_tex != null:
+		img = _map_tex.get_image()
+	if img != null and not img.is_empty():
+		img.resize(int(_map_size.x * 0.5), int(_map_size.y * 0.5),
+			Image.INTERPOLATE_BILINEAR)
+		_map_tex = ImageTexture.create_from_image(img)
+		_map_vp.free()
+		_map_vp = null
+		_map_painter = null
+	else:
+		if _map_painter != null and is_instance_valid(_map_painter):
+			_map_painter.free()
+			_map_painter = null
+	img = null
+	MemProbe.mark("mapui bake 清理后")
 
 
 ## 烘焙绘制：与实时路径用**同一套坐标公式与线宽**，只是中心固定为贴图原点、

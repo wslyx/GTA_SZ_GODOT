@@ -317,12 +317,16 @@ func _on_failed(reason: String) -> void:
 ## 的装配步骤按原版 init() 的顺序调用过了，这里**不能**重复 setup。
 func _on_built() -> void:
 	print("[MainGame] 城市构建完成，启动累计 %d ms" % Time.get_ticks_msec())
+	MemProbe.mark("on_built入口")
 	career.setup(world)
 	rides.setup(world)
 	story.setup(world, career)
+	MemProbe.mark("career/rides/story 后")
 
 	hud.setup(world, self)
+	MemProbe.mark("hud.setup 后")
 	maps.setup(world, self)
+	MemProbe.mark("maps.setup 后")
 	# 观察信标：构建期 HUD 还不存在，提示回调在这里补注入
 	if world.beacons != null and world.beacons.has_method("set_toast"):
 		world.beacons.set_toast(func(m: String, t := 3.0): hud.toast(m, t))
@@ -339,6 +343,7 @@ func _on_built() -> void:
 	maps.big_map_toggled.connect(_on_big_map_toggled)
 	maps.pick_failed.connect(func(reason: String): hud.toast(reason, 2.5))
 	panels.setup(world, self, career, story)
+	MemProbe.mark("panels.setup 后")
 	# 设置页的「帧率显示」行要操作 HUD
 	panels.hud = hud
 	# 暂停页的声音滑杆要操作程序化音频
@@ -356,7 +361,9 @@ func _on_built() -> void:
 	GraphicsQuality.apply_to_world(world)
 
 	session_ready = true
+	MemProbe.mark("finish_loading 前")
 	panels.finish_loading()
+	MemProbe.mark("finish_loading 后")
 	hud.toast("深城纪 · F10 图像设置 · P 帧率 · Esc 暂停", 5.0)
 
 # ---------------------------------------------------------------------------

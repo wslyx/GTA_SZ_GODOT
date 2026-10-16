@@ -25,6 +25,7 @@ GameState="*res://scripts/core/game_state.gd"
 SaveSystem="*res://scripts/core/save_system.gd"
 GraphicsQuality="*res://scripts/core/graphics_quality.gd"
 CityData="*res://scripts/core/city_data.gd"
+MemProbe="*res://scripts/utils/mem_probe.gd"
 
 [display]
 
@@ -47,6 +48,10 @@ scene={
 "animation/fps": 30,
 "animation/import": true,
 "fbx/embedded_image_handling": 0
+}
+"##æ°è´´å¾é»è®¤VRAMåç¼©ï¼æ¬é¡¹ç®åæ è´´å¾å ä¹å¨æ¯3Dæè´¨ï¼mode"=0
+"ï¼æ æï¼è¿æ¾å­##æ¯RGBA8ï¼4B/pxï¼ï¼æ¼ä¸å¼ 4Kå¾å°±ç½å64MBæ¾å­ãä¸ªå«2D/æ°æ®å¾ï¼å è½½æµ·æ¥ã##LUTï¼é¦æ¬¡å¯¼å¥åæå¨æè¯¥é¡¹æ¹å0å³å¯ãå·²ææä»¶ç.importå·²æ¹éæ¹è¿ãtexture"={
+"compress/mode": 2
 }
 
 [input]
