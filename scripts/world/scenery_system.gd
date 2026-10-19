@@ -24,16 +24,19 @@ const FURNITURE_LIMIT := 12
 ## 原版树木总量上限（三级 LOD 各自的实例预算）
 const TREE_BUDGET := {"low": 4000, "medium": 9000, "high": 16000}
 
-## —— 树模型替换（assets/tree_modern.glb，外部提供模型的抽稀版）——
-## 原始 73MB / 143 万面，编辑器直接导入会假死；已用 gltfpack -si 0.05 -sa
-## 抽稀到 7.1 万面 / 4.6MB（原始文件保留在 assets/raw/，有 .gdignore 不进导入）。
+## —— 树模型替换（assets/tree_modern*.glb，外部提供模型的抽稀版）——
+## 原始 73MB / 143 万面，编辑器直接导入会假死；从 raw 源分三档抽稀：
+##   tree_modern.glb      full：2.6 万面 / 2.0MB（≤170m，近景保细节，投影）
+##   tree_modern-lod.glb  mid：~4k 面 / 0.3MB（≤650m）
+##   tree_modern-far.glb  far：~7 百面 / 0.06MB（≤1100m，远端占位）
+## 抽稀管线：flatten → 去 NORMAL/TEXCOORD_0（否则 weld 合不动、简化有 14 万面
+## 下限）→ weld → simplify → normals 重算平滑法线 → weld 重新索引。
 ## 无贴图灰模，运行时按树冠/树干自动染色；根节点带 0.001 容器缩放，已展开。
-## 全套统一 modern 树：近端 full 用 tree_modern（7.1 万面），中远端 mid/far 用
-## 同源抽稀变体 tree_modern-lod（gltf-transform simplify，~1.8 万面 / 1.0MB，
-## 顶点负载降约一个数量级，避免 7 万面 × 全城几万实例的远端面数爆炸）。
-## 模型落地高约 8.7m（原版林冠树 11–30m），TREE_MODEL_SCALE 补到 ~17m。
+## 历史教训：曾把 mid/far 共用一份 1.8 万面模型，650–1100m 半径内几千实例
+## 直接把 4060 顶点吞吐打满（帧率钉在 40）——far 档必须用超轻模型。
 const TREE_MODEL_OVERRIDE := "res://assets/tree_modern.glb"
 const TREE_MODEL_LOD_OVERRIDE := "res://assets/tree_modern-lod.glb"
+const TREE_MODEL_FAR_OVERRIDE := "res://assets/tree_modern-far.glb"
 const TREE_MODEL_SCALE := 2.0
 const TREE_MODEL_FOLIAGE := Color(0.30, 0.52, 0.22)
 const TREE_MODEL_TRUNK := Color(0.40, 0.32, 0.24)
@@ -129,16 +132,22 @@ func _load_canopy_asset() -> void:
 		var key := "full" if lod == 0 else ("mid" if lod == 1 else "far")
 		sp["lods"][key] = str(m.get("file", ""))
 
-	# 树模型替换：近端 full 用 tree_modern，中远端 mid/far 用 tree_modern-lod
-	# （load_tree_model 已展开根节点容器缩放并染色；常驻 load 缓存里 Mesh 只有一份，
-	# 各 LOD 共享同一份数据不重复占显存）
+	# 树模型替换：近端 full 用 tree_modern，中端 mid 用 tree_modern-lod，
+	# 远端 far 用 tree_modern-far（load_tree_model 已展开根节点容器缩放并染色；
+	# 常驻 load 缓存里 Mesh 只有一份，各 LOD 共享同一份数据不重复占显存）
 	var tree_override := GlbLoader.load_tree_model(TREE_MODEL_OVERRIDE, TREE_MODEL_SCALE,
 		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
 	var tree_lod := GlbLoader.load_tree_model(TREE_MODEL_LOD_OVERRIDE, TREE_MODEL_SCALE,
 		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
+	var tree_far := GlbLoader.load_tree_model(TREE_MODEL_FAR_OVERRIDE, TREE_MODEL_SCALE,
+		TREE_MODEL_FOLIAGE, TREE_MODEL_TRUNK)
 	for sp in _species:
 		for key in sp["lods"]:
-			var proto: Array = tree_override if key == "full" else tree_lod
+			var proto: Array = tree_override if key == "full" \
+				else (tree_lod if key == "mid" else tree_far)
+			# far 模型未生成/未导入时退回 mid（load_tree_model 找不到文件会告警并给空表）
+			if proto.is_empty():
+				proto = tree_lod
 			var use_override := not proto.is_empty()
 			if use_override:
 				for mi_idx in proto.size():

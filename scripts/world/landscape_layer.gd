@@ -53,12 +53,13 @@ const OPEN_NEAR_LIMIT := 24
 const ROAD_LIFT := 0.12
 const DETAIL_LIFT := 0.05
 
-## —— 树模型替换（assets/tree_modern.glb，同 scenery_system.gd 的常量）——
-## 模型为抽稀版（7.1 万面 / 4.6MB，原始 143 万面在 assets/raw/ 不进导入）。
+## —— 树模型替换（assets/tree_modern*.glb，同 scenery_system.gd 的常量）——
+## 模型为三档抽稀版：tree_modern 2.6 万面 / tree_modern-lod ~4k 面 /
+## tree_modern-far ~7 百面（原始 143 万面在 assets/raw/ 不进导入）。
 ## 全套统一 modern 树：近端原型（NEAR_DIST ≤150m / open 全量原型）用
-## tree_modern；"-lod" 远端原型用同源抽稀变体 tree_modern-lod（~1.8 万面 /
-## 1.0MB，顶点负载降约一个数量级），中远距离成千实例不再爆面数，且近远成色
-## 一致（原版 -lod 低模是"另一种树"的观感）。
+## tree_modern；"-lod" 远端原型用同源抽稀变体 tree_modern-lod（~4k 面 / 0.3MB）。
+## 本层实例预算小（近端 ≤48、远端 ≤220），不再额外接 far 档；林冠层
+## （scenery_system.gd）才是面数大户，far 档超轻模型挂在那边。
 const TREE_MODEL_OVERRIDE := "res://assets/tree_modern.glb"
 const TREE_MODEL_LOD_OVERRIDE := "res://assets/tree_modern-lod.glb"
 const TREE_MODEL_SCALE := 2.0
