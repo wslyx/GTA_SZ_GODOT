@@ -43,8 +43,17 @@ extends Node
 ##   "walkshot" —— 下车链路验证：F 下车 → 截图（第三人称）→ 按住 W 走 → 截图 →
 ##               C 第一人称 → 截图 → C 回第三人称 → F 上车 → 截图
 ##   "pages"  —— Esc 暂停页 / M 城市地图 两页截图，并点选一个地点看目的地面板
-const MODE := "matrix"
+const MODE := "dismount"
 var _pg_phase := 0
+## dismount 模式状态：基线 → F 下车逐帧追踪 → F 上车 → 再 F 下车对照
+const DISMOUNT_TRACE_FRAMES := 240
+var _dm_phase := 0
+var _dm_t := 0.0
+var _dm_wait := 0.0
+var _dm_frames := 0
+var _dm_sum := 0.0
+var _dm_max := 0.0
+var _dm_long := 0
 var _pg_t := 0.0
 var _pg_wait := 0.0
 var _ws_phase := 0
@@ -173,6 +182,9 @@ func _process(delta: float) -> void:
 		return
 	if MODE == "walkshot":
 		_walkshot_tick(delta)
+		return
+	if MODE == "dismount":
+		_dismount_tick(delta)
 		return
 	if MODE == "autoperf":
 		_autoperf_tick(delta)
@@ -802,6 +814,104 @@ func _walkshot_tick(delta: float) -> void:
 			_capture_shot("walk_back_in_car")
 			print("[perf] walkshot 完成")
 			get_tree().quit(0)
+
+
+## dismount：下车卡顿归因。基线 60 帧 → F 下车逐帧追踪 240 帧（配合
+## main_game 的 [dismount-trace] 微秒打点看是哪一步）→ F 上车 → 再 F
+## 下车对照（预热/缓存生效后第二次还卡不卡）。
+func _dismount_tick(delta: float) -> void:
+	if not _session_ready():
+		return
+	_dm_t += delta
+	match _dm_phase:
+		0:
+			print("[dismount] ready，1s 后开始基线采样")
+			_dm_phase = 1
+			_dm_t = 0.0
+			_dm_wait = 1.0
+		1:
+			if _dm_t < _dm_wait:
+				return
+			print("[dismount] ── 基线 60 帧 ──")
+			_dm_phase = 2
+			_dm_frames = 0; _dm_sum = 0.0; _dm_max = 0.0; _dm_long = 0
+		2:
+			_dm_frames += 1
+			var ms := delta * 1000.0
+			_dm_sum += ms; _dm_max = maxf(_dm_max, ms)
+			if ms > 33.3: _dm_long += 1
+			if _dm_frames >= 60:
+				print("[dismount] 基线：均值 %.2fms  最大 %.2fms  >33.3ms %d" % [
+					_dm_sum / 60.0, _dm_max, _dm_long])
+				_press_key(KEY_F, true)
+				_press_key(KEY_F, false)
+				print("[dismount] 已按 F（第 1 次下车），逐帧追踪 %d 帧（>16.7ms 的帧逐帧打印）" % DISMOUNT_TRACE_FRAMES)
+				_dm_phase = 3
+				_dm_frames = 0; _dm_sum = 0.0; _dm_max = 0.0; _dm_long = 0
+		3:
+			if _dm_collect(delta):
+				var gnd = main.get("_als_ground")
+				var vb = null if gnd == null else gnd.get("_vehicle_body")
+				print("[dismount] 下车后状态：mode=%s（2=步行） mouse_mode=%d（2=已捕获） 停泊障碍=%s（应非 null）" % [
+					str(main.get("mode")), Input.mouse_mode, str(vb)])
+				print("[dismount] 第 1 次下车汇总")
+				_dm_phase = 4
+				_dm_t = 0.0
+				_dm_wait = 1.0
+		4:
+			if _dm_t < _dm_wait:
+				return
+			# 复现用户操作：走一段路再按 F 上车（原相位直接上车没走步，未复现）
+			print("[dismount] 按住 W 步行 300 帧（复现「走一段路再上车」）")
+			_press_key(KEY_W, true)
+			_dm_phase = 41
+			_dm_frames = 0; _dm_sum = 0.0; _dm_max = 0.0; _dm_long = 0
+		41:
+			_dm_frames += 1
+			var wms := delta * 1000.0
+			if wms > 33.3:
+				print("[dismount]   步行帧+%d  %7.2fms" % [_dm_frames, wms])
+			if _dm_frames >= 300:
+				_press_key(KEY_W, false)
+				print("[dismount] 已走 300 帧，松开 W，0.3s 后按 F 上车")
+				_dm_phase = 42
+				_dm_t = 0.0
+				_dm_wait = 0.3
+		42:
+			if _dm_t < _dm_wait:
+				return
+			_press_key(KEY_F, true)
+			_press_key(KEY_F, false)
+			print("[dismount] 已按 F（上车），逐帧追踪 %d 帧" % DISMOUNT_TRACE_FRAMES)
+			_dm_phase = 6
+			_dm_frames = 0; _dm_sum = 0.0; _dm_max = 0.0; _dm_long = 0
+		6:
+			if _dm_collect(delta):
+				# 上车 F 预期被拒（已走出 5m 半径）：验证拒绝后 ALS 仍在驱动步行，
+				# 不再出现"角色被收走、当场僵死"（修复记录十七期间硬 bug）
+				var md = main.get("mode")
+				var act = main.get("_als_walk_active")
+				print("[dismount] 拒绝上车后状态：mode=%s（2=步行） _als_walk_active=%s（应为 true） mouse_mode=%d（2=步行仍捕获 / 0=可见）" % [
+					str(md), str(act), Input.mouse_mode])
+				print("[dismount] 完成")
+				get_tree().quit(0)
+
+
+## 逐帧收集：>16.7ms 的帧逐帧打印；采满 DISMOUNT_TRACE_FRAMES 帧返回 true
+func _dm_collect(delta: float) -> bool:
+	_dm_frames += 1
+	var ms := delta * 1000.0
+	_dm_sum += ms
+	_dm_max = maxf(_dm_max, ms)
+	if ms > 33.3:
+		_dm_long += 1
+	if ms > 16.7:
+		print("[dismount]   帧+%3d  %7.2fms" % [_dm_frames, ms])
+	if _dm_frames >= DISMOUNT_TRACE_FRAMES:
+		print("[dismount] 汇总：均值 %.2fms  最大 %.2fms  >16.7ms 见上  >33.3ms %d/%d" % [
+			_dm_sum / float(DISMOUNT_TRACE_FRAMES), _dm_max, _dm_long, DISMOUNT_TRACE_FRAMES])
+		return true
+	return false
 
 
 func _next_ws(wait: float) -> void:

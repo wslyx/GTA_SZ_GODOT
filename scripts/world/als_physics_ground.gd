@@ -38,6 +38,7 @@ var _ground_center := Vector2(1.0e9, 1.0e9)
 var _building_bodies: Dictionary = {}    ## 格键 → StaticBody3D
 var _building_cell := Vector2i(0x7FFFFFFF, 0x7FFFFFFF)
 var _building_cells: Dictionary = {}     ## 格键 → Array[[BoxShape3D, Vector3 中心], ...]（setup 一次性索引）
+var _vehicle_body: StaticBody3D = null   ## 停着的载具障碍盒（下车时放置，上车时移除）
 
 func setup(world: CityWorld) -> void:
 	_world = world
@@ -183,3 +184,64 @@ func _build_cell(key: int) -> StaticBody3D:
 		shape.position = e[1]
 		body.add_child(shape)
 	return body
+
+
+## —— 停着的载具障碍（GTA 式停车：下车后车留在原地且不可穿越）——
+## 载具体系没有物理体（世界是"高度场 + 无物理体"架构），mannequin 的
+## 胶囊只跟本代理的 layer-1 静态体碰撞；不补这个盒就会从停着的车里穿过。
+## 尺寸用模型自身的合并 AABB 推（跟随模型当前 yaw 旋转），上车时 clear。
+
+## 在 ALS 物理代理里放置"停着的载具"障碍盒。model = 载具模型根节点。
+func set_vehicle_obstacle(model: Node3D) -> void:
+	clear_vehicle_obstacle()
+	if model == null or not model.is_inside_tree():
+		return
+	var aabb := _merged_local_aabb(model)
+	if aabb.size.x < 0.5 or aabb.size.z < 0.5:
+		return
+	var body := StaticBody3D.new()
+	body.name = "ParkedVehicle"
+	body.collision_layer = 1
+	body.collision_mask = 1
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = aabb.size
+	shape.shape = box
+	shape.position = aabb.get_center()
+	body.add_child(shape)
+	add_child(body)
+	# 跟随模型当前的世界放置（含 yaw 朝向与贴地高度）
+	body.global_transform = Transform3D(model.global_basis, model.global_position)
+	_vehicle_body = body
+
+
+## 移除载具障碍（上车/载具重新开始移动前调用）。
+func clear_vehicle_obstacle() -> void:
+	if _vehicle_body != null:
+		_vehicle_body.queue_free()
+		_vehicle_body = null
+
+
+## 模型树在 root 本地空间内的合并 AABB（跳过 root 自身 transform）。
+func _merged_local_aabb(root: Node3D) -> AABB:
+	var mn := Vector3.INF
+	var mx := -Vector3.INF
+	var stack: Array = [[root, Transform3D.IDENTITY]]
+	while not stack.is_empty():
+		var e: Array = stack.pop_back()
+		var n: Node = e[0]
+		var xf: Transform3D = e[1]
+		if n is Node3D and n != root:
+			xf = xf * (n as Node3D).transform
+		if n is MeshInstance3D:
+			var mi := n as MeshInstance3D
+			if mi.mesh != null and mi.mesh.get_aabb().size.length() > 0.0:
+				# 复用 GlbLoader 的角点法 AABB 变换（Transform3D * AABB 版本差异坑）
+				var ab: AABB = GlbLoader._xf_aabb(xf, mi.mesh.get_aabb())
+				mn = mn.min(ab.position)
+				mx = mx.max(ab.position + ab.size)
+		for c in n.get_children():
+			stack.append([c, xf])
+	if not is_finite(mn.x):
+		return AABB()
+	return AABB(mn, mx - mn)

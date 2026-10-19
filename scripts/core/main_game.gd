@@ -95,17 +95,17 @@ var _game_time := 0.0
 ## 步行时的角色本体（原版 city-rider.ts）。
 ## ⚠️ 用 preload 而不是全局类名 Rider：新增脚本的 class_name 要等编辑器
 ## 重扫一次才会进全局类缓存，运行时直接跑会报 "Could not find type Rider"。
-const RIDER_SCRIPT := preload("res://scripts/vehicles/rider.gd")
-var _rider = null                   ## RIDER_SCRIPT 实例（untyped：全局类名未注册）
-var _rider_yaw := 0.0               ## 角色 yaw 平滑跟随移动方向（原版 riderYaw）
+const RIDER_SCRIPT := preload("res://scripts/vehicles/rider.gd")  ## 仅取 CHARACTER_NAME 做提示文案
 ## ALS 步行角色（Godot-Locomotion 迁移的 C# 运行时，见 GtaSzAlsPlayerHost.cs）。
 ## ⚠️ C# 脚本用 load() 而非 preload：.NET 程序集未编译时 preload 会让整个
-## main_game.gd 加载失败；load() 返回 null 则整体回退到 CityWalk 步行。
+## main_game.gd 加载失败；load() 返回 null 则启动阶段直接报错退出（无回退）。
 const ALS_HOST_SCRIPT_PATH := "res://src/Als.Godot/Locomotion/GtaSzAlsPlayerHost.cs"
 const ALS_GROUND_SCRIPT := preload("res://scripts/world/als_physics_ground.gd")
 var _als_host = null               ## GtaSzAlsPlayerHost（C#，untyped：可能未编译）
+var _als_orbit = null              ## OrbitCamera 节点（C#，缓存引用给 _update_mouse_capture）
 var _als_ground = null             ## AlsPhysicsGround（角色周围的动态物理代理）
 var _als_walk_active := false      ## 本轮步行是否由 ALS 角色驱动
+var _walk_error_shown := false     ## 步行缺 ALS 驱动的报错只弹一次（_step_walk 每帧跑）
 var _pending_level_up_dialogue := {}
 
 
@@ -138,23 +138,31 @@ func _build_world() -> void:
 
 	# ALS 步行角色：物理地面代理（角色周围的动态 StaticBody）+ C# 角色宿主。
 	# 宿主 _Ready 里预热动画资源 —— 此刻还在加载画面后面，玩家无感。
-	# C# 方案未编译时 load 返回 null → 步行照旧走 CityWalk，不影响其它模式。
+	# ⚠️ 不再静默回退旧步行角色：程序集缺失时直接报错退出。静默回退曾让
+	# "换电脑后按 F 下车不是 mannequin"极难排查（load(.cs) 返回 null，
+	# 玩家只看到旧角色，控制台没有任何线索）。
 	var host_script = load(ALS_HOST_SCRIPT_PATH)
-	if host_script != null:
-		_als_ground = ALS_GROUND_SCRIPT.new()
-		_als_ground.name = "AlsPhysicsGround"
-		add_child(_als_ground)
-		_als_ground.setup(world)
-		_als_host = host_script.new()
-		_als_host.name = "AlsPlayerHost"
-		add_child(_als_host)
-		# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
-		# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
-		# 之后每次下车取现成角色（EnterWorld 检测到已配置会跳过构造）。
-		var prewarm_feet := CoordinateUtil.to_world(0.0, 0.0, 0.0)
-		_als_ground.update_around(prewarm_feet)   # 地面代理（含首批建筑体）随加载预铺
-		_als_host.EnterWorld(prewarm_feet, 0.0)
-		_als_host.ExitWorld()
+	if host_script == null:
+		push_error("[MainGame] ALS C# 程序集加载失败，步行角色不可用。" +
+			"修复：装 .NET SDK 8、用 Godot .NET 版打开项目并构建 GodotALS.csproj" +
+			"（编辑器菜单 Project → Tools → C# → Build，或命令行 dotnet build）。")
+		get_tree().quit(1)
+		return
+	_als_ground = ALS_GROUND_SCRIPT.new()
+	_als_ground.name = "AlsPhysicsGround"
+	add_child(_als_ground)
+	_als_ground.setup(world)
+	_als_host = host_script.new()
+	_als_host.name = "AlsPlayerHost"
+	add_child(_als_host)
+	_als_orbit = _als_host.get_node_or_null("OrbitCamera")
+	# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
+	# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
+	# 之后每次下车取现成角色（EnterWorld 检测到已配置会跳过构造）。
+	var prewarm_feet := CoordinateUtil.to_world(0.0, 0.0, 0.0)
+	_als_ground.update_around(prewarm_feet)   # 地面代理（含首批建筑体）随加载预铺
+	_als_host.EnterWorld(prewarm_feet, 0.0)
+	_als_host.ExitWorld()
 
 	# 子系统（用 preload 而非 set_script，确保脚本一定被解析）
 	world.sky = _add_system(SKY_SCRIPT, "SkySystem")
@@ -263,14 +271,8 @@ func _load_vehicle_models() -> void:
 		_plane_propeller = _find_child_by_name(_plane_model, "floatplane_propeller")
 		if _plane_propeller == null:
 			push_warning("[MainGame] floatplane.glb 缺少 floatplane_propeller 节点，螺旋桨不转")
-	# 步行角色（原版 city-rider.ts 的久岐忍）。原版是按 F 下车时才异步加载
-	# （提示"正在准备步行角色"）；这里文件在本地，直接在加载画面后面同步预载，
-	# 首次按 F 不卡顿，12MB 模型的实例化成本也藏进了启动加载。
-	_rider = RIDER_SCRIPT.new()
-	_rider.name = "PlayerRider"
-	add_child(_rider)
-	_rider.setup()
-	_rider.visible = false
+	# 步行角色：只有 ALS mannequin（C# 运行时，_build_world 里强校验程序集）。
+	# 旧版 city-rider 的程序化步行角色（久岐忍）已随回退逻辑一起移除。
 	# 主角车辆的车漆 / 玻璃 / 轮毂材质标定（原版 refineHeroVehicleMaterials）。
 	# 必须在实例化之后做：GLB 材质是共享资源，改的正是那些共享实例。
 	if _car_model != null:
@@ -359,6 +361,31 @@ func _on_built() -> void:
 	walk.active = false
 	_apply_light_mode()
 	GraphicsQuality.apply_to_world(world)
+
+	# —— mannequin 着色器预热（首次按 F 下车卡顿的主因之一）——
+	# 原预热 EnterWorld 同帧就 ExitWorld 藏掉，角色从没真正画过一帧，
+	# 皮肤/动画着色器全部推迟到首次下车现编译（数百毫秒级卡顿）。
+	# 现在：出生点 = 最可能的首次下车点，角色在初始相机视野里真渲染
+	# 一帧，着色器编译藏进加载画面。期间 ALS 轨道相机会抢 Current，
+	# 结束后把主相机抢回来。headless 无绘制事件，frame_post_draw 永不
+	# 触发，必须跳过等待。
+	if _als_host != null and _als_host.RuntimeReady \
+			and DisplayServer.get_name() != "headless":
+		var feet := CoordinateUtil.to_world(sp.x, sp.y,
+			world.height_field.height_at(sp.x, sp.y))
+		if _als_ground != null:
+			_als_ground.update_around(feet)   # 出生点的地面/建筑碰撞格顺手预铺
+		_als_host.EnterWorld(feet, CityData.spawn_yaw)
+		# 必须等**物理帧**：首次 Active 的惰性初始化（并行动画 worker 握手、
+		# 动画生命周期就绪、蒙皮缓冲）发生在 ALS 的 _PhysicsProcess 里，
+		# 实测要吃掉 149ms + 67ms 两帧 —— 只等 frame_post_draw 时 240Hz 下
+		# 一个物理帧都跑不到，预热等于没做（disount 探针实测结论）。
+		for i in 8:
+			await get_tree().physics_frame
+		# 着色器同理：保证至少一次真实绘制，皮肤/动画管线在加载画面后面编译
+		await RenderingServer.frame_post_draw
+		_als_host.ExitWorld()
+		camera.current = true
 
 	session_ready = true
 	MemProbe.mark("finish_loading 前")
@@ -725,53 +752,86 @@ func _apply_tank_pose() -> void:
 		_tank_barrel.position = _tank_barrel_home + Vector3(0.0, 0.0, -tank.recoil)
 
 
+## —— 下车链路微秒级打点（临时诊断，配合 tools/_perf.gd 的 dismount 模式）——
+## 只打印 >1ms 的步骤。2026-10-19 定位结论：同步链路全程 <1ms，卡顿在 C#
+## 侧首次 Active 物理帧的惰性初始化（见修复记录十七节），已用物理帧预热解决。
+## 保留开关便于以后复发时一键打开。
+const DISMOUNT_TRACE := false
+
+func _trace_mark(label: String, t0: int) -> void:
+	if not DISMOUNT_TRACE:
+		return
+	var us := Time.get_ticks_usec() - t0
+	if us > 1000:
+		print("[dismount-trace] %6.2fms  %s" % [us / 1000.0, label])
+
+
 func _toggle_vehicle_entry() -> void:
 	if mode == Mode.CAR or mode == Mode.TANK:
 		var v := _vehicle_state()
 		if absf(float(v["speed"])) > 1.0:
 			hud.toast("先停稳再下车")
 			return
+		var _t := Time.get_ticks_usec()
 		var offset := TANK_EXIT_OFFSET if mode == Mode.TANK else WALK_EXIT_OFFSET
 		if not walk.exit_car(v, offset):
 			hud.toast("车门旁边没有落脚点")
 			return
+		_trace_mark("walk.exit_car", _t)
 		_last_ground_vehicle = Mode.TANK if mode == Mode.TANK else Mode.CAR
 		if mode == Mode.TANK:
-			if _tank_model != null:
-				_tank_model.visible = false
 			# 下车（坦克）：收回在飞的炮弹与爆炸
 			if _tank_shells != null:
 				_tank_shells.clear_effects()
-		elif _car_model != null:
-			_car_model.visible = false
+		# ⚠️ 载具模型不再隐藏：下车后车/坦克应停在原地可见（GTA 式停车）。
+		# 模型 transform 停留在 _place_car_model/_apply_tank_pose 的最后姿态，
+		# 上车时 reset_to 会重新对齐到角色位置。
 		_flush_speed()
+		# 停着的载具进入 ALS 物理代理 —— 载具体系没有物理体，不补这个盒
+		# mannequin 胶囊会直接从停着的车里穿过去（修复记录二十节）。
+		if _als_ground != null:
+			_als_ground.set_vehicle_obstacle(
+				_tank_model if _last_ground_vehicle == Mode.TANK else _car_model)
 		mode = Mode.WALKING
 		# 原版 exit-car 时取消自动驾驶
 		autopilot.cancel()
 		maps.clear_destination()
 		_clear_pending()
 		_walk_first_person = false
-		# 原版 riderYaw = walk.yaw：模型先朝向下车时的视线方向，走起来再转向移动方向
-		_rider_yaw = walk.yaw
+		_t = Time.get_ticks_usec()
 		camera.set_mode(ChaseCamera.Mode.WALKING, true)
-		# ALS 角色可用时接管步行（轨道相机换 Current；不可用时照旧 CityWalk）
+		_trace_mark("camera.set_mode(WALKING)", _t)
+		# ALS 角色接管步行（不可用会在内部报错，不回退）
 		_als_enter_world()
-		hud.toast("%s · WASD 行走 / Shift 跑步 / 拖动环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
+		_t = Time.get_ticks_usec()
+		hud.toast("%s · WASD 行走 / Shift 跑步 / 鼠标环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
+		_trace_mark("hud.toast(F 提示)", _t)
 	elif mode == Mode.WALKING:
-		# 先把 ALS 角色位置写回 walk（上车判定按 walk.x/z 到车门的距离）
-		_als_exit_world()
-		# 回到下车前那一台（判据是 _last_ground_vehicle，不是模型的 visible）
+		# ⚠️ 必须先判"能不能上车"，判定通过才收角色！
+		# 旧流程先 _als_exit_world 再 can_enter —— 走远了按 F 被拒时角色已被
+		# 停用隐藏、mode 仍是 WALKING，移除旧步行回退后就变成"当场卡死、
+		# 人和车都不显示"（修复记录十七期间的硬 bug）。walk.x/z 由 ALS 分支
+		# 每帧镜像，距离判定不需要先收角色。
 		var want_tank := _last_ground_vehicle == Mode.TANK and _tank_model != null
 		var v2: Dictionary
 		if want_tank:
 			v2 = {"x": tank.x, "z": tank.z, "yaw": tank.yaw, "speed": tank.speed}
 		else:
 			v2 = _vehicle_state()
+		var _t := Time.get_ticks_usec()
 		if not walk.can_enter(v2, 5.0, WALK_EXIT_OFFSET):
 			hud.toast("走近车门再按 F 上车")
+			_trace_mark("walk.can_enter=拒绝", _t)
 			return
+		_trace_mark("walk.can_enter", _t)
+		_als_exit_world()
+		_trace_mark("als_exit_world", _t)
+		# 载具即将重新移动，移除停泊障碍盒
+		if _als_ground != null:
+			_als_ground.clear_vehicle_obstacle()
 		mode = Mode.TANK if want_tank else Mode.CAR
 		_camera_yaw = walk.yaw
+		_t = Time.get_ticks_usec()
 		if mode == Mode.TANK:
 			tank.x = walk.x
 			tank.z = walk.z
@@ -783,10 +843,11 @@ func _toggle_vehicle_entry() -> void:
 			if _car_model != null:
 				_car_model.visible = true
 			camera.set_mode(ChaseCamera.Mode.DRIVING, true)
+		_trace_mark("reset_to + set_mode(DRIVING)", _t)
 		walk.active = false
-		if _rider != null:
-			_rider.set_enabled(false)
+		_t = Time.get_ticks_usec()
 		hud.toast("已上车 · C 切换驾驶镜头")
+		_trace_mark("hud.toast(已上车)", _t)
 
 func _vehicle_state() -> Dictionary:
 	if mode == Mode.TANK:
@@ -811,41 +872,78 @@ func _als_available() -> bool:
 	return _als_host != null and _als_host.RuntimeReady
 
 
-func _als_enter_world() -> void:
-	if not _als_available() or _als_walk_active:
+## 载具行进中预热 ALS 物理地面代理：下车点 = 停车点，开车路上就把瓦片与
+## 建筑碰撞格增量铺好（代理内部增量：位移 2m 才重排瓦片、跨 160m 格才建
+## 新格），按 F 下车那一帧不再整批现做 —— 下车卡顿的另一主因。
+func _warm_als_ground(data_x: float, data_z: float) -> void:
+	if _als_ground != null:
+		_als_ground.update_around(CoordinateUtil.to_world(data_x, data_z, 0.0))
+
+
+## —— 鼠标捕获策略（每帧收敛到目标状态）——
+## 步行 = ALS 轨道相机接管鼠标视角（自动捕获，不用先点一下）；
+## 驾驶/观景/飞行 = 光标可见；任何 UI（暂停/大地图/日志/帮助/对话）打开时
+## 放开光标，关闭后回到步行自动重新捕获。
+## 顺带解决 OrbitCamera._Input 全程活跃的问题：非步行时 InputEnabled=false，
+## C# 侧的"点击捕获 / Esc 切换"不再吞掉游戏点击与 Esc（原 Esc 同时绑了
+## mouse_capture_toggle 和暂停菜单，一个键两个语义）。
+func _update_mouse_capture() -> void:
+	if _als_orbit == null:
 		return
+	var ui_open := paused or panels.dialog_active or panels.help_visible \
+		or panels.journal_visible or (maps != null and maps.big_map_visible)
+	var walking := mode == Mode.WALKING and _als_walk_active and not ui_open
+	_als_orbit.InputEnabled = walking
+	if walking:
+		if not _als_orbit.IsMouseCaptured:
+			_als_orbit.SetMouseCaptured(true)
+	elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _als_enter_world() -> void:
+	if _als_walk_active:
+		return
+	if not _als_available():
+		# 启动时程序集已强制校验，这里只可能是运行时异常（如 RuntimeReady=false）。
+		# 报错而不是静默换人 —— 旧回退路径已移除，宁可红字也别让角色"变脸"。
+		push_error("[MainGame] ALS 角色不可用（RuntimeReady=false），下车后没有 mannequin。")
+		return
+	var _t := Time.get_ticks_usec()
 	var ground_y := world.height_field.height_at(walk.x, walk.z)
 	var feet := CoordinateUtil.to_world(walk.x, walk.z, ground_y)
+	_trace_mark("height_at(落脚点)", _t)
 	if _als_ground != null:
+		_t = Time.get_ticks_usec()
 		_als_ground.update_around(feet)   # 先把地面瓦片铺到落脚点，避免首帧下坠
+		_trace_mark("als_ground.update_around", _t)
 	# ⚠️ GDScript 调 C# 方法用 C# 原名（PascalCase），不做 snake_case 转换。
+	_t = Time.get_ticks_usec()
 	_als_host.EnterWorld(feet, walk.yaw)
+	_trace_mark("ALS EnterWorld(C# 全部)", _t)
 	_als_walk_active = true
-	if _rider != null:
-		_rider.set_enabled(false)
 
 
 func _als_exit_world() -> void:
 	if not _als_walk_active:
 		return
+	var _t := Time.get_ticks_usec()
 	var motor: Vector3 = _als_host.MotorPosition
 	var d := CoordinateUtil.from_world(motor)
 	walk.x = d.x
 	walk.z = d.y
 	walk.yaw = -_als_host.ViewYaw
 	_als_host.ExitWorld()
+	_trace_mark("ALS ExitWorld(C# 全部)", _t)
 	_als_walk_active = false
 	camera.current = true
 
 func _enter_observer() -> void:
 	_pre_observer_mode = mode
-	# 步行进观景：角色本体要收起来。_step_walk 是唯一管理 _rider 的地方，
-	# 切到 OBSERVER 后它不再跑，不在这里显式隐藏的话角色会一直杵在地面上。
+	# 步行进观景：ALS 角色停用（exit_world 会停马达并交还相机）
 	if mode == Mode.WALKING:
 		_als_exit_world()      # 马达位置写回 walk，停用 ALS 角色
 		walk.active = false
-		if _rider != null:
-			_rider.set_enabled(false)
 	# 飞行中进观景：必须先把飞机停掉，否则 flight 仍 active 而 mode 已不是
 	# AIRCRAFT，_step_aircraft 不再跑，飞机模型会挂在天上不动。
 	elif mode == Mode.AIRCRAFT:
@@ -886,10 +984,8 @@ func _exit_observer() -> void:
 			camera.set_mode(ChaseCamera.Mode.TANK, true)
 		Mode.WALKING:
 			mode = Mode.WALKING
-			if _rider != null:
-				_rider.set_enabled(true)
 			camera.set_mode(ChaseCamera.Mode.WALKING, true)
-			# ALS 角色可用时重新接管步行（内部会把 _rider 重新藏起来）
+			# ALS 角色重新接管步行（不可用时会 push_error，不再回退旧 rider）
 			_als_enter_world()
 		_:
 			mode = Mode.CAR
@@ -993,6 +1089,7 @@ func _process(delta: float) -> void:
 	if _als_host != null:
 		_als_host.process_mode = Node.PROCESS_MODE_DISABLED if paused else Node.PROCESS_MODE_INHERIT
 
+	_update_mouse_capture()
 	_update_modes(dt)
 	_check_manual_arrival()
 
@@ -1139,6 +1236,7 @@ func _step_car(dt: float) -> void:
 	camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false, car.yaw)
 	lights.update_brake(throttle < 0.0 and car.speed > 0.5, car.speed < -0.5)
 	lights.place(_car_model.global_transform if _car_model != null else camera.global_transform)
+	_warm_als_ground(car.x, car.z)
 
 func _step_tank(dt: float) -> void:
 	var throttle := _axis_key([KEY_W, KEY_UP], [KEY_S, KEY_DOWN])
@@ -1203,10 +1301,12 @@ func _step_tank(dt: float) -> void:
 	camera.follow_vehicle(Vector3(tank.x, 0.0, tank.z), tank.speed, dt, true, tank.yaw)
 	lights.update_brake(handbrake, tank.speed < -0.5)
 	lights.place(_tank_model.global_transform if _tank_model != null else camera.global_transform)
+	_warm_als_ground(tank.x, tank.z)
 
 func _step_walk(dt: float) -> void:
 	# ALS 角色驱动：物理地面跟随马达；CityWalk 只做状态镜像（HUD/地图/上车判定
-	# 继续读 walk.x/z）。宿主静默降级（RuntimeReady=false）时走老 CityWalk 路径。
+	# 继续读 walk.x/z）。旧 CityWalk + rider 步行回退已移除 —— ALS 角色是
+	# 唯一步行实现，到这里还没接管就是 bug，报错并停帧（防每帧刷屏）。
 	if _als_walk_active and _als_host != null and _als_host.RuntimeReady:
 		var motor: Vector3 = _als_host.MotorPosition
 		if _als_ground != null:
@@ -1219,39 +1319,10 @@ func _step_walk(dt: float) -> void:
 		walk.moving = walk.speed > 0.1
 		walk_eye_world = motor
 		return
-	var before := Vector2(walk.x, walk.z)
-	walk.step({
-		"forward": Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP),
-		"back": Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN),
-		"left": Input.is_key_pressed(KEY_A),
-		"right": Input.is_key_pressed(KEY_D),
-		"run": Input.is_key_pressed(KEY_SHIFT),
-		"left_arrow": Input.is_key_pressed(KEY_LEFT),
-		"right_arrow": Input.is_key_pressed(KEY_RIGHT),
-		"up_arrow": Input.is_key_pressed(KEY_UP),
-		"down_arrow": Input.is_key_pressed(KEY_DOWN),
-	}, dt)
-	# 角色 yaw 平滑转向**移动方向**（原版 riderYaw，速率 exp(−dt·16)）；
-	# 视线方向是 walk.yaw，由相机单独处理
-	if walk.moving:
-		var target := atan2(walk.x - before.x, walk.z - before.y)
-		var delta := atan2(sin(target - _rider_yaw), cos(target - _rider_yaw))
-		_rider_yaw += delta * (1.0 - exp(-dt * 16.0))
-	var eye := walk.eye()
-	walk_eye_world = CoordinateUtil.to_world(eye["x"], eye["z"], eye["y"])
-	camera.walk_eye = walk_eye_world
-	camera.yaw = walk.yaw
-	camera.look_pitch = walk.pitch
-	camera.follow_walk(dt, walk.camera_distance, _walk_first_person)
-	# 角色本体：第三人称显示、第一人称隐藏（原版 setEnabled(walk.active && !firstPerson)）
-	if _rider != null:
-		_rider.set_enabled(mode == Mode.WALKING and not _walk_first_person)
-		var ground := world.height_field.height_at(walk.x, walk.z)
-		_rider.set_pose(
-			CoordinateUtil.to_world(walk.x, walk.z, ground).x,
-			ground,
-			CoordinateUtil.to_world(walk.x, walk.z, ground).z,
-			_rider_yaw, 0.0 if paused else walk.speed, dt)
+	if not _walk_error_shown:
+		_walk_error_shown = true
+		push_error("[MainGame] 步行模式没有 ALS 角色驱动（旧步行回退已移除），" +
+			"角色将静止。请检查 ALS C# 程序集是否构建成功。")
 
 var walk_eye_world := Vector3.ZERO
 
