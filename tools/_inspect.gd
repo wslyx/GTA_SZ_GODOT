@@ -16,7 +16,8 @@ func _initialize() -> void:
 
 
 func _dump(name: String) -> void:
-	var path := "res://data/city/" + name + ".glb"
+	# 支持 res:// 全路径或 data/city 下的短名
+	var path := name if name.begins_with("res://") else "res://data/city/" + name + ".glb"
 	if not ResourceLoader.exists(path):
 		print("[inspect] 缺少 %s" % path)
 		return

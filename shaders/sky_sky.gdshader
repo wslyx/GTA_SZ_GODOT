@@ -378,30 +378,40 @@ vec2 panorama_uv(vec3 d) {
 	return vec2(u / (PI * 2.0), acos(clamp(d.y, -1.0, 1.0)) / PI);
 }
 
-/// rot 是该 HDR 自己的绕 Y 旋转角（弧度）；用 −rot 旋转采样方向，
-/// 使贴图内容按 +rot 的方向呈现。
-/// ⚠️ 2026-10-21：再补 π —— Babylon 等距柱状映射的 u 原点与 Godot 全景
-/// 相差半个圆（见 sunset_hdr_sky 的注），所有 Babylon 来源的 HDR 全景采样
-/// 都走本函数，一处修正三处生效（白天可见全景 / 白天 IBL / 日落 IBL）。
+/// Babylon 来源 HDR 全景的统一采样（等距柱状文件）：
+/// 先 z 镜像换到 Babylon 空间（z=北），再 R(−rot)，再补 90°
+/// （Babylon CalcProjectionSpherical 的 u 原点在 +X 轴，Godot panorama_uv
+/// 的 u 原点在 −Z 轴）。逐点核对依据见 sunset_hdr_sky 的注（修复记录 二十九）。
+vec2 babylon_panorama(vec3 d, float rot) {
+	vec3 t = rotate_y(vec3(d.x, d.y, -d.z), -rot);
+	return panorama_uv(rotate_y(t, PI * 0.5));
+}
+
+/// 立方图空间方向（火掩码 / 任何「Babylon 面方向」语义的计算都用它）
+vec3 babylon_cube_dir(vec3 d, float rot) {
+	return rotate_y(vec3(d.x, d.y, -d.z), -rot);
+}
+
+/// rot 是该 HDR 自己的绕 Y 旋转角（弧度）。
+/// ⚠️ 只用于白天档（无分级的原始 HDR）。日落档的采样/分级走
+/// babylon_panorama / babylon_cube_dir，两者方向不同（见 sunset_hdr_sky）。
 vec2 dir_to_panorama(vec3 d, float rot) {
-	return panorama_uv(rotate_y(d, PI - rot));
+	return babylon_panorama(d, rot);
 }
 
 /// 日落档可见天空 = 摄影 HDR × 原版分级链 × 高光肩部 × primaryColor。
 ///
-/// 分级是在 HDR **自身未旋转** 的空间里逐面做的（rotationY 只影响采样），
-/// 而 dir_to_panorama() 内部也对方向做 −rot 旋转 —— 两者是同一个方向，
-/// 所以这里把 hdr_dir 算出来喂给分级、再直接交给 panorama_uv()。
+/// ⚠️ 采样方向与分级方向**不是同一个方向**（修复记录 二十九，2026-10-21）：
+/// 立方图空间方向 t = R(−rot)·Mz·d（火掩码在此计算），文件采样列 =
+/// u_b(t) = panorama_uv(R(π/2)·t)。分级链的火区掩码在立方图空间「朝阳」
+/// （dump 实测：火区在 +X 面），落到文件网格上命中的是别的列 ——
+/// 分级链的本质是把文件里的蓝灰云**染成**橙金色。
+/// 逐点核对：视线中心 → t=(0.982,0,−0.191) → dump right 面 60% 列 =
+/// (246,119,50) 亮火 → ×0.20 过 ACES ≈ 原版实测 (171,88,53) ✓。
 vec3 sunset_hdr_sky(vec3 p) {
-	// ⚠️ 2026-10-21 方向修正：Babylon 的等距柱状→立方图映射与 Godot 的全景
-	// u 原点相差半个圆（Babylon u=0 在 −Z，Godot panorama_uv 的 u=0 在 +Z），
-	// 所以同一张 HDR 要补 π：t = R(π − rot)·p。
-	// 实测标定：出生点视线方位 261.4°，belfast 太阳在文件方位 241.6°，
-	// R(π−2.80) 采样落点 241.8°（0.2° 内命中）；旧映射 R(−rot) 落在 61.8°
-	//（背阳区），表现为整片靛蓝云 —— 见 修复记录 二十六。
-	vec3 hdr_dir = rotate_y(p, PI - sunset_rot);
-	vec3 raw = texture(sunset_pano, panorama_uv(hdr_dir)).rgb;
-	vec3 graded = grade_sunset_radiance(hdr_dir, raw);
+	vec3 t = babylon_cube_dir(p, sunset_rot);
+	vec3 raw = texture(sunset_pano, babylon_panorama(p, sunset_rot)).rgb;
+	vec3 graded = grade_sunset_radiance(t, raw);
 	float peak = max(max(graded.r, graded.g), graded.b);
 	return graded * sunset_display_scale(peak) * sunset_bg_gain;
 }
@@ -428,9 +438,10 @@ vec3 env_slot(float m, vec3 d, sampler2D tex, float energy, float rot) {
 		// 日落档：原版 `scene.environmentTexture` 就是**分级后**的 belfast HDR
 		// （ShenzhenSunsetEnvironment 在解码时逐面跑 gradeSunsetRadiance）。
 		// 只有可见天空才叠肩部滚降，辐照度保持全动态范围。
-		vec3 hdr_dir = rotate_y(d, -rot);
-		vec3 raw = texture(tex, panorama_uv(hdr_dir)).rgb;
-		return grade_sunset_radiance(hdr_dir, raw) * energy;
+		// ⚠️ 分级方向（立方图空间）与文件采样列不同（见 sunset_hdr_sky）
+		vec3 t = babylon_cube_dir(d, rot);
+		vec3 raw = texture(tex, babylon_panorama(d, rot)).rgb;
+		return grade_sunset_radiance(t, raw) * energy;
 	}
 	return texture(tex, dir_to_panorama(d, rot)).rgb * energy;
 }

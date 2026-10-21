@@ -38,8 +38,10 @@ const TREE_MODEL_OVERRIDE := "res://assets/tree_modern.glb"
 const TREE_MODEL_LOD_OVERRIDE := "res://assets/tree_modern-lod.glb"
 const TREE_MODEL_FAR_OVERRIDE := "res://assets/tree_modern-far.glb"
 const TREE_MODEL_SCALE := 2.0
-const TREE_MODEL_FOLIAGE := Color(0.30, 0.52, 0.22)
-const TREE_MODEL_TRUNK := Color(0.40, 0.32, 0.24)
+## 冠/干染色 —— 2026-10-21 对齐原版 tree.glb 的 leaf/bark 本色（原值 0.30/0.52/0.22
+## 偏黄绿，是白天树冠发白、日落染成枯黄的因素之一）
+const TREE_MODEL_FOLIAGE := Color(0.29, 0.46, 0.32)
+const TREE_MODEL_TRUNK := Color(0.48, 0.45, 0.37)
 ## 生效中的林冠实例预算（set_quality / 设置页可覆盖）
 var _tree_budget := 9000
 
