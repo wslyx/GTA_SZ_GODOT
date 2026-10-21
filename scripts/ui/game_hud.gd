@@ -128,12 +128,12 @@ const QUICK_TIPS := {
 	"walking": [
 		{"key": "WASD", "label": "行走"}, {"key": "滚轮", "label": "远近"},
 		{"key": "C", "label": "人称"}, {"key": "Shift", "label": "跑步"},
-		{"key": "拖动", "label": "看向"}, {"key": "F", "label": "上车"},
+		{"key": "鼠标", "label": "看向"}, {"key": "F", "label": "上车"},
 		{"key": "E", "label": "互动"},
 	],
 	"observer": [
 		{"key": "WASD", "label": "平移"}, {"key": "Q E", "label": "升降"},
-		{"key": "拖动", "label": "环绕"}, {"key": "B", "label": "飞机"},
+		{"key": "鼠标", "label": "环绕"}, {"key": "B", "label": "飞机"},
 		{"key": "G / F", "label": "返回"}, {"key": "滚轮", "label": "远近"},
 	],
 	"tank": [

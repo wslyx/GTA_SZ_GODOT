@@ -107,7 +107,10 @@ public partial class AlsOrbitCamera : Node3D
         }
     }
 
-    public void ApplyMouseMotion(in Vector2 relative)
+    // ⚠️ 参数按值传（不要用 in/ref/out 修饰）：Godot 的 C# 源生成器不会把带
+    // 这些修饰符的方法暴露给 GDScript —— 深城纪宿主（main_game.gd）捕获鼠标
+    // 后要从 GDScript 调本方法驱动环视，签名必须保持脚本互通。
+    public void ApplyMouseMotion(Vector2 relative)
     {
         if (!float.IsFinite(relative.X) || !float.IsFinite(relative.Y) ||
             !float.IsFinite(MouseSensitivity) || MouseSensitivity <= 0f)

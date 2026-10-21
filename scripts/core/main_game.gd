@@ -61,7 +61,9 @@ var _keys := {}
 var _camera_yaw := 0.0
 var _look_pitch := 0.25
 var _dragging := false
-var _last_mouse := Vector2.ZERO
+## 捕获模式下观察模式长按手势的"虚拟光标"：屏幕中心 + 捕获期间累计的
+## motion.relative（捕获时真实 position 失真，见 _update_mouse_capture 注释）。
+var _beacon_cursor := Vector2.ZERO
 var _walk_first_person := false
 var _car_model: Node3D
 var _tank_model: Node3D
@@ -417,7 +419,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT:
 			_dragging = mb.pressed
-			_last_mouse = mb.position
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
 			if mode == Mode.WALKING:
 				walk.zoom(120.0)
@@ -431,34 +432,54 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mode == Mode.OBSERVER and world != null and world.beacons != null:
 				var g = world.beacons.gesture
 				if mb.pressed:
-					g.begin(0, mb.position.x, mb.position.y, mb.button_index,
+					# 捕获模式下没有自由光标，落点取屏幕中心（准星语义）；
+					# 可见模式（UI 开着时理论上到不了这里）仍用真实位置。
+					if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+						_beacon_cursor = get_viewport().get_visible_rect().size * 0.5
+					else:
+						_beacon_cursor = mb.position
+					g.begin(0, _beacon_cursor.x, _beacon_cursor.y, mb.button_index,
 						true, Input.is_key_pressed(KEY_SHIFT), float(Time.get_ticks_msec()))
 				else:
 					g.end(0)
-	elif event is InputEventMouseMotion and _dragging:
-		var mm := event as InputEventMouseMotion
-		var d := mm.position - _last_mouse
-		_last_mouse = mm.position
-		if mode == Mode.WALKING:
-			if Input.is_key_pressed(KEY_SHIFT):
-				walk.yaw += d.x * 0.004
-			else:
-				_camera_yaw -= d.x * 0.004
-				_look_pitch = clampf(_look_pitch - d.y * 0.003, -1.0, 1.05)
-		elif mode == Mode.OBSERVER:
-			if Input.is_key_pressed(KEY_SHIFT):
-				observer.pan(d.x, d.y)
-			else:
-				observer.look(d.x, d.y)
-		else:
-			_camera_yaw -= d.x * 0.004
-			_look_pitch = clampf(_look_pitch - d.y * 0.003, -0.2, 1.0)
 	elif event is InputEventMouseMotion:
-		# 观察模式的长按计步：按住后移动超过 8px 就取消（把位移还给环绕/平移）
+		var mm := event as InputEventMouseMotion
+		# 观察模式的长按计步：按住后移动超过 8px 就取消。
+		# 捕获模式下 position 失真（被扳回中心），改喂"中心 + 累计 relative"
+		# 的虚拟光标，"移动超 8px 取消"的判定语义不变。
 		if mode == Mode.OBSERVER and world != null and world.beacons != null \
 				and not world.beacons.gesture.pointer.is_empty():
-			var mm2 := event as InputEventMouseMotion
-			world.beacons.gesture.move(0, mm2.position.x, mm2.position.y)
+			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+				_beacon_cursor += mm.relative
+				world.beacons.gesture.move(0, _beacon_cursor.x, _beacon_cursor.y)
+			else:
+				world.beacons.gesture.move(0, mm.position.x, mm.position.y)
+		# 视角增量的两个来源：
+		#   · 捕获模式（gameplay 常态）：移动鼠标直接转视角，FPS 式，不用按键；
+		#   · 光标可见（理论只在 UI 打开时出现）：保留旧的"按住右键拖动"兜底。
+		# 增量一律用 relative 而不是位置差：捕获模式下 position 会被扳回中心
+		# 绕圈回绕，位置差会出跳变；relative 与可见模式下的位置差数值等价，
+		# 两种模式通吃。
+		if _dragging or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			var d := mm.relative
+			if mode == Mode.WALKING:
+				if _als_walk_active and _als_orbit != null:
+					# ALS 轨道相机环视：捕获期间鼠标即转，灵敏度由
+					# OrbitCamera 内部 0.0025 决定
+					_als_orbit.ApplyMouseMotion(Vector2(d.x, d.y))
+				elif Input.is_key_pressed(KEY_SHIFT):
+					walk.yaw += d.x * 0.004
+				else:
+					_camera_yaw -= d.x * 0.004
+					_look_pitch = clampf(_look_pitch - d.y * 0.003, -1.0, 1.05)
+			elif mode == Mode.OBSERVER:
+				if Input.is_key_pressed(KEY_SHIFT):
+					observer.pan(d.x, d.y)
+				else:
+					observer.look(d.x, d.y)
+			else:
+				_camera_yaw -= d.x * 0.004
+				_look_pitch = clampf(_look_pitch - d.y * 0.003, -0.2, 1.0)
 
 
 ## 大地图展开 → 主动清掉相机拖拽状态。
@@ -804,7 +825,7 @@ func _toggle_vehicle_entry() -> void:
 		# ALS 角色接管步行（不可用会在内部报错，不回退）
 		_als_enter_world()
 		_t = Time.get_ticks_usec()
-		hud.toast("%s · WASD 行走 / Shift 跑步 / 鼠标环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
+		hud.toast("%s · WASD 行走 / Shift 跑步 / 移动鼠标环视 / 滚轮远近 / F 上车" % RIDER_SCRIPT.CHARACTER_NAME)
 		_trace_mark("hud.toast(F 提示)", _t)
 	elif mode == Mode.WALKING:
 		# ⚠️ 必须先判"能不能上车"，判定通过才收角色！
@@ -880,25 +901,43 @@ func _warm_als_ground(data_x: float, data_z: float) -> void:
 		_als_ground.update_around(CoordinateUtil.to_world(data_x, data_z, 0.0))
 
 
-## —— 鼠标捕获策略（每帧收敛到目标状态）——
-## 步行 = ALS 轨道相机接管鼠标视角（自动捕获，不用先点一下）；
-## 驾驶/观景/飞行 = 光标可见；任何 UI（暂停/大地图/日志/帮助/对话）打开时
-## 放开光标，关闭后回到步行自动重新捕获。
-## 顺带解决 OrbitCamera._Input 全程活跃的问题：非步行时 InputEnabled=false，
-## C# 侧的"点击捕获 / Esc 切换"不再吞掉游戏点击与 Esc（原 Esc 同时绑了
-## mouse_capture_toggle 和暂停菜单，一个键两个语义）。
+## —— 光标策略：默认"捕获 + 隐藏"（FPS 式），只有"需要鼠标的 UI"打开时可见 ——
+## gameplay 画面（驾驶 / 坦克 / 步行 / 无人机 / 飞机 / 观景）一律
+## MOUSE_MODE_CAPTURED：光标隐藏、鼠标锁在窗口内（移动到屏幕边缘不会丢，
+## 也不会误点窗口外）。以下界面打开时切回 MOUSE_MODE_VISIBLE：
+##   - Esc 暂停页（继续驾驶 / 声音按钮要靠鼠标点）；
+##   - F10 图像设置页；
+##   - 大地图（M / Esc 开关，点选目的地、拖拽全靠鼠标）；
+##   - 加载页 / 失败重试页（session 未就绪，重试按钮要靠鼠标点）。
+##
+## 捕获带来的两处输入适配（见 _unhandled_input）：
+##   1. 视角改为"移动鼠标直接转"（FPS 式，无需按住右键）——捕获只藏/锁
+##      光标，不会自动把位移接到相机上，必须在 _unhandled_input 显式接线；
+##      增量用 motion.relative —— 捕获模式下 position 会被扳回中心（绕圈
+##      回绕），按位置差算会出跳变；relative 在可见 / 捕获两种模式下都
+##      成立，且数值上与位置差等价，光标可见时的右键拖动兜底照旧；
+##   2. 观察模式"长按左键立光柱"的落点改用屏幕中心（准星语义）——捕获
+##      模式下没有自由光标，屏幕中心即瞄准点；"移动超 8px 取消长按"的
+##      计步用"中心 + 捕获期间累计 relative"的虚拟光标喂给手势。
+## OrbitCamera.InputEnabled 恒 false —— C# 侧的点击捕获 / Esc 切换彻底
+## 退场（原先 Esc 还绑着暂停菜单，一键两义），视角仍由 GDScript 喂
+## ApplyMouseMotion 驱动。
 func _update_mouse_capture() -> void:
 	if _als_orbit == null:
 		return
-	var ui_open := paused or panels.dialog_active or panels.help_visible \
-		or panels.journal_visible or (maps != null and maps.big_map_visible)
-	var walking := mode == Mode.WALKING and _als_walk_active and not ui_open
-	_als_orbit.InputEnabled = walking
-	if walking:
-		if not _als_orbit.IsMouseCaptured:
-			_als_orbit.SetMouseCaptured(true)
-	elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_als_orbit.InputEnabled = false
+	# 需要光标的界面（任一成立即显示）：
+	#   session 未就绪 → 加载页 / 失败重试页；
+	#   settings_visible → F10 图像设置页（打开即 paused）；
+	#   pause_overlay.visible → Esc 暂停页；
+	#   big_map_visible → 大地图。
+	var want_cursor: bool = not session_ready \
+		or (panels != null and (panels.settings_visible \
+			or (panels.pause_overlay != null and panels.pause_overlay.visible))) \
+		or (maps != null and maps.big_map_visible)
+	var target := Input.MOUSE_MODE_VISIBLE if want_cursor else Input.MOUSE_MODE_CAPTURED
+	if Input.mouse_mode != target:
+		Input.mouse_mode = target
 
 
 func _als_enter_world() -> void:
@@ -970,7 +1009,7 @@ func _enter_observer() -> void:
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 	world.set_aerial(true)
-	hud.toast("观景模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向；长按左键立光柱（I 前往 / O 收藏 / U 清除）", 6.0)
+	hud.toast("观景模式：W/A/S/D 平移，Q/E 升降，Shift 加速，移动鼠标转向；长按左键立光柱（I 前往 / O 收藏 / U 清除）", 6.0)
 
 func _exit_observer() -> void:
 	observer.end()
@@ -1905,7 +1944,7 @@ func _on_map_photo(pos: Vector2) -> void:
 	_flush_speed()
 	camera.set_mode(ChaseCamera.Mode.OBSERVER, true)
 	world.set_aerial(true)
-	hud.toast("俯瞰模式：W/A/S/D 平移，Q/E 升降，Shift 加速，拖动转向")
+	hud.toast("俯瞰模式：W/A/S/D 平移，Q/E 升降，Shift 加速，移动鼠标转向")
 
 
 ## 自动驾驶的阶段性提示（到达 / 受阻），每次启动只报一次
