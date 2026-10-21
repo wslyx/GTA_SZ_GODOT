@@ -45,10 +45,11 @@ const SKY_GAIN := 0.42
 
 ## 日落档**可见天空**的显示增益 = 原版 `skyMaterial.primaryColor`（.20,.20,.20）。
 ##
-## 原版注释写明这是"天空独立曝光"：它只压可见天空，IBL 另有
-## `scene.environmentIntensity`（= ENV_INTENSITY[SUNSET] = .40）—— 两条路的系数
-## 是分开的，不能共用一个值。此前日落走程序化 szSky、用 SKY_GAIN = .42 标定；
-## 改用摄影 HDR 后那份标定作废，这一档直接回到原版的 primaryColor。
+## 2026-10-21 核实：Babylon `background.fragment` 中
+## `finalColor = reflectionColor.rgb * vPrimaryColor.rgb`，primaryColor 对
+## BackgroundMaterial 的显示立方图**就是线性乘子**，0.20 直译无误。
+## 本轮真正修掉的是 sky_sky.gdshader 里全景采样缺 π 偏移（火区贴到对侧，
+## 看到的是背阳靛蓝云）—— 修复记录 二十六。
 const SUNSET_BG_GAIN := 0.20
 
 ## HDR 环境贴图（Poly Haven，见 data/licenses/daylight-environment.md）

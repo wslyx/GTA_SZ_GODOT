@@ -100,8 +100,12 @@ uniform sampler2D sunset_pano : source_color, hint_default_white;
 /// 分级是在 HDR **自身未旋转** 的空间里逐面做的，采样才用这个角（见 sunset_hdr_sky）。
 uniform float sunset_rot = 0.0;
 /// 日落**可见天空**的显示增益 = 原版 `skyMaterial.primaryColor`（.20,.20,.20）。
-/// 原版注释写明这是"天空独立曝光"：它只压可见天空，IBL 另有
-/// `scene.environmentIntensity`（.40），两条路的系数不可共用。
+///
+/// 2026-10-21 核实：Babylon `background.fragment` 里
+/// `finalColor = reflectionColor.rgb * vPrimaryColor.rgb` —— 对 BackgroundMaterial
+/// 的摄影显示立方图，primaryColor **就是线性乘子**，0.20 直译无误。
+/// （此前一轮把它当成"误译"而改 1.0 是错的：旧图靛蓝的真正根因是下方
+/// dir_to_panorama 缺 π 偏移导致火区没命中，与增益无关。）
 uniform float sunset_bg_gain = 0.20;
 /// 日落 HDR 是否可用；不可用时退回程序化 szSky（保留 sky_gain 旧标定）。
 uniform bool sunset_uses_hdr = true;
@@ -374,10 +378,13 @@ vec2 panorama_uv(vec3 d) {
 	return vec2(u / (PI * 2.0), acos(clamp(d.y, -1.0, 1.0)) / PI);
 }
 
-/// rot 是该HDR 自己的绕 Y 旋转角（弧度）；用 −rot 旋转采样方向，
-/// 使贴图内容按 +rot 的方向呈现（见 rotate_y 的说明）。
+/// rot 是该 HDR 自己的绕 Y 旋转角（弧度）；用 −rot 旋转采样方向，
+/// 使贴图内容按 +rot 的方向呈现。
+/// ⚠️ 2026-10-21：再补 π —— Babylon 等距柱状映射的 u 原点与 Godot 全景
+/// 相差半个圆（见 sunset_hdr_sky 的注），所有 Babylon 来源的 HDR 全景采样
+/// 都走本函数，一处修正三处生效（白天可见全景 / 白天 IBL / 日落 IBL）。
 vec2 dir_to_panorama(vec3 d, float rot) {
-	return panorama_uv(rotate_y(d, -rot));
+	return panorama_uv(rotate_y(d, PI - rot));
 }
 
 /// 日落档可见天空 = 摄影 HDR × 原版分级链 × 高光肩部 × primaryColor。
@@ -386,7 +393,13 @@ vec2 dir_to_panorama(vec3 d, float rot) {
 /// 而 dir_to_panorama() 内部也对方向做 −rot 旋转 —— 两者是同一个方向，
 /// 所以这里把 hdr_dir 算出来喂给分级、再直接交给 panorama_uv()。
 vec3 sunset_hdr_sky(vec3 p) {
-	vec3 hdr_dir = rotate_y(p, -sunset_rot);
+	// ⚠️ 2026-10-21 方向修正：Babylon 的等距柱状→立方图映射与 Godot 的全景
+	// u 原点相差半个圆（Babylon u=0 在 −Z，Godot panorama_uv 的 u=0 在 +Z），
+	// 所以同一张 HDR 要补 π：t = R(π − rot)·p。
+	// 实测标定：出生点视线方位 261.4°，belfast 太阳在文件方位 241.6°，
+	// R(π−2.80) 采样落点 241.8°（0.2° 内命中）；旧映射 R(−rot) 落在 61.8°
+	//（背阳区），表现为整片靛蓝云 —— 见 修复记录 二十六。
+	vec3 hdr_dir = rotate_y(p, PI - sunset_rot);
 	vec3 raw = texture(sunset_pano, panorama_uv(hdr_dir)).rgb;
 	vec3 graded = grade_sunset_radiance(hdr_dir, raw);
 	float peak = max(max(graded.r, graded.g), graded.b);

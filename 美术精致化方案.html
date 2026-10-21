@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>深城纪 Godot 版 · 美术精致化方案（2026-10-21）</title>
+<style>
+  :root {
+    --ink: #1c2430; --sub: #5b6675; --line: #dde3ea; --bg: #f7f9fb;
+    --accent: #0f6bd7; --warn: #b35c00; --good: #1a7f4b; --bad: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.75 "Microsoft YaHei", "PingFang SC", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 28px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 16.5px; margin: 24px 0 8px; }
+  .meta { color: var(--sub); font-size: 13px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; background: #fff; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; }
+  img.shot { width: 100%; border: 1px solid var(--line); border-radius: 8px; display: block; }
+  .cap { color: var(--sub); font-size: 13px; margin: 6px 0 18px; }
+  .tag { display: inline-block; font-size: 12px; border-radius: 4px; padding: 1px 8px; margin-right: 6px; vertical-align: 1px; }
+  .t-rep   { background: #e3f0e8; color: var(--good); }
+  .t-bey   { background: #fdeeea; color: var(--bad); }
+  .t-fix   { background: #fdf3e2; color: var(--warn); }
+  .hl { background: #fff8dc; padding: 0 4px; }
+  .warn { color: var(--warn); font-weight: 600; }
+  code { background: #eef2f7; border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>深城纪 Godot 版 · 美术精致化方案</h1>
+<div class="meta">
+  2026-10-21 · 基于 10 张 1920×1124 实机截图（Godot 4.7.1 / Vulkan / RTX 4060，画质档默认 medium）·
+  截图存于 <code>tools/shots/d1~d10_*.png</code> · 本轮只做诊断，未改任何代码
+</div>
+
+<div class="card">
+  <b>结论先行</b>：整体框架已经相当完整（光照三档、立面多样性、窗光、烘焙 AO、SSR 都在工作），
+  目前拉低精致感的短板按影响面排序是——
+  <b>① 水面平涂（白天最伤画面）→ ② 日落档全画面红罩染 → ③ 雨丝观感假 → ④ 夜街路面照度不足 → ⑤ 草地/路面微观细节缺失</b>。
+  其中 ①③⑤ 恰好对应未完成清单里的既定工单（B1 平面镜、地面材质缺口），②③ 属于本轮新发现。
+</div>
+
+<h2>一、逐张诊断</h2>
+
+<h3>1.1 白天街景（d1）—— 基本盘良好，细节欠打磨</h3>
+<img class="shot" src="tools/shots/d1_day_street.png" alt="白天街景">
+<div class="cap">滨海大道 · 白天 · 画质中</div>
+<ul>
+  <li>天空干净但偏「空」：几乎没有可见云形，地平线过渡略生硬。</li>
+  <li>路面近景是一整块均匀灰：沥青颗粒/磨旧痕迹在低速视角下完全读不出来，车道线崭新等宽。</li>
+  <li>行道树冠层稀疏，「秃枝感」明显（d1/d6/d7 多张可见），与热带城市植被预期不符。</li>
+</ul>
+
+<h3>1.2 日落街景（d2）—— <span class="hl">本轮新发现的最大观感问题</span></h3>
+<img class="shot" src="tools/shots/d2_sunset_street.png" alt="日落街景">
+<div class="cap">滨海大道 · 日落 · 画质中</div>
+<ul>
+  <li>全画面被玫瑰红罩染：树冠被染成艳红（几乎像秋枫），左侧楼群呈暗枣红，路面偏粉。</li>
+  <li>天空却是一大片灰紫云，<b>没有金色地平线与日落辉光</b>——「地上红、天上灰」互相打架，观感是「脏」而不是「暖」。</li>
+  <li>佐证：d7（日落俯瞰）同样的红染 + 水面只有一道孤立的亮斑光柱。</li>
+  <li class="warn">注意：日落 HDR 与曝光是之前逐项标定过的（修复记录第二十五节），动它之前必须先拿原版同机位截图比对，确认红染来自「太阳颜色 × 树冠反照率」还是本来如此。</li>
+</ul>
+
+<h3>1.3 夜景街景（d3）—— 氛围成立，路面欠光</h3>
+<img class="shot" src="tools/shots/d3_night_street.png" alt="夜景街景">
+<div class="cap">滨海大道 · 夜晚 · 画质中</div>
+<ul>
+  <li>星空 + 城市辉光云 + 立面窗光都成立，天空是三档里最好的。</li>
+  <li>但本段路面几乎纯黑，车道线「浮」在黑底上；路灯灯池在这段路上一个都没有（右侧人行道仅一 faint 池）。</li>
+  <li>公共照明 clipmap 已实现（修复记录第二十节），问题更可能是<b>本路段灯位稀疏 / 灯池半径小</b>，需与原版对照确认。</li>
+</ul>
+
+<h3>1.4 雨天（d4 低档 / d5 高档）—— 湿路成立，雨丝穿帮</h3>
+<img class="shot" src="tools/shots/d4_rain_low.png" alt="雨天低档">
+<div class="cap">雨天 · 日落 · 画质低</div>
+<img class="shot" src="tools/shots/d5_rain_high.png" alt="雨天高档">
+<div class="cap">雨天 · 日落 · 画质高</div>
+<ul>
+  <li>湿路反射（中央亮斑）成立，低/高档在静帧下差异不大——低档兜底 SSR 有效。</li>
+  <li><b>雨丝是均匀的白色短竖条</b>：等长、等亮、间距均匀，像渲染故障而不是雨。这是三档天气里最假的元素。</li>
+  <li>路面缺少水洼「斑块」感：整条路均匀变暗 + 一条镜面亮带，原版 puddles 应有碎块状积水。</li>
+</ul>
+
+<h3>1.5 白天俯瞰（d6）与白天飞行（d9）—— 水面是最大短板</h3>
+<img class="shot" src="tools/shots/d6_day_observer.png" alt="白天俯瞰">
+<div class="cap">无人机视角 · 白天 · 画质中</div>
+<img class="shot" src="tools/shots/d9_air_day.png" alt="白天飞行">
+<div class="cap">飞行视角 · 白天 · 画质中</div>
+<ul>
+  <li><b>海面是纯色平涂</b>：饱和青绿色、零反射、零波纹、零岸边过渡，占画面近一半时「塑料感」最强。这正是未完成清单 B1 立案的结构性缺口（原版用 512 平面镜，本版只有 IBL + SSR）。</li>
+  <li>草地是大面积均匀荧光绿，从空中看完全平（未完成清单 B6 有立案：地面材质现只用一张宏观贴图）。</li>
+  <li>道路网、立交匝道、远景天际线的结构本身是好的。</li>
+</ul>
+
+<h3>1.6 夜间俯瞰（d8）—— 全场最佳，说明方向是对的</h3>
+<img class="shot" src="tools/shots/d8_night_observer.png" alt="夜间俯瞰">
+<div class="cap">无人机视角 · 夜晚 · 画质中</div>
+<ul>
+  <li>灯池沿路网铺开、天际线窗光分层、水面深色收敛——这张已经「像回事」。</li>
+  <li>小瑕疵：路面灯池偏黄绿色调（路灯色温可以再核一遍原版）；远处岸线有一圈发白的「灯带糊」。</li>
+</ul>
+
+<h3>1.7 夜间飞行（d10）—— 好看，但有一条穿帮接缝</h3>
+<img class="shot" src="tools/shots/d10_air_night.png" alt="夜间飞行">
+<div class="cap">飞行视角 · 夜晚 · 画质中</div>
+<ul>
+  <li>银河、城市灯海、航舰灯光都成立。</li>
+  <li class="warn">画面中部有一条横贯的暗色矩形带（左侧尤其明显）——疑似远景城市壳分块边缘或雾过渡断层，属于<b>疑似渲染缺陷</b>而非风格问题，建议优先定位。</li>
+</ul>
+
+<h2>二、精致化方案（供拍板）</h2>
+
+<p>分两条线：<span class="tag t-rep">按原版补齐</span> = 不偏离一比一口径的既定工单；
+<span class="tag t-bey">超越原版</span> = 会偏离一比一口径，需你明确授权；
+<span class="tag t-fix">缺陷修复</span> = 不改风格只修穿帮。</p>
+
+<table>
+  <tr><th>#</th><th>项目</th><th>类型</th><th>解决什么</th><th>预估</th><th>风险</th></tr>
+  <tr>
+    <td>P1</td>
+    <td><b>平面镜水面</b>（清单 B1）<br><code>SubViewport</code> 镜像相机一次服务水面 + 湿路</td>
+    <td><span class="tag t-rep">按原版补齐</span></td>
+    <td>白天海面平涂（d6/d9）、水面倒影不清、雨天镜面感弱——<b>单点观感提升最大</b></td>
+    <td>2–3 天</td>
+    <td>中高（多一个 render target，需评估低档降级）</td>
+  </tr>
+  <tr>
+    <td>P2</td>
+    <td><b>雨丝与水洼观感重做</b></td>
+    <td><span class="tag t-bey">超越原版</span><span class="tag t-fix">缺陷修复</span></td>
+    <td>d4/d5 的「白色短竖条」假雨丝；按原版 puddles 数据做斑块状积水（雨丝重做属超越项，水洼斑块属补齐）</td>
+    <td>1–2 天</td>
+    <td>低</td>
+  </tr>
+  <tr>
+    <td>P3</td>
+    <td><b>日落档红罩染校准</b></td>
+    <td><span class="tag t-fix">缺陷修复</span></td>
+    <td>d2/d7 的「地上红、天上灰」打架。<span class="warn">前置条件：先取原版同机位截图</span>（顺带解锁清单 C1「白天建筑偏亮」的比对），确认后再决定改太阳色/树冠反照率还是不动</td>
+    <td>比对 0.5 天 + 视结论 1 天</td>
+    <td>中（动已标定参数，需像素量化护栏）</td>
+  </tr>
+  <tr>
+    <td>P4</td>
+    <td><b>夜街灯池密度 / 色温核查</b></td>
+    <td><span class="tag t-rep">按原版补齐</span></td>
+    <td>d3 本路段零灯池、d8 灯池偏黄绿。先对照原版布灯数据，判断是漏布还是口径差异</td>
+    <td>0.5–1 天</td>
+    <td>低</td>
+  </tr>
+  <tr>
+    <td>P5</td>
+    <td><b>夜间飞行横向暗带定位</b>（d10）</td>
+    <td><span class="tag t-fix">缺陷修复</span></td>
+    <td>远景壳分块边缘 / 雾断层穿帮。先复现定位（用 <code>hide</code> 键二分 distant/facades），再修</td>
+    <td>0.5–1 天</td>
+    <td>低</td>
+  </tr>
+  <tr>
+    <td>P6</td>
+    <td><b>地面微观材质</b>：路面近景颗粒 + 草地分层（清单 B6/A5 关联）</td>
+    <td><span class="tag t-rep">按原版补齐</span></td>
+    <td>d1 路面平、d6 草地荧光绿平涂。含 A5 中湾铺装、ground-relief 完整材质</td>
+    <td>2–3 天</td>
+    <td>中</td>
+  </tr>
+  <tr>
+    <td>P7</td>
+    <td><b>腾讯滨海大厦逐窗格亮灯</b>（清单 A4）</td>
+    <td><span class="tag t-rep">按原版补齐</span></td>
+    <td>夜景地标辨识度：幕墙从整片亮改为随机窗格点亮</td>
+    <td>1–2 天</td>
+    <td>中高（几何处理）</td>
+  </tr>
+  <tr>
+    <td>P8</td>
+    <td><b>行道树冠层加密</b></td>
+    <td><span class="tag t-bey">超越原版</span></td>
+    <td>d1/d6 的「秃枝感」。换/加 foliage 卡或调冠层密度——原版树资产同源，属在原版基础上的替换</td>
+    <td>1–2 天</td>
+    <td>中（资产替换需挑选）</td>
+  </tr>
+  <tr>
+    <td>P9</td>
+    <td><b>座舱内饰</b>（清单 B3）：仪表盘 / 方向盘几何</td>
+    <td><span class="tag t-rep">按原版补齐</span></td>
+    <td>第一人称车内代入感（截图覆盖不到，但对玩家感知明显）</td>
+    <td>1–2 天</td>
+    <td>低</td>
+  </tr>
+</table>
+
+<h3>建议批次</h3>
+<table>
+  <tr><th>批次</th><th>内容</th><th>理由</th></tr>
+  <tr><td>第 1 批</td><td>P5 暗带定位 + P4 灯池核查 + P3 原版截图比对（三个排查型小项并行）</td><td>先定性再动手，半天到一天能出全部结论</td></tr>
+  <tr><td>第 2 批</td><td><b>P1 平面镜水面</b></td><td>观感提升最大的一项</td></tr>
+  <tr><td>第 3 批</td><td>P2 雨丝水洼 + P3 按比对结论实施</td><td>天气族一次做齐</td></tr>
+  <tr><td>第 4 批</td><td>P6 地面材质 + P7 大厦亮灯</td><td>两处独立着色器，互不影响</td></tr>
+  <tr><td>第 5 批</td><td>P8 树冠 + P9 座舱（可选）</td><td>超越项与体验项，看前三批效果再定</td></tr>
+</table>
+
+<h2>三、执行约定（沿用项目既有铁律）</h2>
+<ul>
+  <li>凡改画面，必跑 <code>tools/_shot.tscn</code> 开窗截图 + <code>compare_shots.py</code>/像素统计做前后量化对比；无头跑通不等于画面对。</li>
+  <li><span class="warn">「白天建筑偏亮」已标定完毕，不得借本轮顺手改曝光 / albedo</span>——会把已对齐的日落与夜景一起带偏（清单 C1）。</li>
+  <li>新着色器 / 新脚本沿用已知坑清单：新 class 必须 <code>preload</code>、<code>var x :=</code> 遇 Variant 会推断失败、GDScript 负数取模用 <code>fposmod</code>。</li>
+  <li>本轮环境备注：截图必须用 <b>.NET 版 Godot</b>（<code>Godot_v4.7.2-stable_mono_win64_console.exe</code>）——普通 4.7.1 版加载不了 C# 步行角色程序集，会直接退出（本轮实测踩到）。</li>
+</ul>
+
+</div>
+</body>
+</html>

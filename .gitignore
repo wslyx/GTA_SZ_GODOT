@@ -52,6 +52,13 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# tools/ 运行产物：截图探针输出（tools/_shot.gd 写入，磁盘保留不入库；
+# .gdignore 仍入库，保证 Godot 不导入该目录）
+tools/shots/*.png
+tools/shots/*.jpg
+# 临时备份（shot_plan.json 的本地改稿）
+tools/shot_plan.backup.json
 *.egg-info/
 
 # ------------------------------------------------------------
