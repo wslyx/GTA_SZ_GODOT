@@ -14,19 +14,32 @@ const HORIZON_INNER := 7000.0
 const HORIZON_OUTER := 50000.0
 const HORIZON_Y := -0.25
 
+## 水面网格专用层位（planar_mirror 的镜像相机剔除该位，防自反射）
+const WATER_LAYER_VALUE := 1 << 20
+
+## 平面镜（B1，2026-10-21）。⚠️ 新脚本的 class_name 不在全局类缓存，
+## 必须 preload（项目已知坑 #1）
+const PLANAR_MIRROR_SCRIPT := preload("res://scripts/world/planar_mirror.gd")
+
 var world: CityWorld
 var water_height := -0.25
 var horizon_mesh: MeshInstance3D
 var shader_material: ShaderMaterial
 var raised_vertices := 0
 var _built := false
+var planar_mirror = null
 
 
 func setup(p_world: CityWorld) -> void:
 	world = p_world
 	water_height = float(world.height_field.water_height)
+	# ⚠️ 顺序敏感：先建材质再抬水面 —— _raise_terrain_water 要用 shader_material
+	# 接管水面网格。旧顺序（先 raise 后建材质）+ any_change 短路导致
+	# 水面 shader/平面镜从未生效（修复记录 二十八）。
+	_make_water_material()
 	_raise_terrain_water()
 	_create_horizon()
+	_setup_mirror()
 	_built = true
 
 
@@ -67,9 +80,12 @@ func _raise_terrain_water() -> void:
 			if mat != null:
 				rebuilt.surface_set_material(s, mat)
 
-		if not any_change:
-			continue
-		mi.mesh = rebuilt
+		# ⚠️ 无论顶点是否改动都要接管：数据侧水面可能已夷平（any_change=false），
+		# 但它仍是水面 —— 旧代码在此 continue，导致水面 shader 从未生效
+		# （修复记录 二十八：近岸 turquoise 平涂的根因）。
+		if any_change:
+			mi.mesh = rebuilt
+		mi.layers = WATER_LAYER_VALUE
 		if shader_material != null:
 			mi.material_override = shader_material
 	if raised_vertices > 0:
@@ -77,6 +93,9 @@ func _raise_terrain_water() -> void:
 
 
 func _make_water_material() -> ShaderMaterial:
+	# 幂等：地形水面与远海环必须共用同一份 ShaderMaterial（镜面参数只 set 一份）
+	if shader_material != null:
+		return shader_material
 	shader_material = ShaderMaterial.new()
 	if ResourceLoader.exists("res://shaders/water.gdshader"):
 		shader_material.shader = load("res://shaders/water.gdshader")
@@ -103,7 +122,24 @@ func _create_horizon() -> void:
 	horizon_mesh.material_override = mat
 	horizon_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	horizon_mesh.extra_cull_margin = 1.0e8
+	horizon_mesh.layers = WATER_LAYER_VALUE
 	add_child(horizon_mesh)
+
+
+## 平面镜（B1）：SubViewport 镜像相机 + 水面着色器投影采样
+func _setup_mirror() -> void:
+	planar_mirror = PLANAR_MIRROR_SCRIPT.new()
+	planar_mirror.name = "PlanarMirror"
+	add_child(planar_mirror)
+	planar_mirror.setup(water_height)
+	_apply_mirror_to_material()
+
+
+func _apply_mirror_to_material() -> void:
+	if shader_material == null or planar_mirror == null:
+		return
+	shader_material.set_shader_parameter("mirror_tex", planar_mirror.get_texture())
+	shader_material.set_shader_parameter("mirror_enabled", planar_mirror.enabled)
 
 
 func set_quality(p: Dictionary) -> void:
@@ -111,6 +147,10 @@ func set_quality(p: Dictionary) -> void:
 		return
 	# 低画质降低波形细节（原版通过 mirrorSize 控制反射成本，这里退化为波幅）
 	shader_material.set_shader_parameter("wave_scale", 1.0 if int(p.get("msaa", 2)) >= 2 else 0.5)
+	# 平面镜随 SSR 档位：中/高档开，低档关（低档维持 IBL+SSR 旧路径）
+	if planar_mirror != null:
+		planar_mirror.set_quality(p)
+		_apply_mirror_to_material()
 
 
 ## 夜间反射变暗（原版 envIntensity 夜 .78）
@@ -126,12 +166,18 @@ func update_system(_delta: float, focus: Vector3) -> void:
 	# 环形远海跟随焦点，保证视野内永远有海平线
 	if horizon_mesh != null:
 		horizon_mesh.global_position = Vector3(focus.x, HORIZON_Y, focus.z)
+	# 平面镜逐帧跟随主相机（mirror 视角 = 主相机跨水面镜像）
+	if planar_mirror != null:
+		planar_mirror.update_mirror(get_viewport().get_camera_3d())
 
 
 func diagnostics() -> Dictionary:
-	return {
+	var d := {
 		"waterHeight": water_height,
 		"raisedVertices": raised_vertices,
 		"horizonInner": HORIZON_INNER,
 		"horizonOuter": HORIZON_OUTER,
 	}
+	if planar_mirror != null and planar_mirror.has_method("diagnostics"):
+		d.merge(planar_mirror.diagnostics())
+	return d

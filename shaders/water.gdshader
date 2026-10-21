@@ -7,9 +7,11 @@ shader_type spatial;
 //         (.092, .171)、(-.238, .114)、(1.62, .83)、(-.74, 2.31)
 //     用 fwidth 做抗混叠，并把亚像素斜率方差回灌到 roughness
 //   - 近岸用 shore-distance.png 控制浅水色与泡沫（foam = min(p1, p2)）
-//   - 反射：原版是 512 平面镜（refreshRate 3）。Godot 没有内置平面镜，
-//     这里用「环境天空反射（IBL）+ 屏幕空间反射」，并把 fresnel 权重调成
-//     相近的观感；质上是近似，见项目 README「已知差异」。
+//   - 反射：原版是 512 平面镜（refreshRate 3）。2026-10-21 起接入真正的
+//     平面镜（planar_mirror.gd 的 SubViewport 镜像相机，B1）：按屏幕 UV
+//     投影采样 + fresnel 混合。镜像相机是 proper 化的（up 取共轭），
+//     渲染图 = 真镜像垂直翻转 → 采样 v 要翻回来。低画质档 mirror_enabled
+//     = false，退回 IBL + SSR 旧路径。
 
 render_mode cull_disabled, depth_draw_opaque;
 
@@ -22,6 +24,9 @@ uniform float roughness_base : hint_range(0.0, 1.0) = 0.13;
 uniform float shore_max_distance = 120.0;
 uniform vec4 shore_extent = vec4(-10000.0, -13000.0, 10000.0, 3000.0);
 uniform sampler2D shore_distance : hint_default_black;
+uniform sampler2D mirror_tex : hint_default_black, filter_linear_mipmap;
+uniform bool mirror_enabled = false;
+uniform float mirror_strength : hint_range(0.0, 1.0) = 1.0;
 
 varying vec3 v_world;
 varying vec3 v_normal_ws;
@@ -85,4 +90,20 @@ void fragment() {
 	NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
 	// 让天空/环境反射明显（对应原版 envIntensity 1，夜 .78）
 	AO = 1.0;
+
+	// 平面镜倒影（B1）：屏幕 UV 投影采样 + fresnel。
+	// 镜像相机是 proper 化的（up 取共轭）→ 图是真镜像垂直翻转 → v 翻回。
+	if (mirror_enabled) {
+		vec3 V = normalize(CAMERA_POSITION_WORLD - v_world);
+		float cos_i = clamp(dot(V, n), 0.0, 1.0);
+		float fresnel = 0.02 + 0.98 * pow(1.0 - cos_i, 5.0);
+		vec2 muv = vec2(SCREEN_UV.x, 1.0 - SCREEN_UV.y);
+		// 波纹扰动（用世界法线的水平分量推屏幕 UV，幅度随 wave_scale）
+		muv += vec2(n.x, n.z) * 0.02 * wave_scale;
+		muv = clamp(muv, vec2(0.002), vec2(0.998));
+		vec3 refl = texture(mirror_tex, muv).rgb;
+		// 倒影能量：入射角越大越强（fresnel），叠加到自发光通道 ——
+		// 镜像纹理里已是完整光照的成品画面（含夜灯/日落色），无需再调色
+		EMISSION += refl * fresnel * mirror_strength;
+	}
 }
