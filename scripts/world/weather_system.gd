@@ -19,6 +19,10 @@ const RIPPLE_COUNT := 64
 const RAIN_AREA := 28.0
 const PUDDLE_ROAD_Y := 0.10
 
+## 水面/积水专用层位（与 planar_mirror.gd 的 WATER_LAYER_BIT 同步：
+## 镜像相机剔除该位，防积水自反射）
+const WATER_LAYER_VALUE := 1 << 20
+
 var world: CityWorld
 var raining := false
 var intensity := 0.0
@@ -64,12 +68,47 @@ func _process(_delta: float) -> void:
 		puddle_mesh = MeshInstance3D.new()
 		puddle_mesh.name = "puddles"
 		puddle_mesh.mesh = _puddle_mesh
-		puddle_mesh.material_override = _puddle_mat
+		puddle_mesh.material_override = _build_puddle_material()
 		puddle_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		puddle_mesh.layers = WATER_LAYER_VALUE   # 镜像相机剔除，防自反射
 		puddle_mesh.visible = raining
 		add_child(puddle_mesh)
-		_puddles.append(_puddle_mat)
+		_puddles.append(puddle_mesh.material_override)
 		print("[WeatherSystem] 积水网格后台构建完成并挂载")
+
+
+## 积水材质（P2b）：puddle.gdshader 接入平面镜倒影。
+## mirror_strength 跟随 planar_mirror 的档位开关（低档 0 → 退回暗色 + SSR 旧路径）。
+func _build_puddle_material() -> Material:
+	# ⚠️ 显式 Material 类型（fallback 分支是 StandardMaterial3D）
+	var mat: Material = ShaderMaterial.new()
+	if ResourceLoader.exists("res://shaders/puddle.gdshader"):
+		mat.shader = load("res://shaders/puddle.gdshader")
+		_refresh_puddle_mirror(mat)
+	else:
+		push_warning("[WeatherSystem] 缺少 puddle.gdshader，积水退回旧材质")
+		var std := StandardMaterial3D.new()
+		std.albedo_color = Color(0.025, 0.036, 0.045, 0.85)
+		std.roughness = 0.075
+		std.metallic_specular = 0.85
+		std.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		std.cull_mode = BaseMaterial3D.CULL_DISABLED
+		std.rim = 0.2
+		mat = std
+	_puddle_mat = mat
+	return mat
+
+
+## 把平面镜纹理/开关写进积水材质（纹理来自 bay_water 的 PlanarMirror）
+func _refresh_puddle_mirror(mat: Material) -> void:
+	if mat == null or not (mat is ShaderMaterial):
+		return
+	var water = world.water if world != null else null
+	var mirror = water.planar_mirror if water != null else null
+	if mirror == null or mirror.get_texture() == null:
+		return
+	mat.set_shader_parameter("mirror_tex", mirror.get_texture())
+	mat.set_shader_parameter("mirror_strength", 1.0 if mirror.enabled else 0.0)
 
 
 func _build_rain() -> void:
@@ -77,13 +116,21 @@ func _build_rain() -> void:
 	rain_node.name = "rain"
 	rain_node.visible = false
 	add_child(rain_node)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.035, 1.6, 0.035)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.72, 0.80, 0.88, 0.42)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.disable_receive_shadows = true
+	# P2a：竖直薄片 + 渐变 shader，逐帧朝向相机（billboard）。
+	# 旧实现是轴对齐 BoxMesh —— 侧对相机时几乎不可见，正对时是均匀实心白条。
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.05, 2.0)
+	# ⚠️ 显式 Material 类型：fallback 分支是 StandardMaterial3D（项目已知坑 #2）
+	var mat: Material = ShaderMaterial.new()
+	if ResourceLoader.exists("res://shaders/rain_streak.gdshader"):
+		mat.shader = load("res://shaders/rain_streak.gdshader")
+	else:
+		push_warning("[WeatherSystem] 缺少 rain_streak.gdshader，雨丝退回白条")
+		var fallback := StandardMaterial3D.new()
+		fallback.albedo_color = Color(0.72, 0.80, 0.88, 0.42)
+		fallback.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		fallback.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat = fallback
 	_rain_mm = MultiMesh.new()
 	_rain_mm.transform_format = MultiMesh.TRANSFORM_3D
 	_rain_mm.mesh = mesh
@@ -157,16 +204,8 @@ func _build_puddle_worker() -> void:
 		i += stride
 	if count == 0:
 		return
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.025, 0.036, 0.045, 0.85)
-	mat.roughness = 0.075
-	mat.metallic = 0.0
-	mat.metallic_specular = 0.85
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.rim = 0.2
+	# ⚠️ 材质不在worker线程建（shader 资源加载留主线程），挂载时在 _process 建
 	_puddle_mesh = st.commit()
-	_puddle_mat = mat
 	print("[WeatherSystem] 积水片 %d 个（来自 %d 条布局记录）" % [count, values.size() / stride])
 
 
@@ -190,6 +229,9 @@ func set_raining(v: bool) -> void:
 	# 空跑一遍纯属浪费（初始 setup 传的是 false）
 	if raining or _wet_applied:
 		_apply_wet_materials()
+	# 积水材质刷新镜面开关（档位可能在开雨之间切换过）
+	if puddle_mesh != null and puddle_mesh.material_override is ShaderMaterial:
+		_refresh_puddle_mirror(puddle_mesh.material_override)
 	# 沥青材质单独走原版 RAIN_ROAD_LOOK（反照率/粗糙度/镜面强度三档一起换）
 	if world != null and world.road_surface != null:
 		world.road_surface.set_weather(raining)
@@ -260,15 +302,27 @@ func update_system(delta: float, focus: Vector3) -> void:
 		return
 	if rain_node != null:
 		rain_node.global_position = Vector3(focus.x, focus.y + 12.0, focus.z)
+	# 雨丝 billboard：薄片朝向相机（保持竖直，只绕 Y 朝向）
+	var cam := get_viewport().get_camera_3d()
 	var t := Time.get_ticks_msec() / 1000.0
+	var cam_pos: Vector3 = cam.global_position if cam != null else Vector3(focus.x, focus.y + 12.0, focus.z)
 	for i in RAIN_STREAK_COUNT:
 		var seed_v := _rain_seeds[i]
 		# 原版：y = mod(y - t*(13 + g*8) + 40, 20) - 6
 		var y := fposmod(seed_v * 20.0 - t * (13.0 + seed_v * 8.0) + 40.0, 20.0) - 6.0
-		_rain_mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(
+		var pos := Vector3(
 			(seed_v * 7.0 - fposmod(seed_v * 3.0, 1.0) * 14.0),
 			y,
-			(fposmod(seed_v * 11.0, 1.0) * 28.0 - 14.0))))
+			(fposmod(seed_v * 11.0, 1.0) * 28.0 - 14.0))
+		var xf := Transform3D(Basis.IDENTITY, pos)
+		if cam != null:
+			var to_cam := cam_pos - (rain_node.global_position + pos)
+			to_cam.y = 0.0
+			if to_cam.length_squared() > 0.01:
+				var z_axis := to_cam.normalized()
+				var x_axis := Vector3.UP.cross(z_axis).normalized()
+				xf.basis = Basis(x_axis, Vector3.UP, z_axis)
+		_rain_mm.set_instance_transform(i, xf)
 
 
 func diagnostics() -> Dictionary:
