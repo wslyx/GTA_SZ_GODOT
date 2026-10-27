@@ -59,8 +59,70 @@ func setup(p_world: CityWorld) -> void:
 	_sign_grid = PointGrid.new(256.0)
 	_sign_grid.build(_sign_points)
 	_make_pool()
+	_build_direction_signs()
 	print("[SignSystem] 招牌数据 %d 条，显示池 %d" % [_signs.size(), _pool.size()])
 	update_signs(world.focus)
+
+
+## ── 指路牌（2026-10-24 补齐）────────────────────────────────────────
+## 原版 city-world.ts setupSigns()：spawn ±650/700m 内的 primary/trunk 主干道
+## （路名含「辅」跳过、points ≥4、最多 9 块），8×2m 单面片挂在 a 点 6.8m 高，
+## 自发光不受光照（夜里也清晰可读），按行进方向选 sign-east/west.jpg。
+## 贴面只朝 a→b 行进方向 —— 背面不渲染（原版注释：背面会镜像文字）。
+const DIRECTION_SIGN_MAX := 9
+
+func _build_direction_signs() -> void:
+	var spawn: Vector2 = CityData.spawn_pos
+	var placed := 0
+	var tex_cache := {}
+	for road in CityData.roads:
+		if placed >= DIRECTION_SIGN_MAX:
+			break
+		var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+		if pts.size() < 4:
+			continue
+		var kind := str(road.get("kind", ""))
+		if kind != "primary" and kind != "trunk":
+			continue
+		if "辅" in str(road.get("name", "")):
+			continue
+		var a := pts[0]
+		var b := pts[1]
+		if absf(a.x - spawn.x) > 650.0 or absf(a.y - spawn.y) > 700.0:
+			continue
+		placed += 1
+		var dir_data := b - a
+		var tex_name := "west" if b.x < a.x else "east"
+		var tex_path := "res://data/city/textures/sign-%s.jpg" % tex_name
+		var tex: Texture2D = null
+		if tex_cache.has(tex_name):
+			tex = tex_cache[tex_name]
+		elif ResourceLoader.exists(tex_path):
+			tex = load(tex_path)
+			tex_cache[tex_name] = tex
+		if tex == null:
+			push_warning("[SignSystem] 缺少指路牌贴图 %s" % tex_path)
+			continue
+		var quad := QuadMesh.new()
+		quad.size = Vector2(8.0, 2.0)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		# 原版：disableLighting + emissiveColor .82 → 等价 unshaded × 0.82
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(0.82, 0.82, 0.82)
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		var mi := MeshInstance3D.new()
+		mi.name = "direction-sign"
+		mi.mesh = quad
+		mi.material_override = mat
+		mi.position = CoordinateUtil.to_world(a.x, a.y, 6.8)
+		# 原版 rotation.y = atan2(dx, dz) + π（Babylon z=北、平面朝 −Z，
+		# 法线 = a→b 行进方向）；Godot QuadMesh 面朝 +Z：
+		# 法线 = (sin φ, cos φ)，令其等于 (dx, −dz)̂ → φ = atan2(dx, −dz)
+		mi.rotation.y = atan2(dir_data.x, -dir_data.y)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+	print("[SignSystem] 指路牌 %d 块" % placed)
 
 
 func _make_font() -> void:

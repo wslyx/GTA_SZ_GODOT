@@ -3,11 +3,7 @@
   "gap": 3.0,
   "settle": 2.5,
   "shots": [
-    { "name": "v_day",     "env": { "light_mode": 0, "tier": "medium" } },
-    { "name": "v_sunset",  "env": { "light_mode": 1, "tier": "medium" } },
-    { "name": "v_night",   "env": { "light_mode": 2, "tier": "medium" } },
-    { "name": "v_rain_sunset", "env": { "light_mode": 1, "tier": "low", "rain": true } },
-    { "name": "v_observer_day", "env": { "light_mode": 0, "tier": "medium", "mode": "observer" } },
-    { "name": "v_aircraft_day", "env": { "light_mode": 0, "tier": "medium", "mode": "aircraft" } }
+    { "name": "w1_rain_sunset_street", "env": { "light_mode": 1, "tier": "medium", "rain": true } },
+    { "name": "w2_rain_night_street",  "env": { "light_mode": 2, "tier": "medium", "rain": true } }
   ]
 }

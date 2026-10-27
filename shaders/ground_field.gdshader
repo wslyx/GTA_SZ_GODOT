@@ -65,6 +65,8 @@ uniform vec4 city_ambient_heights = vec4(0.0, 12.0, 40.0, 150.0);
 //   沥青 day 1 / 昏夜 .55 / 雨天 1.18–1.10，草地 .75（见 road_surface / 草地那两处）。
 // ---------------------------------------------------------------------------
 uniform float env_scale = 1.0;
+uniform sampler2D mirror_tex : hint_default_black, filter_linear_mipmap;
+uniform float mirror_strength = 0.0;
 
 // ---------------------------------------------------------------------------
 // A5 草地分层（原版 CityGrassPBR）
@@ -291,5 +293,19 @@ void fragment() {
 		vec3 public_lux = texture(public_irradiance, public_uv).rgb;
 		EMISSION += ALBEDO * public_lux * city_light_field.w * public_inside
 			* max(0.0, wnormal.y) * 3.6;
+	}
+
+	// ---- P2c 雨天沥青平面镜（2026-10-24）----
+	// 原版 setupReflections() 给 asphalt 直接挂 512 镜像（雨天 RAIN_LOOK 粗糙度
+	// 0.455 时锐利，干路 0.92 时糊没）—— 雨天路面的金色眩光就是它。
+	// 移植版镜像只在雨天开（mirror_strength 由 ground_field.gd 按档位写入）。
+	// SCREEN_UV 投影采样 + v 翻转，与水面/积水同一套约定（修复记录 二十八）。
+	if (mirror_strength > 0.0) {
+		vec3 V = normalize(CAMERA_POSITION_WORLD - wpos);
+		float cos_i = clamp(dot(V, wnormal), 0.0, 1.0);
+		float fresnel = 0.04 + 0.96 * pow(1.0 - cos_i, 5.0);
+		vec2 muv = clamp(vec2(SCREEN_UV.x, 1.0 - SCREEN_UV.y),
+			vec2(0.002), vec2(0.998));
+		EMISSION += texture(mirror_tex, muv).rgb * fresnel * mirror_strength;
 	}
 }

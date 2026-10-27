@@ -456,9 +456,25 @@ func _sync() -> void:
 	# 沥青的环境光强度直接问 road_surface —— 昼夜 / 干湿的真值只有一处，
 	# 免得两边各维护一份表（雨天 1.18/1.10，晴天 1/0.55）
 	var asphalt_env := 1.0
+	var raining := false
 	if world != null and world.road_surface != null:
 		asphalt_env = float(world.road_surface.current_look().get("environment", 1.0))
+		raining = world.road_surface.raining
 	_asphalt_env = asphalt_env
+	# P2c：雨天沥青平面镜（原版 setupReflections 给 asphalt 挂 512 镜像；
+	# 干路粗糙度 0.92 镜像糊没，只有雨天开 —— 这里同语义：raining 才给强度）。
+	# ⚠️ 夜间压到 0.35：我们的镜面采样是锐利的（原版经粗糙度 mip 模糊把能量
+	# 摊薄），夜里全强度会把暗路洗成黄绿（w2 首跑实测）。
+	var mirror_tex: Texture2D = null
+	var mirror_gain := 0.0
+	if raining and world != null:
+		if world.road_surface != null:
+			mirror_gain = 1.0 if GameState.light_mode != GameContent.LightMode.NIGHT else 0.35
+		if world.water != null and world.water.planar_mirror != null \
+				and world.water.planar_mirror.enabled:
+			mirror_tex = world.water.planar_mirror.get_texture()
+		else:
+			mirror_gain = 0.0
 	for e in _entries:
 		var src: BaseMaterial3D = e["src"]
 		var mat: ShaderMaterial = e["mat"]
@@ -470,6 +486,12 @@ func _sync() -> void:
 			env_scale = GRASS_ENV
 		elif role.begins_with("asphalt"):
 			env_scale = asphalt_env
+			# P2c：雨天沥青平面镜（低档 planar_mirror.enabled=false → 强度 0 退回 SSR）
+			if mirror_tex != null:
+				mat.set_shader_parameter("mirror_tex", mirror_tex)
+				mat.set_shader_parameter("mirror_strength", mirror_gain)
+			else:
+				mat.set_shader_parameter("mirror_strength", 0.0)
 		mat.set_shader_parameter("env_scale", env_scale)
 		mat.set_shader_parameter("albedo_tint", src.albedo_color)
 		mat.set_shader_parameter("uv_scale", Vector2(src.uv1_scale.x, src.uv1_scale.y))
