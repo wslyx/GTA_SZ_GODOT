@@ -111,8 +111,23 @@ var _walk_error_shown := false     ## 步行缺 ALS 驱动的报错只弹一次�
 var _pending_level_up_dialogue := {}
 
 
-func _ready() -> void:
-	# ⚠️ 加载界面必须先于任何重活出现。
+## 多人战局：把当前出行模式翻译成协议模式串（经 NetSession 上报，
+## 远程玩家昵称牌据此显示"（车）/（坦克）/（飞机）"徽标）
+func _net_mode_string() -> String:
+	match mode:
+		Mode.WALKING:
+			return "walk"
+		Mode.CAR:
+			return "car"
+		Mode.TANK:
+			return "tank"
+		Mode.AIRCRAFT:
+			return "plane"
+		_:
+			return "observer"
+
+
+func _ready() -> void:	# ⚠️ 加载界面必须先于任何重活出现。
 	# PanelsUI._ready() 会在 add_child 的瞬间建好加载画面，但那一帧还没画到屏幕上；
 	# 如果紧接着就在同一帧里跑 CityData.load_core() / collision.build() 这类
 	# 秒级的同步活，玩家看到的仍然是白屏。所以这里先让出一到两帧，等加载画面
@@ -158,6 +173,9 @@ func _build_world() -> void:
 	_als_host.name = "AlsPlayerHost"
 	add_child(_als_host)
 	_als_orbit = _als_host.get_node_or_null("OrbitCamera")
+	# 多人战局：把 ALS 角色宿主绑定为本地玩家，NetSession 据此上报位置（未连接时零开销）
+	NetSession.bind_local_player(_als_host)
+	NetSession.bind_mode_provider(_net_mode_string)
 	# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
 	# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
 	# 之后每次下车取现成角色（EnterWorld 检测到已配置会跳过构造）。

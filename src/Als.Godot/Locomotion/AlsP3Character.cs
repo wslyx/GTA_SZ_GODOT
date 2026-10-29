@@ -323,6 +323,16 @@ public partial class AlsP3Character : Node3D
         AlsP3VisualRootVisibilityObservation.Decode(
             Volatile.Read(ref _state.VisualRootVisibilitySnapshot));
 
+    /// <summary>
+    /// 主线程权威的真实视觉根"树内可见"状态。
+    /// 可见性切换（ShowCommittedVisual / ResetVisualReadyCore）全部发生在主线程，
+    /// worker 从不写 Visible；相比 worker 发布的观察快照（存在滞后/陈旧覆盖），
+    /// 主线程直读 IsVisibleInTree 是零竞态的判定依据，供槽位不变量校验使用。
+    /// </summary>
+    internal bool IsVisualRootVisibleInTree =>
+        GodotObject.IsInstanceValid(this) && _worker.VisualRoot is { } visualRoot &&
+        GodotObject.IsInstanceValid(visualRoot) && visualRoot.IsVisibleInTree();
+
     public AlsP3LifecycleDiagnostics LifecycleDiagnostics
     {
         get

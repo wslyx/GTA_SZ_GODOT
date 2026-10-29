@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests_e2e/net_test_scene.gd" id="1_nt"]
+
+[node name="NetTest" type="Node"]
+script = ExtResource("1_nt")

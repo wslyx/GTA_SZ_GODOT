@@ -26,6 +26,7 @@ SaveSystem="*res://scripts/core/save_system.gd"
 GraphicsQuality="*res://scripts/core/graphics_quality.gd"
 CityData="*res://scripts/core/city_data.gd"
 MemProbe="*res://scripts/utils/mem_probe.gd"
+NetSession="*res://scripts/net/net_session.gd"
 
 [display]
 

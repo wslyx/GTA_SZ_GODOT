@@ -1539,8 +1539,23 @@ public partial class AlsP3WorkerRoot : Node3D
         }
     }
 
+    /// <summary>
+    /// 表现视觉根（仅供主线程诊断读取；worker 不切换任何节点的 Visible）。
+    /// </summary>
+    internal Node3D? VisualRoot => _visualRoot;
+
     private void PublishVisualRootVisibility(long observationFrameId)
     {
+        // 主线程已停用/隐藏该角色（Active=0 或 VisualReady=0）时，本次观察
+        // 必然读取于隐藏之前（陈旧值）。发布它会覆盖主线程写入的权威
+        // "已知隐藏"标记（MainThreadKnownHiddenValue），导致主线程的
+        // 可见性不变量校验误报 "P3 real visual root remained visible"。
+        // 因此丢弃陈旧观察；角色重新激活并就绪后，观察会随新帧恢复发布。
+        if (Volatile.Read(ref _state.Active) == 0 ||
+            Volatile.Read(ref _state.VisualReady) != 1)
+        {
+            return;
+        }
         var snapshot = AlsP3VisualRootVisibilityObservation.EncodeWorker(
             observationFrameId,
             _visualRoot!.IsVisibleInTree());

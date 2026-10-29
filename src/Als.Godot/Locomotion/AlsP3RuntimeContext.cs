@@ -968,9 +968,14 @@ internal sealed class AlsP3CharacterState
         ulong rootDigest,
         bool verified)
     {
-        RollbackFullPoseDigest = fullPoseDigest;
-        RollbackRootDigest = rootDigest;
-        Volatile.Write(ref RollbackVerified, verified ? 1 : 0);
+        // 写入方在工作线程（worker 失败恢复路径），与持 _failureGate 锁的
+        // CaptureRuntimeDiagnostics 读取方保持对称，避免双 digest 撕裂读。
+        lock (_failureGate)
+        {
+            RollbackFullPoseDigest = fullPoseDigest;
+            RollbackRootDigest = rootDigest;
+            Volatile.Write(ref RollbackVerified, verified ? 1 : 0);
+        }
     }
 
     public AlsP3PreparedResultPublication PrepareResultPublication(
