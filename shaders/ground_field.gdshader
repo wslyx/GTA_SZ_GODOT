@@ -68,6 +68,15 @@ uniform float env_scale = 1.0;
 uniform sampler2D mirror_tex : hint_default_black, filter_linear_mipmap;
 uniform float mirror_strength = 0.0;
 
+// ---- A5 中湾铺装（baypark_look.gd 按网格写 kind；0 = 不在样例内）----
+uniform float baypark_kind = 0.0;
+uniform vec2 baypark_center = vec2(-2283.27, 794.82); // 世界 xz（数据 z 取负）
+uniform float baypark_full_radius = 420.0;
+uniform float baypark_outer_radius = 600.0;
+uniform float baypark_detail_near = 22.0;
+uniform float baypark_detail_far = 115.0;
+uniform vec3 baypark_paver_mean = vec3(0.166116, 0.195645, 0.185488);
+
 // ---------------------------------------------------------------------------
 // A5 草地分层（原版 CityGrassPBR）
 // ---------------------------------------------------------------------------
@@ -160,6 +169,32 @@ float city_ambient_at(vec3 p, vec3 n) {
 		: mix(s.g, s.b, clamp((y - h1) / max(h2 - h1, 0.001), 0.0, 1.0));
 	ao = mix(ao, 1.0, smoothstep(h2, city_ambient_heights.w, y));
 	return mix(1.0, ao, city_ambient_params.x);
+}
+
+float bp_hash(vec2 p) {
+	vec3 q = fract(vec3(p.xyx) * 0.1031);
+	q += dot(q, q.yzx + 33.33);
+	return fract((q.x + q.y) * q.z);
+}
+
+float bp_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(bp_hash(i), bp_hash(i + vec2(1.0, 0.0)), f.x),
+		mix(bp_hash(i + vec2(0.0, 1.0)), bp_hash(i + vec2(1.0)), f.x), f.y);
+}
+
+// 盒式滤波接缝：缩到亚像素时保持能量，而不是糊成黑条
+float bp_line(float sd, float half_width, float footprint) {
+	float w = max(footprint, 0.0005);
+	return clamp((half_width - sd) / w + 0.5, 0.0, 1.0)
+		- clamp((-half_width - sd) / w + 0.5, 0.0, 1.0);
+}
+
+float bp_bevel(float p) {
+	float t = clamp((abs(p) - 0.003) / 0.022, 0.0, 1.0);
+	return sign(p) * 6.0 * t * (1.0 - t);
 }
 
 void fragment() {
@@ -263,6 +298,89 @@ void fragment() {
 	// 观感上是略亮一点点。见差异清单 §10.3。
 	if (city_landscape_night.x > 0.001) {
 		base *= mix(1.0, city_landscape_night.z, city_landscape_night.x);
+	}
+
+	// ---- A5 中湾铺装（原版 city-baypark-look.ts 片元逐段移植）----
+	// 与原版 MaterialPlugin 同语义：只改 albedo/roughness/normal，圈外不动。
+	// 石材铺装区用标定均值替换原贴图（原贴图自带的粗网格会与细缝叠两层）。
+	if (baypark_kind > 0.5) {
+		vec2 bp_local = wpos.xz - baypark_center;
+		float bp_radius = length(bp_local);
+		float bp_mask = (1.0 - smoothstep(baypark_full_radius, baypark_outer_radius, bp_radius));
+		if (bp_mask > 0.0001) {
+			float paver = 1.0 - step(1.5, baypark_kind);
+			float cap = step(1.5, baypark_kind) * (1.0 - step(2.5, baypark_kind));
+			float wall = step(2.5, baypark_kind) * (1.0 - step(3.5, baypark_kind));
+			float rock = step(3.5, baypark_kind);
+
+			vec2 bp_dx = dFdx(wpos.xz);
+			vec2 bp_dy = dFdy(wpos.xz);
+			float bp_pixel = max(length(bp_dx), length(bp_dy));
+			float bp_dist = length(INV_VIEW_MATRIX[3].xyz - wpos);
+			float detail = 1.0 - smoothstep(baypark_detail_near, baypark_detail_far, bp_dist);
+			float relief = detail * (1.0 - smoothstep(0.012, 0.075, bp_pixel));
+
+			float patch = bp_noise(bp_local * 0.075 + 17.0);
+			float grain = bp_noise(bp_local * 2.6 + wpos.y * 0.7);
+
+			vec2 along = vec2(0.9396926, 0.3420201);
+			vec2 across = vec2(-0.3420201, 0.9396926);
+			vec2 q = vec2(dot(bp_local, along), dot(bp_local, across));
+
+			float joint = 0.0;
+			vec2 slope = vec2(0.0);
+			float slab = 0.0;
+			if (paver > 0.5) {
+				vec2 size = vec2(0.72, 0.36);
+				float row = floor(q.y / size.y);
+				vec2 cell = vec2(q.x / size.x + mod(row, 2.0) * 0.5, q.y / size.y);
+				vec2 signed_d = (fract(cell + 0.5) - 0.5) * size;
+				vec2 footprint = abs(vec2(dot(bp_dx, along), dot(bp_dx, across)))
+					+ abs(vec2(dot(bp_dy, along), dot(bp_dy, across)));
+				joint = max(bp_line(signed_d.x, 0.003, footprint.x),
+					bp_line(signed_d.y, 0.003, footprint.y));
+				slope = vec2(bp_bevel(signed_d.x), bp_bevel(signed_d.y)) * 0.07;
+				slab = (bp_hash(floor(cell)) - 0.5) * 0.10 * detail;
+			} else if (cap + wall > 0.5) {
+				// 既有混凝土上稀疏的伸缩缝，不是新砌的砖
+				float signed_d = (fract(q.x / 2.4 + 0.5) - 0.5) * 2.4;
+				joint = bp_line(signed_d, 0.004, bp_pixel);
+				slope.x = bp_bevel(signed_d) * 0.075;
+			}
+
+			float wet = (1.0 - smoothstep(-0.34, 0.17, wpos.y + (patch - 0.5) * 0.16)) * (1.0 - paver);
+			wet += paver * smoothstep(0.66, 0.91, patch) * 0.16;
+
+			float dry_rough = mix(0.83, 0.92, rock);
+			dry_rough += mix(-0.045, 0.04, patch);
+			rough = mix(rough, clamp(dry_rough - wet * mix(0.21, 0.34, wall + rock) + joint * 0.06, 0.56, 0.98), bp_mask);
+
+			vec3 tint = mix(vec3(1.025, 1.015, 0.98), vec3(0.98, 1.005, 1.015), patch);
+			float aggregate = (grain - 0.5) * mix(0.085, 0.04, paver) * detail;
+			float fine_fade = 1.0 - smoothstep(0.006, 0.020, bp_pixel);
+			if (paver > 0.5 && fine_fade > 0.001) {
+				aggregate += (bp_noise(bp_local * 72.0) - 0.5) * 0.04 * fine_fade;
+			}
+
+			float tone = (1.0 + slab + aggregate)
+				* (1.0 - joint * mix(0.30, 0.20, paver) * detail)
+				* (1.0 - wet * 0.23);
+
+			vec3 bp_base = base;
+			if (paver > 0.5) {
+				bp_base = baypark_paver_mean * albedo_tint.rgb;
+			}
+			base = mix(base, bp_base * tint * tone, bp_mask);
+
+			// 解析倒角 → 世界空间梯度 → 视空间扰动法线
+			if (relief > 0.0001) {
+				vec3 grad = vec3(along.x * slope.x + across.x * slope.y, 0.0,
+					along.y * slope.x + across.y * slope.y);
+				grad += vec3(grain - 0.5, 0.0, patch - 0.5) * mix(0.035, 0.09, rock);
+				grad -= wnormal * dot(wnormal, grad);
+				NORMAL = normalize(NORMAL - (VIEW_MATRIX * vec4(grad, 0.0)).xyz * relief * bp_mask);
+			}
+		}
 	}
 
 	ALBEDO = base;

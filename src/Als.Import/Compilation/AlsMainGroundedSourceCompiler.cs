@@ -87,5 +87,5 @@ internal static class AlsMainGroundedSourceCompiler
         var number = value.GetProperty(name).GetSingle();
         Require(float.IsFinite(number), "Non-finite Main Grounded source metadata."); return number;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

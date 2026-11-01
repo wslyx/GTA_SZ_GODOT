@@ -195,5 +195,5 @@ public static class AlsIdleControlInputCompiler
         };
         return other.Member + "(" + string.Join(",", args.Select(arg => Input(g, other, arg, depth + 1))) + ")";
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new ArgumentException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

@@ -90,5 +90,5 @@ public static class AlsRefactoredLayeringInventoryCompiler
         return new(count, nodes, order);
     }
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool value, string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

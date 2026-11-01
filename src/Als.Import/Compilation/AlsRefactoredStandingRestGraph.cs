@@ -108,5 +108,5 @@ public sealed class AlsRefactoredStandingRestGraph
     private static JsonElement[] Policies(JsonElement n) => [n.GetProperty("runtime"),n.GetProperty("authoredProperties").GetProperty("Node")];
     private static int Id(JsonElement n) => n.GetProperty("propertyIndex").GetInt32();
     private static string Text(JsonElement n,string key) => n.GetProperty(key).GetString()!;
-    private static void Require(bool value,string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value,string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

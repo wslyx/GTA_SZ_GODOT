@@ -13,8 +13,12 @@ extends Node
 ##   { "warmup": 6.0, "gap": 1.2,
 ##     "shots": [ {"name":"baseline"}, {"name":"noglow","env":{"glow_enabled":false}} ] }
 
-const OUT_DIR := "D:/CodePro/game_ws/GTA_SZ_GODOT/tools/shots"
-const PLAN_PATH := "D:/CodePro/game_ws/GTA_SZ_GODOT/tools/shot_plan.json"
+## ⚠️ 路径**不要写绝对盘符**：项目从 D:\CodePro\game_ws 迁到 E:\CodePro\godot_fps_demo
+## 之后，写死的 "D:/CodePro/game_ws/..." 会让 make_dir_recursive_absolute 直接失败、
+## save_png 静默不落盘 —— 截完一堆图却一个文件都没有。用 res:// 全局化跟随项目根。
+var _out_dir := ""
+var _plan_path := "res://tools/shot_plan.json"
+var _fps_probe := false
 
 var main: Node = null
 var plan: Dictionary = {}
@@ -34,7 +38,12 @@ var finished := false
 
 
 func _ready() -> void:
-	DirAccess.make_dir_recursive_absolute(OUT_DIR)
+	# 方案文件可用环境变量覆盖，方便一份探针跑多套计划（不必反复改 shot_plan.json）
+	var plan_env := OS.get_environment("SHOT_PLAN")
+	if not plan_env.is_empty():
+		_plan_path = plan_env
+	_out_dir = ProjectSettings.globalize_path("res://tools/shots")
+	DirAccess.make_dir_recursive_absolute(_out_dir)
 	plan = _read_plan()
 	warmup = float(plan.get("warmup", 6.0))
 	gap = float(plan.get("gap", 1.2))
@@ -55,10 +64,10 @@ func _ready() -> void:
 
 
 func _read_plan() -> Dictionary:
-	if not FileAccess.file_exists(PLAN_PATH):
+	if not FileAccess.file_exists(_plan_path):
 		push_warning("[shot] 无 shot_plan.json，用默认单张")
 		return {}
-	var f := FileAccess.open(PLAN_PATH, FileAccess.READ)
+	var f := FileAccess.open(_plan_path, FileAccess.READ)
 	if f == null:
 		return {}
 	var txt := f.get_as_text()
@@ -81,7 +90,15 @@ func _process(delta: float) -> void:
 	if finished or main == null:
 		return
 	if not started:
-		if not bool(main.get("session_ready")):
+		# 用 `== true` 而不是 bool(...)：主场景脚本解析失败时 get() 会返回 null，
+		# 而 GDScript 的 bool(null) 会直接抛 "Nonexistent 'bool' constructor"，
+		# 每帧抛一次 —— 实测刷了 43 万行、把 700s 超时耗光才停。
+		if main.get("session_ready") != true:
+			t += delta
+			if t > warmup + 90.0:
+				push_error("[shot] 等 session_ready 超时（%.0fs）：主场景可能没装载成功"
+					% (warmup + 90.0))
+				get_tree().quit(1)
 			return
 		started = true
 		t = 0.0
@@ -109,6 +126,18 @@ func _process(delta: float) -> void:
 		return
 	# 2) 过渡收敛后再截图（顺带处理"必须在曝光前一刻发生"的项）
 	if _applied == idx + 1 and t >= _apply_t + settle:
+		# fps_probe：截图前先量 2 秒平均帧率（定点性能复现用）
+		if _fps_probe:
+			var __f0 := Engine.get_frames_per_second()
+			var __acc := 0.0
+			var __n := 0
+			var __t0 := Time.get_ticks_msec()
+			while Time.get_ticks_msec() - __t0 < 2000:
+				await get_tree().process_frame
+				__acc += float(Engine.get_frames_per_second())
+				__n += 1
+			print("[fps-probe] %s 平均 FPS=%.1f（采样 %d 帧）" % [
+				str(shots[idx].get("name", "?")), __acc / maxf(1.0, float(__n)), __n])
 		_late_env(shots[idx].get("env", {}))
 		_capture(str(shots[idx].get("name", "shot")))
 		idx += 1
@@ -175,6 +204,20 @@ func dump_materials() -> void:
 func _late_env(overrides: Dictionary) -> void:
 	if bool(overrides.get("fire", false)) and main.has_method("fire_missile"):
 		main.call("fire_missile")
+	# 长焦：截图前一刻暂停物理（相机不再被追尾逻辑每帧改写）再改 fov，
+	# 用来把远处地标的细节拉近看。
+	if overrides.has("zoom") and main.has_method("get"):
+		main.set("paused", true)
+		var cam = main.get("camera")
+		if cam != null:
+			cam.set("fov", float(overrides["zoom"]))
+			print("[shot] fov -> %.1f（已暂停物理）" % float(overrides["zoom"]))
+	# 座舱仪表注值：[speed_mps, steer, trip_m] —— 截图前一刻写入并暂停物理，
+	# 否则下一帧就被真实值（停车 0 km/h）覆盖，只能拍到 000
+	if overrides.has("cockpit_probe") and main.has_method("debug_cockpit_telemetry"):
+		var v: Array = overrides["cockpit_probe"]
+		if v.size() >= 3:
+			main.call("debug_cockpit_telemetry", float(v[0]), float(v[1]), float(v[2]))
 
 
 ## 覆盖环境参数。键名直接对应 Environment 的属性名，另外支持几个快捷键：
@@ -224,6 +267,33 @@ func _apply_env(overrides: Dictionary) -> void:
 						(nd as Node3D).visible = false
 					else:
 						push_warning("[shot] world 上没有 %s" % str(value))
+			"hide_world":
+				# 终局二分：把整个 CityWorld 藏掉，看白板是否还在（区分 world 内/外）
+				var w3 = main.get("world")
+				if w3 is Node3D:
+					(w3 as Node3D).visible = false
+					print("[shot] CityWorld 已整体隐藏")
+			"hide_named":
+				# 按名字前缀隐藏网格（找遮挡物/验证"白板是谁"用）：搜 world 各根 + main 直挂
+				if value is String and not value.is_empty():
+					var w2 = main.get("world")
+					var n_hidden := 0
+					var stk: Array = []
+					for root_name in ["landmarks_root", "terrain_root", "buildings_root",
+						"facades_root", "chunks_root", "scenery_root"]:
+						var rt = w2.get(root_name)
+						if rt != null:
+							stk.append(rt)
+					for ch0 in main.get_children():
+						stk.append(ch0)
+					while not stk.is_empty():
+						var nd: Node = stk.pop_back()
+						for ch in nd.get_children():
+							stk.append(ch)
+						if nd is MeshInstance3D and String(nd.name).to_lower().begins_with(value):
+							(nd as MeshInstance3D).visible = false
+							n_hidden += 1
+					print("[shot] 已隐藏 %s × %d" % [value, n_hidden])
 			"fxaa":
 				# 屏幕空间抗锯齿开关（FXAA 会影响全屏细节观感）
 				GraphicsQuality.set_override("aa", 1 if bool(value) else 0)
@@ -259,6 +329,19 @@ func _apply_env(overrides: Dictionary) -> void:
 						"observer": main.call("_enter_observer")
 						"aircraft": main.call("_toggle_aircraft")
 						_: pass
+			"goto":
+				# 把车瞬移到**数据坐标** [x, z]（可选第三项 yaw），用来拍远处地标。
+				# 追尾相机会检测到大位移并直接落位（follow_vehicle 的 carry>25 分支）。
+				if value is Array and (value as Array).size() >= 2:
+					var v: Array = value
+					var car = main.get("car")
+					if car != null:
+						car.set("x", float(v[0]))
+						car.set("z", float(v[1]))
+						if v.size() >= 3:
+							car.set("yaw", float(v[2]))
+						print("[shot] 车已移到数据坐标 (%.0f, %.0f) yaw=%s" % [
+							float(v[0]), float(v[1]), str(car.get("yaw"))])
 			"aim":
 				# 坦克炮塔/炮管指向 [turret_yaw, barrel_pitch]，用来验证
 				# "炮塔节点联动"是否真的转到了模型上（默认炮口朝前，看不出来）。
@@ -299,10 +382,66 @@ func _apply_env(overrides: Dictionary) -> void:
 				var wx = world.get("weather")
 				if wx != null and bool(value) != bool(wx.get("raining")):
 					wx.call("toggle")
+			"view":
+				# 驾驶视角档位：0/1/2 = 追尾三档，3 = 座舱（原版 CITY_DRIVER_POSE）。
+				# 走游戏自己的 _cycle_camera_view()，与按 C 键完全同一条路径，
+				# 避免探针自己拼一套相机再"验证"相机。
+				var want := int(value)
+				if int(main.get("mode")) != 0:
+					push_warning("[shot] view 需要在驾驶模式（先设 \"mode\":\"car\"）")
+				else:
+					var guard := 0
+					while guard < 8 and int(main.get("_cam_phase")) != want:
+						main.call("_cycle_camera_view")
+						guard += 1
+					print("[shot] cam_phase -> %d" % int(main.get("_cam_phase")))
 			"fire":
 				# 发射一枚导弹（实际执行时机见 _late_env —— 必须在截图前一刻）
 				if main.has_method("fire_missile"):
 					main.call("fire_missile")
+			"onfoot":
+				# 下车步行（等价于按 F）：切到 WALKING，让 ALS 角色进入世界。
+				# 只有这一档才看得到 mannequin —— 座舱/追尾视角里角色是禁用的。
+				if bool(value) and int(main.get("mode")) == 0:
+					main.call("_toggle_vehicle_entry")
+					print("[shot] 已切到步行（mode=%d）" % int(main.get("mode")))
+			"fps_probe":
+				# 定点测帧率：等场景稳定后采样 2 秒平均 FPS（配合 goto/observer_at 用）
+				if bool(value):
+					_fps_probe = true
+			"help":
+				# 打开按键帮助页（= 按 ?），用于检查帮助表排版 / 内容是否与实际按键一致
+				if bool(value):
+					var pn = main.get("panels")
+					if pn != null:
+						# 与游戏内按键同路径：先同步当前模式（决定高亮哪节）再开页
+						pn.call("set_help_mode", int(main.get("mode")))
+						pn.call("toggle_help")
+						print("[shot] 帮助页已打开（模式 %d）" % int(main.get("mode")))
+			"observer_at":
+				# 无人机定点俯视：[x_data, z_data, y, yaw_rad, pitch_deg]
+				# 直接摆相机并冻结物理，用来检查地面材质/铺装这类需要俯视的细节。
+				if value is Array and (value as Array).size() >= 5:
+					var v: Array = value
+					main.call("_enter_observer")
+					var cam = main.get("camera")
+					var p3: Vector3 = CoordinateUtil.to_world(float(v[0]), float(v[1]), float(v[2]))
+					cam.set("observer_position", p3)
+					cam.set("observer_yaw", float(v[3]))
+					cam.set("observer_pitch", deg_to_rad(float(v[4])))
+					cam.set("global_position", p3)
+					main.set("paused", true)
+					cam.call("follow_observer", 1.0)   # dt=1 → 直接落位
+					print("[shot] 无人机定点 (%.0f, %.0f, %.0f) pitch=%.0f°" % [
+						float(v[0]), float(v[1]), float(v[2]), float(v[4])])
+			"zoom":
+				# 只认领这个键名（实际在 _late_env 里执行：必须暂停后再改 fov）
+				pass
+			"cockpit_probe":
+				# 座舱仪表注值 [speed_mps, steer, trip_m]：只在 _late_env 执行
+				# （必须在截图前一刻，否则下一帧就被真实车速覆盖）。这里显式
+				# 认领这个键，免得落到下面的兜底分支去 set() 一个不存在的属性。
+				pass
 			"exposure":
 				GraphicsQuality.set_override("exposure", float(value))
 				lighting.call("apply_mode", GameState.light_mode)
@@ -332,7 +471,7 @@ func _reset_env() -> void:
 func _capture(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	var path := "%s/%s.png" % [OUT_DIR, name]
+	var path := "%s/%s.png" % [_out_dir, name]
 	var err := img.save_png(path)
 	print("[shot] %s  %dx%d  err=%d" % [path, img.get_width(), img.get_height(), err])
 

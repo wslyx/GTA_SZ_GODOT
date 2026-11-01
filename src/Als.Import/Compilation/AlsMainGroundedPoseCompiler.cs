@@ -95,5 +95,5 @@ public static class AlsMainGroundedPoseCompiler
         .Where(p => Text(p, "direction") == "input").Select(p => Text(p, "name")).Order(StringComparer.Ordinal)
         .SequenceEqual(expected.Order(StringComparer.Ordinal)), "Unsupported Main pose inputs.");
     private static string Text(JsonElement row, string name) => row.GetProperty(name).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

@@ -13,7 +13,9 @@ var _acc := 100.0  # 首帧立即打一次
 ## 阶段埋点：打印当前 Godot 资源堆用量。
 static func mark(label: String) -> void:
 	var stat := float(Performance.get_monitor(Performance.MEMORY_STATIC)) / 1048576.0
-	print("[MemProbe] %s static=%.0fMB" % [label, stat])
+	# 启动性能归因： mark 点自带时间戳（grep [BOOT-T] 就能拉出整条时间线）
+	print("[MemProbe] %s static=%.0fMB t=%.1fs" % [
+		label, stat, float(Time.get_ticks_msec()) / 1000.0])
 
 
 func _process(delta: float) -> void:

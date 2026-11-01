@@ -1,0 +1,9 @@
+{
+  "warmup": 10.0,
+  "gap": 3.0,
+  "settle": 4.0,
+  "shots": [
+    { "name": "v1_paint_sunset", "env": { "mode": "car", "light_mode": 1, "tier": "high" } },
+    { "name": "v2_paint_night",  "env": { "light_mode": 2 } }
+  ]
+}

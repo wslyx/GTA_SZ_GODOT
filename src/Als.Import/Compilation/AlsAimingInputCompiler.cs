@@ -170,5 +170,5 @@ public static class AlsAimingInputCompiler
     private static AlsAimingAngle Angle(JsonElement array) => new(array[0].GetDouble(), array[1].GetDouble());
     private static double DefaultScalar(string text, string name) => Number(Regex.Match(text, @"(?m)^   " + name + @"=([^\r\n]+)").Groups[1].Value);
     private static double Number(string value) => double.Parse(value, CultureInfo.InvariantCulture);
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

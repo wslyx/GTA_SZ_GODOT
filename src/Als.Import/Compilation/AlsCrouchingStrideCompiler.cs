@@ -100,5 +100,5 @@ public static class AlsCrouchingStrideCompiler
         .Where(p => Text(p, "direction") == "input").Select(p => Text(p, "name")).Order(StringComparer.Ordinal)
         .SequenceEqual(names.Order(StringComparer.Ordinal)), "Unsupported Crouching stride pins.");
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

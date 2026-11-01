@@ -193,5 +193,5 @@ public static class AlsOverlaySourceCompiler
     private static int Int(JsonElement value, string name) => value.GetProperty(name).GetInt32();
     private static float Number(JsonElement value, string name) => value.GetProperty(name).GetSingle();
     private static bool Bool(JsonElement value, string name) => value.GetProperty(name).GetBoolean();
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

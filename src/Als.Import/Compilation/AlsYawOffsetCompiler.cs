@@ -274,5 +274,5 @@ public static class AlsYawOffsetCompiler
     }
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
     private static float Number(string value) => float.Parse(value, CultureInfo.InvariantCulture);
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

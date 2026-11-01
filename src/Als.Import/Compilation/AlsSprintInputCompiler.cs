@@ -61,5 +61,5 @@ public static class AlsSprintInputCompiler
     private static string Text(JsonElement node,string name)=>node.GetProperty(name).GetString()!;
     private static float Number(JsonElement node,string name)
     { var value=node.GetProperty(name).GetSingle();Require(float.IsFinite(value),"Nonfinite Sprint parameter.");return value; }
-    private static void Require(bool value,string message) { if(!value)throw new FormatException(message); }
+    private static void Require(bool value,string message) { if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

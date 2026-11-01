@@ -1,0 +1,9 @@
+{
+  "warmup": 10.0,
+  "gap": 1.0,
+  "settle": 3.0,
+  "shots": [
+    { "name": "f1", "env": { "mode": "observer", "observer_at": [-2168.0, -810.0, 45.0, 1.57, -60.0], "light_mode": 0, "tier": "high" } },
+    { "name": "f2", "env": { "mode": "observer", "observer_at": [-2168.0, -810.0, 45.0, 1.57, -60.0], "light_mode": 0, "tier": "high" } }
+  ]
+}

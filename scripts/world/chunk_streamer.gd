@@ -210,6 +210,11 @@ func update_system(delta: float, focus: Vector3) -> void:
 		var unload_r := UNLOAD_RADIUS_AERIAL if _aerial else UNLOAD_RADIUS
 		var ur2 := unload_r * unload_r
 		var sr2 := SHADOW_RADIUS * SHADOW_RADIUS
+		# ⚠️ 一轮最多卸载一个区块：高速行驶时多个区块同时出半径，
+		# 若同帧 queue_free 多个大子树，帧末删除节点的成本会叠成 100ms+ 的长帧
+		# （实测最大 135.9ms，与 blocks 递减严格同步）。
+		# 卸载速率仍高于装载速率（一轮一个 vs 冷却串行），内存不会积压。
+		var unloaded_this_scan := 0
 		for e in chunks:
 			if e["state"] != "loaded":
 				continue
@@ -217,7 +222,9 @@ func update_system(delta: float, focus: Vector3) -> void:
 			var dz := float(e["z"]) - fz
 			var d2 := dx * dx + dz * dz
 			if d2 > ur2:
-				_unload_chunk(e)
+				if unloaded_this_scan == 0:
+					_unload_chunk(e)
+					unloaded_this_scan += 1
 				continue
 			# 阴影随玩家移动刷新（chunk 加载时只判定了一次）
 			var near := d2 <= sr2
@@ -288,6 +295,8 @@ func _unload_chunk(e: Dictionary) -> void:
 
 
 func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) -> void:
+	# 卡顿归因：区块挂载（configure/dedup/阴影遍历）在主线程，耗时直接就是长帧
+	var __t0 := Time.get_ticks_msec()
 	var key := str(meta)
 	_current_key = ""
 	var e: Dictionary = _by_key.get(key, {})
@@ -321,6 +330,9 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 			"node": node, "i": e["i"], "j": e["j"],
 			"x": e["x"], "z": e["z"], "road": false, "detail": false,
 		})
+	var __ms := Time.get_ticks_msec() - __t0
+	if __ms > 12:
+		print("[HITCH] 区块挂载 %s 用时 %d ms（configure/dedup/阴影）" % [key, __ms])
 
 
 func _on_failed(path: String, _reason: String) -> void:

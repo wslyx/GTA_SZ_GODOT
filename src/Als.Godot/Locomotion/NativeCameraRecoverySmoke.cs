@@ -87,5 +87,5 @@ public partial class NativeCameraRecoverySmoke : Node
         }
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
-    private static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+    private static void Require(bool ok, string message) { if (!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

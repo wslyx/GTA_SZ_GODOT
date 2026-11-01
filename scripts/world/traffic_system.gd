@@ -213,6 +213,7 @@ func place(px: float, pz: float) -> void:
 # ---------------------------------------------------------------------------
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if not enabled or cars.is_empty():
 		return
 	var px := focus.x
@@ -231,6 +232,9 @@ func update_system(delta: float, focus: Vector3) -> void:
 	_sync_instances(px, pz, clampf(_sync_acc, 0.0, 0.5))
 	_sync_acc = 0.0
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Traffic", __hitch_ms])
 
 func _sync_instances(px: float, pz: float, advance_dt := 0.0) -> void:
 	var buffers := {}

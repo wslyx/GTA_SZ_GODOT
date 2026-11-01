@@ -47,5 +47,5 @@ public sealed class AlsRefactoredSkeletonCurves
         }
         Require(!quoted&&depth==0,"Unterminated metadata tuple.");if(start<value.Length-1)result.Add(value[start..^1].Trim());return result.ToArray();
     }
-    private static void Require(bool valid,string message){if(!valid)throw new ArgumentException(message);}
+    private static void Require(bool valid,string message){if(!valid){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

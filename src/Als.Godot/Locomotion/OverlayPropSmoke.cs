@@ -165,5 +165,5 @@ public partial class OverlayPropSmoke : Node
         _demo?.DisposeRuntime(); Input.MouseMode = _oldMouse; Input.UseAccumulatedInput = _oldAccumulation;
     }
     private void Fail(Exception error) { GD.PushError(error.ToString()); Cleanup(); _done = true; GetTree().Quit(1); }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

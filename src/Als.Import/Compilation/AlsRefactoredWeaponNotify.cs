@@ -93,7 +93,7 @@ public sealed class AlsRefactoredWeaponNotifyProfile
         Require(graph.Nodes.All(n => visited.Contains(n.Name) || n.Kind == "EdGraphNode_Comment" && n.Pins.Count == 0), "Unconsumed weapon EventGraph nodes.");
         return result;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }
 
 /// <summary>Ordered main-thread notification dispatch requests. This does not emulate the

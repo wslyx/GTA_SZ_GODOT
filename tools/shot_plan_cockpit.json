@@ -1,0 +1,11 @@
+{
+  "warmup": 7.0,
+  "gap": 3.0,
+  "settle": 2.5,
+  "shots": [
+    { "name": "c1_cockpit_day",   "env": { "mode": "car", "view": 3, "light_mode": 0, "tier": "high" } },
+    { "name": "c2_cockpit_night", "env": { "light_mode": 2, "view": 3, "tier": "high" } },
+    { "name": "c3_cockpit_drive", "env": { "light_mode": 0, "view": 3, "tier": "high",
+        "cockpit_probe": [25.0, 0.6, 12345.0] } }
+  ]
+}

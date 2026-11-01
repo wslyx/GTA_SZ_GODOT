@@ -123,5 +123,5 @@ public static class AlsRefactoredTriangulationCompiler
         foreach(var p in properties.Where(p=>p.Key.StartsWith("SampleData(",StringComparison.Ordinal)))
             Require(Regex.IsMatch(p.Value,@"^\(Animation=""/Script/Engine.AnimSequence'[^']+'""(?:,SampleValue=\(X=[-0-9.]+,Y=[-0-9.]+,Z=0\.000000\))?\)$"),"Unsupported sample rate/frame/mirror policy.");
     }
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

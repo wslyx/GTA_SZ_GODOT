@@ -400,5 +400,5 @@ public static class AlsRawAnimationSourceCompiler
             Require(allowed.Contains(property.Name) && seen.Add(property.Name), "Unknown or duplicate raw source field: " + property.Name);
         Require(required.All(seen.Contains), "Missing required raw source field.");
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

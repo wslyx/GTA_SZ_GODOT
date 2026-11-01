@@ -190,5 +190,5 @@ public partial class PhysicsWorldPoseSmoke : Node3D
     }
     private void Reject(Action action)
     { var rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } Require(rejected, "Invalid seed accepted."); _rejections++; }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

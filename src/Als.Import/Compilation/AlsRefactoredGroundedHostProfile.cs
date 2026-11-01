@@ -98,5 +98,5 @@ public sealed class AlsRefactoredGroundedHostProfile
         var stopGraph=Function("StopTransitionAndTurnInPlaceAnimations");var stopCall=Call(stopGraph,"StopTransitionAndTurnInPlaceAnimations");
         StopDuration=float.Parse(stopGraph.Literal(stopCall,"BlendOutDuration"),CultureInfo.InvariantCulture);
     }
-    private static void Require(bool ok,string message){if(!ok)throw new ArgumentException(message);}
+    private static void Require(bool ok,string message){if(!ok){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

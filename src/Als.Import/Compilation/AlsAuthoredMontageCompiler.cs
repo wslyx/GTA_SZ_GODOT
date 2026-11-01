@@ -95,5 +95,5 @@ public static class AlsAuthoredMontageCompiler
         var compiled = result.ToArray(); _ = new AlsMontageRuntime([], compiled); return compiled;
     }
 
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

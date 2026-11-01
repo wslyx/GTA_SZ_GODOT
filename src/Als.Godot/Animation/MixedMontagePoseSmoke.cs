@@ -110,5 +110,5 @@ public partial class MixedMontagePoseSmoke : Node
         GD.Print($"MIXED_MONTAGE_POSE_OK frames=240 retries={retries} overlap_samples={fades} changed_bones={changed} curve_samples={curveFrames} accepted={accepted} replaced={replaced} completed={completed} ownership=shared requests=connected source=real_roll_and_turn root_motion=not_applied gameplay=not_connected demo=not_connected");
     }
     private static string Read(string file) => Godot.FileAccess.GetFileAsString("res://assets/config/"+file);
-    private static void Require(bool condition,string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition,string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

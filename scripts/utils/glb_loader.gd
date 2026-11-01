@@ -130,10 +130,16 @@ func _finish(scene: Resource) -> void:
 	if scene == null:
 		_fail(p, "load_threaded_get 返回 null")
 		return
+	# 卡顿归因：load_threaded 把解码放后台，但 `instantiate()`（建节点树 +
+	# 解码 mesh buffer 成引擎格式）在主线程 —— 大文件的这一步就是长帧
+	var __t0 := Time.get_ticks_msec()
 	var inst := (scene as PackedScene).instantiate()
 	if inst == null:
 		_fail(p, "实例化失败")
 		return
+	var __ms := Time.get_ticks_msec() - __t0
+	if __ms > 12:
+		print("[HITCH] 实例化 %s 用时 %d ms" % [p.get_file(), __ms])
 	# GLB 由 Blender 导出，glTF 已是 (east, up, -north)，与 Godot 世界 (x=east, y=up, z=-north)
 	# 完全一致，因此**不需要任何旋转或镜像**。这里刻意不动 transform，改动会引入
 	# 三角绕序反转（见 CoordinateUtil 头部说明）。

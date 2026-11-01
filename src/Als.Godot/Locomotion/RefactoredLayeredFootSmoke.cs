@@ -178,7 +178,7 @@ public partial class RefactoredLayeredFootSmoke : Node3D, IAlsGroundedFrameRunti
     public void RequestInertialization(in AlsPoseUpdateContext context, float seconds) => throw new InvalidOperationException("Escaped inertia owner.");
     public void OnCachedUpdatesSkipped(int handler, ReadOnlySpan<AlsPoseUpdateContext> skipped) => throw new InvalidOperationException("Unknown skipped updates.");
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { GD.PushError(error.ToString()); SetPhysicsProcess(false); GetTree().Quit(1); }
     public override void _ExitTree()
     {

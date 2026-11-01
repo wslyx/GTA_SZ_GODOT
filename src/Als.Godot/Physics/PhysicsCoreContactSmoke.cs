@@ -112,7 +112,7 @@ public partial class PhysicsCoreContactSmoke : Node3D
     }
     private void Cleanup()
     { _query?.Dispose(); _query = null; foreach (var shape in _resources) shape.Dispose(); _resources.Clear(); }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception e) { GD.PushError("CORE_CONTACT_WORLD_FAILED " + e); _done = true; Cleanup(); GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();
 

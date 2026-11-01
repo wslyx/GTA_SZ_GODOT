@@ -134,5 +134,5 @@ public static class AlsOverlayTransitionCompiler
     internal static float Scalar(Graph graph, Node node, string name) => float.Parse(graph.Literal(node, name), CultureInfo.InvariantCulture);
     private static string Text(JsonElement row, string name) => row.GetProperty(name).GetString()!;
     private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
-    private static void Require(bool value, string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

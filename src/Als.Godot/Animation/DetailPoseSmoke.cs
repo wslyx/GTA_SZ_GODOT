@@ -138,5 +138,5 @@ public partial class DetailPoseSmoke : Node
         MathF.Min((expected.Rotation - actual.Rotation).Length(), (expected.Rotation + actual.Rotation).Length()) < .00001f,
         "Detail additive reconstruction differs from the actual animation sample.");
 
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

@@ -269,5 +269,5 @@ public static class AlsOverlayStateCompiler
     private static bool Bool(JsonElement value, string name) => value.GetProperty(name).GetBoolean();
     private static double Number(string value) { var number = double.Parse(value, CultureInfo.InvariantCulture); Require(double.IsFinite(number), "Non-finite Overlay literal."); return number; }
     private static FormatException Failure(string message) => new(message);
-    private static void Require(bool condition, string message) { if (!condition) throw Failure(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw Failure(message); } }
 }

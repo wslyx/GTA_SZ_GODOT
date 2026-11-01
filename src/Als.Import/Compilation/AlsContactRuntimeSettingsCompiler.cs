@@ -49,5 +49,5 @@ public static class AlsContactRuntimeSettingsCompiler
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException or FormatException or OverflowException or IndexOutOfRangeException)
         { throw new InvalidDataException("Malformed native contact runtime settings.", e); }
     }
-    private static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

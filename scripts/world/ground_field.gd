@@ -24,7 +24,9 @@ const SHADER_PATH := "res://shaders/ground_field.gdshader"
 ## 原版 attach 判据（对 mesh.name 做匹配）。
 ## ⚠️ 结尾多留了 `ground-relief`：原版那块地形补面在 Babylon 里叫 `ground_relief_*`，
 ## 移植版由 distant_system.gd 程序化生成、节点名是 `ground-relief`（连字符）。
-const GROUND_MESH_RE := "^(?:roads_|terrain_(?:land|park|pavement)|ground_relief_|ground-relief|detail_lianhua_|rain-|rain_|coastal_bridge_|city_meadow_)"
+# A5：terrain_concrete / coastal_shore_* 纳入接管（中湾铺装要在它们身上生效，
+# 且接管会保留原贴图/顶点色 —— 之前用独立 override 丢顶点色，整片地面变白板）
+const GROUND_MESH_RE := "^(?:roads_|terrain_(?:land|park|pavement|concrete)|coastal_shore_(?:concrete|seawall|coastal-rock)|landmark_baypark_(?:concrete|stone)|ground_relief_|ground-relief|detail_lianhua_|rain-|rain_|coastal_bridge_|city_meadow_)"
 ## 原版 applyLandscapeSurfaces 的草地判据（材质名）
 const GRASS_MAT_NAMES := ["land", "park"]
 ## C 屋顶表面：只对 `block_<i>_<j>_roof` 生效（原版 city-roof-surface.ts 的同名判据）
@@ -94,6 +96,10 @@ var _field_grid: PointGrid
 
 ## clipmap 状态
 var _clip_tex: ImageTexture = null
+## 无头（--headless）走的是 dummy 渲染器：ImageTexture 上传会直接怼一行
+## `ERROR: Parameter "t" is null. (texture_2d_initialize)`，既刷日志又没意义
+## （无头本来就不出图）。所以无头下跳过上传，并把 consume 侧继续判空。
+var _headless := DisplayServer.get_name() == "headless"
 var _clip_task := -1
 var _clip_slot: Dictionary = {}
 var _want_x := INF
@@ -111,6 +117,7 @@ var _built := false
 
 
 func setup(p_world: CityWorld) -> void:
+	var __t0 := Time.get_ticks_msec()
 	world = p_world
 	if not _load_ambient():
 		push_warning("[GroundField] 烘焙 AO 未载入，该层关闭")
@@ -128,7 +135,8 @@ func setup(p_world: CityWorld) -> void:
 # 资源
 # ---------------------------------------------------------------------------
 
-## A6：occlusion.png（3399×1307 RGB8，4m/px）+ occlusion.json
+## A6：occlusion.png（3399×1307 RGB8，4m/px）+ occlusion.json	print("[BOOT-T] GroundField setup 完成 %.0f ms（AO 烘焙/灯位/材质）" % float(Time.get_ticks_msec() - __t0))
+
 func _load_ambient() -> bool:
 	var meta: Dictionary = DataLoader.json_dict("/city/ambient/occlusion.json")
 	if meta.is_empty():
@@ -218,6 +226,20 @@ func _add_field(wx: float, wz: float, radius: float, c: Color, power: float) -> 
 # 材质替换
 # ---------------------------------------------------------------------------
 
+## A5 中湾铺装：这几类海岸/地形网格在着色器里开铺装块（baypark_kind 门控）。
+## 原版 city-baypark-look.ts 是 MaterialPlugin 挂在既有材质上；这里等价做法就是
+## 在接管材质时顺手写 baypark_kind —— 重扫幂等，不会被二次接管顶掉。
+## 样例中心/半径/砖均值是着色器 uniform 的默认值，这里只写 kind。
+const BAYPARK_KIND_BY_NAME := {
+	"terrain_pavement": 1.0,
+	"terrain_concrete": 2.0,
+	"coastal_shore_concrete": 2.0,
+	"coastal_shore_seawall": 3.0,
+	"coastal_shore_coastal-rock": 4.0,
+	"landmark_baypark_concrete": 1.0,
+	"landmark_baypark_stone": 1.0,
+}
+
 func _build_materials() -> void:
 	if _shader_failed:
 		return
@@ -263,6 +285,12 @@ func _build_materials() -> void:
 				# 否则 `is_lawn` 会去采样未赋值的 sampler（法线会是垃圾值）。
 				var lawn := GRASS_MAT_NAMES.has(str(src.resource_name)) and _lawn_tex.size() == 6
 				_init_material(mat, src, lawn)
+				var bp_kind: float = BAYPARK_KIND_BY_NAME.get(str(mi.name).to_lower(), 0.0)
+				if bp_kind > 0.0:
+					mat.set_shader_parameter("baypark_kind", bp_kind)
+					mat.set_shader_parameter("baypark_center",
+						Vector2(-2283.27, 794.82))
+					print("[GroundField] 中湾铺装 kind=%.0f → %s" % [bp_kind, mi.name])
 				by_src[src.get_instance_id()] = mat
 				_entries.append({"mat": mat, "src": src, "lawn": lawn})
 				mi.set_surface_override_material(s, mat)
@@ -405,6 +433,7 @@ func _scan_roofs() -> void:
 # ---------------------------------------------------------------------------
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if not _built:
 		return
 	_clipmap_step(focus)
@@ -429,7 +458,11 @@ func update_system(delta: float, focus: Vector3) -> void:
 			_scan_roofs()
 
 
-## 原版 setNight / setMode 的 state.night
+	# 原版 setNight / setMode 的 state.night
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["GroundField", __hitch_ms])
+
 func _night_factor() -> float:
 	match GameState.light_mode:
 		GameContent.LightMode.NIGHT: return 1.0
@@ -616,6 +649,8 @@ static func _gradient(t: float) -> float:
 
 
 func _upload_clipmap() -> void:
+	if _headless:
+		return
 	if _clip_slot.is_empty():
 		return
 	var bytes: PackedByteArray = _clip_slot.get("bytes", PackedByteArray())

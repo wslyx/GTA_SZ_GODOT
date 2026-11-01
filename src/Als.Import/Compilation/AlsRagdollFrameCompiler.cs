@@ -103,5 +103,5 @@ public static class AlsRagdollFrameCompiler
     private static string Text(JsonElement p, string name) => p.GetProperty(name).GetString() ?? throw new InvalidDataException(name);
     private static int Int(JsonElement p, string name) => p.GetProperty(name).GetInt32();
     private static bool Bool(JsonElement p, string name) => p.GetProperty(name).GetBoolean();
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

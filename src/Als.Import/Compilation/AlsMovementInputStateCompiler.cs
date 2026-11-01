@@ -40,5 +40,5 @@ public static class AlsMovementInputStateCompiler
     }
     private static float Number(JsonElement value, string name)
     { var result = value.GetProperty(name).GetSingle(); Require(float.IsFinite(result), "Non-finite input state default."); return result; }
-    private static void Require(bool value, string message) { if (!value) throw new FormatException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

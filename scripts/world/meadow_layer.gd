@@ -38,7 +38,10 @@ const CACHE_TILES := 12
 ## 原版同时最多 4 个瓦片在途
 const MAX_PENDING := 4
 ## 重建节流（毫秒）
-const REBUILD_THROTTLE_MS := 70
+## 驾驶模式的重建节流：原版 70ms 是"步行/慢速"节奏；行车 30m/s 时 3m 阈值
+## 每秒能触发十几次 55–187ms 的草皮重建（实测热点转弯的主要卡顿之一）。
+## 行车 500ms 一次足够：草皮是背景细节，速度感下不可感。
+const REBUILD_THROTTLE_MS := 500
 ## 优先级分桶数（越大越接近精确排序）
 const BUCKETS := 64
 

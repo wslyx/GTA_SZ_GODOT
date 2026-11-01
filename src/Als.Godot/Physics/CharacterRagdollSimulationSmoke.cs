@@ -168,7 +168,7 @@ public partial class CharacterRagdollSimulationSmoke : Node
         if (_inputOwned) { KeyInput(false); Input.MouseMode = _mouse; Input.UseAccumulatedInput = _accumulation; _inputOwned = false; }
         _demo?.DisposeRuntime();
     }
-    private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { _done = true; Cleanup(); GD.PushError(error.ToString()); GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();
 }

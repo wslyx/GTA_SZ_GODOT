@@ -265,5 +265,5 @@ public static class AlsMantlingPoseCompiler
         Require((v.Length==1||v.Length==count||empty&&v.Length==0)&&v.All(a=>a.Length==width&&a.All(float.IsFinite)),"Invalid raw channel.");return v;
     }
     private static Vector3 Vector(float[] v)=>new(v[0],v[1],v[2]);
-    private static void Require(bool condition,string message) {if(!condition) throw new ArgumentException(message);}
+    private static void Require(bool condition,string message) {if(!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

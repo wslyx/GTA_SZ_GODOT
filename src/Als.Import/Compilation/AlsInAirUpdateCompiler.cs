@@ -66,5 +66,5 @@ public static class AlsInAirUpdateCompiler
     private static JsonElement One(IEnumerable<JsonElement> values)
     { var items = values.ToArray(); Require(items.Length == 1, "Missing or ambiguous air update element."); return items[0]; }
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool value, string message) { if (!value) throw new FormatException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

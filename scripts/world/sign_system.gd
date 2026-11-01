@@ -252,12 +252,16 @@ func update_signs(cam_pos: Vector3) -> void:
 
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	_timer -= delta
 	if _timer > 0.0:
 		return
 	_timer = 0.25
 	update_signs(focus)
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Signs", __hitch_ms])
 
 func diagnostics() -> Dictionary:
 	var shown := 0

@@ -72,5 +72,5 @@ public static class AlsPrimitiveGeometryCompiler
     }
     private static double N(JsonNode n) { var v = n.GetValue<double>(); Require(double.IsFinite(v), "Nonfinite primitive field."); return v; }
     private static AlsDoubleVector V(JsonNode n) { var a = n.AsArray(); Require(a.Count == 3, "Invalid primitive vector."); return new(N(a[0]!), N(a[1]!), N(a[2]!)); }
-    private static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

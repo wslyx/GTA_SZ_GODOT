@@ -156,5 +156,5 @@ public static class AlsRefactoredBoxOverlayCompiler
         JsonValueKind.Object => a.EnumerateObject().Count() == b.EnumerateObject().Count() && b.EnumerateObject().All(p => a.TryGetProperty(p.Name, out var v) && Equal(v, p.Value)),
         _ => false
     };
-    private static void Require(bool ok, string message) { if (!ok) throw new ArgumentException(message); }
+    private static void Require(bool ok, string message) { if (!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

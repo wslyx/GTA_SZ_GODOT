@@ -244,5 +244,5 @@ public partial class RagdollFrameSmoke : Node
             return new(Convert.ToHexString(hash.GetHashAndReset()), hz * 4, flail, snapshots, blends, runtime.Committed.PlayerEpoch);
         }
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

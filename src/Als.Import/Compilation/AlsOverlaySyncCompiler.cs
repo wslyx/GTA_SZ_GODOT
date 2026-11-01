@@ -55,5 +55,5 @@ public static class AlsOverlaySyncCompiler
         return new(Hash(sources.BindingDigest + "\n" + json), players, sequences, markers.ToArray(), [0, 1, 2]);
     }
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

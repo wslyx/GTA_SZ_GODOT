@@ -254,5 +254,5 @@ public partial class CrouchingStatePoseSmoke : Node
         AlsLocalPoseClip Clip(int id) => new(library.Library.GetAnimation(library.ClipNames[id]), library.Skeleton, ownsAnimation: false);
     }
     private static string Read(string file) => Godot.FileAccess.GetFileAsString("res://assets/config/" + file);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

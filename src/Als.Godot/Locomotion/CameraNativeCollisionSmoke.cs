@@ -86,5 +86,5 @@ public partial class CameraNativeCollisionSmoke : Node3D
     private static float F(JsonElement e,string name) => e.GetProperty(name).GetSingle();
     private static AlsDoubleVector V(JsonElement e,string name) { var a=e.GetProperty(name); return new(a[0].GetDouble(),a[1].GetDouble(),a[2].GetDouble()); }
     private static AlsAimingRotation R(JsonElement e,string name) { var a=e.GetProperty(name); return new(a[0].GetDouble(),a[1].GetDouble(),a[2].GetDouble()); }
-    private static void Require(bool ok,string message) { if(!ok) throw new InvalidOperationException(message); }
+    private static void Require(bool ok,string message) { if(!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

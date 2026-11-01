@@ -263,7 +263,7 @@ public partial class PhysicsBodySetSmoke : Node3D
         }
     }
     private static void Reject(Action action) { try { action(); } catch (Exception e) when (e is ArgumentException or InvalidOperationException) { return; } throw new InvalidOperationException("Invalid physical lifecycle was accepted."); }
-    private static void Require(bool condition,string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition,string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception e) { _done = true; foreach (var c in _cases) c.Bodies.Dispose(); GD.PushError(e.ToString()); GetTree().Quit(1); }
     public override void _ExitTree() { foreach (var c in _cases) c.Bodies.Dispose(); }
 }

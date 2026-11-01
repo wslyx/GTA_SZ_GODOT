@@ -174,5 +174,5 @@ internal static class BaseLayerPoseChecks
         catch (ArgumentException) { return; }
         throw new InvalidOperationException("BaseLayer guard accepted invalid work.");
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

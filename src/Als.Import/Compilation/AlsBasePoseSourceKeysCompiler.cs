@@ -121,5 +121,5 @@ public static class AlsBasePoseSourceKeysCompiler
         Require(actual.Length == fields.Length && actual.Distinct(StringComparer.Ordinal).Count() == fields.Length &&
             actual.Order(StringComparer.Ordinal).SequenceEqual(fields.Order(StringComparer.Ordinal)), "Unsupported or duplicate source-key field.");
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

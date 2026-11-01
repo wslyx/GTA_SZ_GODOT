@@ -42,5 +42,5 @@ public static class AlsRootPoseCompiler
         }
     }
     private static string Text(JsonElement p, string name) => p.GetProperty(name).GetString() ?? throw new InvalidDataException(name);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

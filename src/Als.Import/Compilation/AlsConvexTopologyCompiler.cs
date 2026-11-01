@@ -59,5 +59,5 @@ public static class AlsConvexTopologyCompiler
     }
     private static AlsDoubleVector V(JsonElement e)
     { Require(e.GetArrayLength() == 3, "Invalid convex vector size."); return new(e[0].GetDouble(), e[1].GetDouble(), e[2].GetDouble()); }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

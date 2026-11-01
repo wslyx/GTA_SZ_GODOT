@@ -138,5 +138,5 @@ public static class AlsStandingDirectionCacheCompiler
     }
     private static JsonElement Pin(JsonElement node, string name) => node.GetProperty("pins").EnumerateArray().Single(p => Text(p, "name") == name && Text(p, "direction") == "input");
     private static string Text(JsonElement node, string name) => node.GetProperty(name).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

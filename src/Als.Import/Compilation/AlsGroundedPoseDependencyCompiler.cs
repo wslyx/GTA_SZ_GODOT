@@ -88,5 +88,5 @@ public static class AlsGroundedPoseDependencyCompiler
     private static string Text(JsonElement row, string name) => row.GetProperty(name).GetString()!;
     private static float Number(JsonElement row, string name)
     { var value = row.GetProperty(name).GetSingle(); Require(float.IsFinite(value), "Non-finite Grounded dependency."); return value; }
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

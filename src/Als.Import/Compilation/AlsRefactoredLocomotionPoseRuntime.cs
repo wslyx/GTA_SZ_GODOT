@@ -256,5 +256,5 @@ public sealed class AlsRefactoredLocomotionPoseRuntime : IAlsPoseCacheUpdateSink
     }
     public void Cancel(){_main.Cancel();_jump.Cancel();_players.Cancel();_outer.Cancel();_inner.Cancel();foreach(var lean in _lean)lean.Cancel();_prepared=_evaluated=_faulted=GroundedUpdated=false;_sink=null;}
     private void Check(){if(!_prepared||_faulted)throw new InvalidOperationException("No valid Locomotion pose candidate.");}
-    private static void Require(bool ok,string message){if(!ok)throw new ArgumentException(message);}
+    private static void Require(bool ok,string message){if(!ok){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

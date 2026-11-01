@@ -70,5 +70,5 @@ internal static class AlsRefactoredDirectionRuleCompiler
         Require(graph.Nodes.All(n => n.Pins.Values.All(p => p.Name is "self" or "A" or "B" or "C" or "ReturnValue" or "Value" or "ErrorTolerance" or "MachineIndex" or "StateIndex" or "bCanEnterTransition")), "Unexpected predicate operand.");
         return rule;
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new ArgumentException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

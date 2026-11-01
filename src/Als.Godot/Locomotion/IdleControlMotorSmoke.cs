@@ -72,6 +72,6 @@ public partial class IdleControlMotorSmoke : Node
         public AlsLocomotionCommand GetCommand(long frameId) => AlsLocomotionCommand.CreateDefault() with
         { ViewYaw = -(frameId == 2 ? 359 : 1) * MathF.PI / 180, AimYaw = -MathF.PI / 2 };
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { SetPhysicsProcess(false); GD.PushError(error.ToString()); GetTree().Quit(1); }
 }

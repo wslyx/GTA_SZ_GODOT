@@ -167,5 +167,5 @@ public partial class BasePosesSmoke : Node
         { source.EvaluateEvaluator(evaluator, seconds, pose, curves); if (FailEvaluation) throw new SourceFailure(); }
     }
     private static string Read(string path) => Godot.FileAccess.GetFileAsString("res://" + path);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

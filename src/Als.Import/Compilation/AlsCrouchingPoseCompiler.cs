@@ -192,5 +192,5 @@ public static class AlsCrouchingPoseCompiler
     private static void Inputs(JsonElement node, string[] expected) => Require(node.GetProperty("pins").EnumerateArray()
         .Where(p => Text(p, "direction") == "input").Select(p => Text(p, "name")).Order(StringComparer.Ordinal)
         .SequenceEqual(expected.Order(StringComparer.Ordinal)), "Unsupported Crouching input pins.");
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

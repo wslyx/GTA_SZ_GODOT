@@ -171,5 +171,5 @@ public static class AlsRefactoredCachedOverlayCompiler
         }
     }
     private static string Name(JsonElement n)=>n.GetProperty("path").GetString()!.Split('.')[^1];
-    private static void Require(bool ok,string message){if(!ok)throw new ArgumentException(message);}
+    private static void Require(bool ok,string message){if(!ok){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

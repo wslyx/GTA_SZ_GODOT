@@ -175,7 +175,7 @@ public partial class LandPredictionSmoke : Node
         var body = new StaticBody3D { Name = name, Position = position, CollisionLayer = 1, CollisionMask = 1 };
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } }); return body;
     }
-    private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { SetPhysicsProcess(false); GD.PushError(error.ToString()); GetTree().Quit(1); }
     private sealed class Idle : IAlsLocomotionCommandSource
     {

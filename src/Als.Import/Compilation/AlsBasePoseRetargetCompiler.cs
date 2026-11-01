@@ -124,5 +124,5 @@ public static class AlsBasePoseRetargetCompiler
     }
     private static string Unquote(string value) => value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
     private static string Text(JsonElement value, string property) => value.GetProperty(property).GetString() ?? throw new ArgumentException("Missing retarget source text.");
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

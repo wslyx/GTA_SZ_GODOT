@@ -1,0 +1,8 @@
+{
+  "warmup": 9.0,
+  "gap": 3.0,
+  "settle": 3.5,
+  "shots": [
+    { "name": "h1_help", "env": { "mode": "car", "light_mode": 0, "tier": "high", "help": true } }
+  ]
+}

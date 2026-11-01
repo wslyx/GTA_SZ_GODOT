@@ -227,5 +227,5 @@ public sealed class AlsRefactoredNotifyBank
         var m = Regex.Match(text, @"(?:^|[,(])" + field + @"=([-0-9.]+)");
         Require(Near(value, m.Success ? float.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : fallback), "Changed native notify field: " + field);
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

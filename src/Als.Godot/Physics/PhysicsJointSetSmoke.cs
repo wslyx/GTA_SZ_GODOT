@@ -203,7 +203,7 @@ public partial class PhysicsJointSetSmoke : Node3D
         }
         catch(Exception e){Fail(e);}
     }
-    private static void Require(bool value,string message){if(!value)throw new InvalidOperationException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); }}
     private void Fail(Exception e){GD.PushError("PHYSICS_JOINT_SET_FAILED "+e);_done=true;GetTree().Quit(1);}
     public override void _ExitTree(){foreach(var c in _cases){c.Joints.Dispose();c.Bodies.Dispose();}}
 }

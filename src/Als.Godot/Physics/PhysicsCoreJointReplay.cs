@@ -591,7 +591,7 @@ public partial class PhysicsCoreJointReplay : Node3D
     { var v = e.GetProperty(name); return new(v[0].GetDouble(), v[1].GetDouble(), v[2].GetDouble()); }
     private static AlsPrecisePose Pose(JsonElement e)
     { var q = e.GetProperty("rotation"); return new(V(e, "position"), new(q[0].GetDouble(), q[1].GetDouble(), q[2].GetDouble(), q[3].GetDouble()), AlsDoubleVector.One); }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Release()
     {
         if(_flailCapture is not null && _flailSamples.Count>0)

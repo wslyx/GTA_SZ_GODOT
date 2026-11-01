@@ -68,10 +68,19 @@ public partial class GtaSzAlsPlayerHost : Node3D
 
     public override void _Ready()
     {
+        // 启动性能归因：ALS 资产链（摘要校验 + 动画集编译）在大仓库里可能吃掉
+        // 数十秒 —— 用秒表把每段耗时打出来（grep [ALS-T]）。
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        void Mark(string label)
+        {
+            GD.Print($"[ALS-T] {label} {sw.ElapsedMilliseconds} ms");
+            sw.Restart();
+        }
         try
         {
             // 动画运行时选项必须在任何角色/图构造之前解析一次。
             AlsAnimationRuntimeOptions.ConfigureDemo();
+            Mark("运行时选项");
             _slot = new AlsP3CharacterSlot { Name = "CharacterSlot" };
             AddChild(_slot);
             _orbitCamera = new AlsOrbitCamera { Name = "OrbitCamera" };
@@ -89,9 +98,12 @@ public partial class GtaSzAlsPlayerHost : Node3D
             var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
                 AlsGodotImportCoordinator.CompiledResourcePath)
                 ?? throw new InvalidOperationException("ALS compiled animation set resource is missing.");
+            Mark("加载编译资源 tres");
             var animationSet = animationSetResource.LoadDefinition();
+            Mark("LoadDefinition（含摘要链）");
             var profile = AlsLocomotionProfileCompiler.Compile(
                 Godot.FileAccess.GetFileAsString(ProfilePath), animationSet);
+            Mark("运动轮廓编译");
             var settings = AlsLocomotionSettings.Load(
                 Godot.FileAccess.GetFileAsString(SettingsPath));
             var motorSettings = CreateMotorSettings(settings);
@@ -103,9 +115,16 @@ public partial class GtaSzAlsPlayerHost : Node3D
                 profile,
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: OS.IsDebugBuild());
+            Mark("运行时上下文构造");
             // 自动布娃娃环境：GTA 主场景没有 demo 的 World 节点，交给宿主父级（城市根）。
             _context.AutomaticRagdollEnvironment = GetParent() as Node ?? this;
             _runtimeConfigured = true;
+            var skipped = GodotAls.Import.Compilation.AlsProvenancePolicy.Skipped;
+            if (skipped.Count > 0)
+            {
+                GD.Print($"[ALS] 已跳过 {skipped.Count} 项导出取证校验（ALS_SKIP_PROVENANCE=1，结构与范围校验仍在跑）");
+                foreach (var message in skipped) GD.Print($"    - {message}");
+            }
         }
         catch (Exception exception)
         {

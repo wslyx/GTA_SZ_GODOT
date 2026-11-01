@@ -95,5 +95,5 @@ internal static class AlsLocomotionSourceSyncCompiler
         var value = element.GetProperty(property).GetSingle();
         Require(float.IsFinite(value), "Non-finite source Sync metadata."); return value;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

@@ -416,7 +416,7 @@ public static class AlsGroundedMachineCompiler
         var array = values.ToArray(); Require(array.Length == 1, "Missing or ambiguous grounded source."); return array[0];
     }
     private static ArgumentException Failure(string message) => new(message);
-    private static void Require(bool condition, string message) { if (!condition) throw Failure(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw Failure(message); } }
     private static void RejectDuplicateProperties(JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.Object)

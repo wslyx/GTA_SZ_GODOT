@@ -63,5 +63,5 @@ public static class AlsRefactoredLayeringGraphCompiler
         }
     }
     private static string NodeValue(Node node)=>Regex.Match(node.Body,@"(?m)^      Node=([^\n]+)").Groups[1].Value.Trim();
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

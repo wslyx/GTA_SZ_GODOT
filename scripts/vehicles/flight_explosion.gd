@@ -3,14 +3,10 @@ class_name FlightExplosion
 ##
 ## 飞行爆炸 —— 对应原版 src/city-flight-explosion.ts。
 ##
-## ⚠️ 与已知的简化：原版是一个**体积光线步进着色器**（133 行 GLSL，球体内部
-## 走 28 步 fbm 噪声、自遮挡 + 烟尘夹层）。本移植没有搬那支着色器，改用
-## 「9 个自发光球体 + 原版的生成时刻表与包络公式」近似：
-##   - 生成时刻表 FLIGHT_FIREBALLS（at / offset / radius / seed）逐字照搬；
-##   - 包络 fireballEnvelope（growth / heat / opacity）逐字照搬；
-##   - 颜色用原版 fire(heat) 的四段 smoothstep 渐变在 GDScript 里重算。
-## 差别在**球体内部的纹理细节**（噪声团块、自遮挡），规模与节奏一致。
-## 若要一比一，需要把那支 GLSL 译成 gdshader 并配 inverseWorld/eye uniform。
+## 体积火球（2026-11-01 夜已一比一）：原版那支 133 行 GLSL（球体内部 28 步
+## fbm 光线步进、自遮挡 + 烟尘夹层）已译成 `shaders/flight_fireball.gdshader`，
+## 本脚本只负责调度：生成时刻表 FLIGHT_FIREBALLS、包络 fireballEnvelope、
+## `eye_world` 每帧喂相机世界坐标（原版 onBind 同款）。
 
 ## 原版 FLIGHT_FIREBALLS：错开的多次爆燃，全部落在 3 秒的坠毁恢复窗内
 const FIREBALLS := [
@@ -27,7 +23,7 @@ const FIREBALLS := [
 const LIFE := 3.0
 
 var _spheres: Array[MeshInstance3D] = []
-var _mats: Array[StandardMaterial3D] = []
+var _mats: Array[ShaderMaterial] = []
 var _origin := Vector3.ZERO
 var _yaw := 0.0
 var _seconds := 99.0      ## 已经过去的秒数；>= LIFE 视为熄灭
@@ -41,22 +37,21 @@ func _ready() -> void:
 func _ensure_built() -> void:
 	if not _spheres.is_empty():
 		return
-	var sphere := SphereMesh.new()
-	sphere.radius = 1.0
-	sphere.height = 2.0
-	sphere.radial_segments = 16
-	sphere.rings = 8
+	var shader := load("res://shaders/flight_fireball.gdshader") as Shader
+	if shader == null:
+		push_error("[FlightExplosion] 火球着色器加载失败")
+		return
+	var box := BoxMesh.new()
+	box.size = Vector3.ONE * 2.0   ## 局部 ±1，与原版 CreateBox({size:2}) 一致
 	for i in FIREBALLS.size():
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(0.0, 0.0, 0.0, 0.0)
-		mat.disable_receive_shadows = true
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var mat := ShaderMaterial.new()
+		mat.shader = shader
+		var fb: Dictionary = FIREBALLS[i]
+		mat.set_shader_parameter("seed", float(fb["seed"]))
 		_mats.append(mat)
 		var mi := MeshInstance3D.new()
 		mi.name = "fireball-%d" % i
-		mi.mesh = sphere
+		mi.mesh = box
 		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visible = false
@@ -91,6 +86,11 @@ func step(seconds: float) -> void:
 
 func _step(seconds: float) -> void:
 	var alive := false
+	# eye_world：原版在 onBind 里喂 activeCamera.globalPosition；这里在推进时喂
+	var eye := Vector3(0.0, 2.0, 0.0)
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		eye = cam.global_position
 	for i in FIREBALLS.size():
 		var fb: Dictionary = FIREBALLS[i]
 		var env := _envelope(seconds, float(fb["at"]))
@@ -101,9 +101,11 @@ func _step(seconds: float) -> void:
 		alive = true
 		var r: float = float(fb["radius"]) * float(env["growth"])
 		mi.scale = Vector3.ONE * maxf(0.01, r)
-		var col: Color = _fire(float(env["heat"]))
-		col.a = float(env["opacity"])
-		_mats[i].albedo_color = col
+		var mat: ShaderMaterial = _mats[i]
+		mat.set_shader_parameter("eye_world", eye)
+		mat.set_shader_parameter("age", float(env["age"]))
+		mat.set_shader_parameter("heat", float(env["heat"]))
+		mat.set_shader_parameter("opacity", float(env["opacity"]))
 	if not alive and seconds >= LIFE:
 		reset()
 
@@ -140,7 +142,6 @@ func reset() -> void:
 	_seconds = 99.0
 	for i in _spheres.size():
 		_spheres[i].visible = false
-		_mats[i].albedo_color = Color(0.0, 0.0, 0.0, 0.0)
 
 
 func stats() -> Dictionary:

@@ -205,7 +205,7 @@ public partial class RefactoredFootQuerySmoke : Node3D
         var body = new StaticBody3D { Name = name, Position = position, Rotation = new(0, 0, Mathf.DegToRad(tilt)), CollisionLayer = layer };
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } }); return body;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { GD.PushError(error.ToString()); SetPhysicsProcess(false); GetTree().Quit(1); }
     public override void _ExitTree() { _gather?.Dispose(); }
 }

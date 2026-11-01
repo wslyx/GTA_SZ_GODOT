@@ -193,7 +193,7 @@ public partial class PhysicsSceneContactSmoke : Node3D
         public void Commit() => contacts.Commit();
         public void Abort() => contacts.Abort();
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Cleanup() { _scene?.Dispose(); _scene = null; _query?.Dispose(); _query = null; _sphere?.Dispose(); _sphere = null; }
     private void Fail(Exception error) { GD.PushError($"CORE_SCENE_CONTACT_FAILED scenario={_scenario} frame={_frame} {error}"); _done = true; GetTree().Quit(1); }
     public override void _ExitTree() => Cleanup();

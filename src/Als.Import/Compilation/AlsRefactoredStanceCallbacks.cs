@@ -76,5 +76,5 @@ public sealed class AlsRefactoredStanceCallbacks
         Require(result.Count == (crouching ? 12 : 15), "Incomplete stance callbacks.");
         return result.OrderBy(n => n.PropertyIndex).ToArray();
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new ArgumentException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

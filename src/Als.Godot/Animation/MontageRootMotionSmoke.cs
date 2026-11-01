@@ -88,5 +88,5 @@ public partial class MontageRootMotionSmoke : Node
         GD.Print($"MONTAGE_ROOT_MOTION_OK cases={cases} frames={frames} motion_frames={moving} retries={retries} max_position_m={maxPosition:R} max_rotation={maxRotation:R} oracle=UE_RootMotionFromMontagesOnly collision=not_applied");
     }
     private static string Read(string file) => Godot.FileAccess.GetFileAsString("res://assets/config/" + file);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

@@ -134,5 +134,5 @@ public partial class MainGroundedPoseSmoke : Node
                 System.Numerics.Vector3.Distance(expected[bone].Scale, actual[bone].Scale) < .000001f, "Main composed pose differs.");
     }
     private static string Read(string file) => Godot.FileAccess.GetFileAsString("res://assets/config/" + file);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

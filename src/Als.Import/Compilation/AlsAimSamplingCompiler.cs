@@ -100,5 +100,5 @@ public static class AlsAimSamplingCompiler
     private static int Int(JsonElement value, string name) => value.GetProperty(name).GetInt32();
     private static float Scalar(JsonElement value, string name) => value.GetProperty(name).GetSingle();
     private static bool Bool(JsonElement value, string name) => value.GetProperty(name).GetBoolean();
-    private static void Require(bool valid, string message) { if (!valid) throw new FormatException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

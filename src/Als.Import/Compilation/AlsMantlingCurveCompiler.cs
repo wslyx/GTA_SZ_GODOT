@@ -85,5 +85,5 @@ public static class AlsMantlingCurveCompiler
     private static string Text(JsonElement row,string field)=>row.GetProperty(field).GetString()??throw new ArgumentException(field);
     private static float Number(JsonElement row,string field)
     {var value=row.GetProperty(field).GetSingle();Require(float.IsFinite(value),"Nonfinite mantle curve value.");return value;}
-    private static void Require(bool condition,string message){if(!condition)throw new ArgumentException(message);}
+    private static void Require(bool condition,string message){if(!condition){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

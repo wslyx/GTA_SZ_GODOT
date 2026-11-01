@@ -95,5 +95,5 @@ public static class AlsMantlingMontageCompiler
         _=>throw new ArgumentException("Unsupported mantle blend option.")};
     private static string Text(JsonElement row,string field)=>row.GetProperty(field).GetString()??throw new ArgumentException(field);
     private static float Number(JsonElement row,string field){var v=row.GetProperty(field).GetSingle();Require(float.IsFinite(v),"Nonfinite mantle montage value.");return v;}
-    private static void Require(bool condition,string message){if(!condition)throw new ArgumentException(message);}
+    private static void Require(bool condition,string message){if(!condition){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

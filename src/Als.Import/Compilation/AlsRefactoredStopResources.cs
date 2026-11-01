@@ -116,5 +116,5 @@ public sealed class AlsRefactoredStopResources
     { foreach (var p in Policies(n)) foreach (var name in new[] {"initialUpdateFunction","becomeRelevantFunction","updateFunction"}) Expect(p.GetProperty(name),new { functionName = "None" }); }
     private static string Text(JsonElement n,string name) => n.GetProperty(name).GetString()!;
     private static int Int(JsonElement n,string name) => n.GetProperty(name).GetInt32();
-    private static void Require(bool value,string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value,string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

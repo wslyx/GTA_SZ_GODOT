@@ -258,6 +258,7 @@ static func _palette_colour(tab: Array, idx: int, fallback: Color) -> Color:
 # ---------------------------------------------------------------------------
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if not enabled or not _built:
 		return
 	var px := focus.x
@@ -293,6 +294,10 @@ func update_system(delta: float, focus: Vector3) -> void:
 ## 只渲染焦点附近的停车排（对应原版 80m 格 3×3 邻域 + 上限）。
 ## 用网格索引取半径内的车，不再全量扫 21110 辆。
 ## Transform3D / 颜色按车缓存：车是静止的，重复计算毫无意义。
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Ebikes", __hitch_ms])
+
 func _build_parked(px: float, pz: float, aerial: bool) -> void:
 	var radius := NEARBY_RADIUS_AERIAL if aerial else NEARBY_RADIUS_STREET
 	var limit := LIMIT_AERIAL if aerial else LIMIT_STREET

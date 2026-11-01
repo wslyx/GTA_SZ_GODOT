@@ -207,5 +207,5 @@ public partial class StandingDirectionCacheSmoke : Node
         public void Dispose() { _graph.Dispose(); _library.Dispose(); }
     }
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

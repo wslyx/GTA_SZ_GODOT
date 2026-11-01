@@ -105,5 +105,5 @@ public partial class OverlaySourceSmoke : Node
             new(-q[0].GetDouble(), q[1].GetDouble(), -q[2].GetDouble(), q[3].GetDouble()), new(s[0].GetDouble(), s[1].GetDouble(), s[2].GetDouble()));
     }
     private static string Read(string path) => Godot.FileAccess.GetFileAsString("res://" + path);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

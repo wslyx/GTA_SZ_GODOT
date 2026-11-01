@@ -43,7 +43,7 @@ extends Node
 ##   "walkshot" —— 下车链路验证：F 下车 → 截图（第三人称）→ 按住 W 走 → 截图 →
 ##               C 第一人称 → 截图 → C 回第三人称 → F 上车 → 截图
 ##   "pages"  —— Esc 暂停页 / M 城市地图 两页截图，并点选一个地点看目的地面板
-const MODE := "dismount"
+const MODE := "drive"
 var _pg_phase := 0
 ## dismount 模式状态：基线 → F 下车逐帧追踪 → F 上车 → 再 F 下车对照
 const DISMOUNT_TRACE_FRAMES := 240
@@ -64,7 +64,8 @@ const DRIVE_FRAMES := 600
 
 ## loadshot 的抓图时刻（秒，自启动算起）
 const LOADSHOT_TIMES := [0.4, 1.2, 2.0, 2.8, 3.6, 6.0]
-const SHOT_DIR := "D:/CodePro/game_ws/GTA_SZ_GODOT/tools/shots"
+## 同 _shot.gd：不写绝对盘符，项目迁盘后照样能落盘
+var SHOT_DIR := ""
 
 const SCENE := "res://scenes/main.tscn"
 const TRACE_FRAMES := 120
@@ -206,6 +207,23 @@ func _process(delta: float) -> void:
 				elif MODE == "rounds":
 					_start_round(0)
 				elif MODE == "drive":
+					# PERF_GOTO="x,z[,yaw]"：先把车瞬移到热点，复现"该点开车转弯卡"
+					var goto_env := OS.get_environment("PERF_GOTO")
+					if not goto_env.is_empty():
+						var parts := goto_env.split(",")
+						var car = main.get("car")
+						car.set("x", float(parts[0]))
+						car.set("z", float(parts[1]))
+						car.set("yaw", float(parts[2]) if parts.size() >= 3 else 0.0)
+						main.set("_camera_yaw", float(car.get("yaw")))
+						main.get("camera").set("yaw", float(car.get("yaw")))
+						print("[perf] 车已移到 (%s)" % goto_env)
+					var hide_env := OS.get_environment("PERF_HIDE")
+					if not hide_env.is_empty():
+						var rt = main.get("world").get(hide_env)
+						if rt is Node3D:
+							(rt as Node3D).visible = false
+							print("[perf] 已隐藏 %s（归因用）" % hide_env)
 					print("[perf] 合成按住 W 开始行驶（%d 帧），同时统计长帧" % DRIVE_FRAMES)
 					_press_key(KEY_W, true)
 					_frames = 0
@@ -225,6 +243,11 @@ func _process(delta: float) -> void:
 				else:
 					_next_config()
 		Phase.TRACE:
+			if MODE == "drive" and int(OS.get_environment("PERF_TURN")) == 1:
+				# 转向复现：每 60 帧交替按住 A / D（配合 W 画蛇形）
+				if _frames % 120 == 0:
+					_press_key(KEY_A, _frames % 240 == 0)
+					_press_key(KEY_D, _frames % 240 != 0)
 			_trace_frame(delta)
 		Phase.SETTLE:
 			phase_t += delta
@@ -264,6 +287,7 @@ func _loadshot_tick(delta: float) -> void:
 func _capture_shot(shot_name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
+	SHOT_DIR = ProjectSettings.globalize_path("res://tools/shots")
 	DirAccess.make_dir_recursive_absolute(SHOT_DIR)
 	var path := "%s/%s.png" % [SHOT_DIR, shot_name]
 	var err := img.save_png(path)

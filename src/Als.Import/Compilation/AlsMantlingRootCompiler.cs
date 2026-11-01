@@ -104,5 +104,5 @@ public static class AlsMantlingRootCompiler
     private static string Text(JsonElement row,string key)=>row.GetProperty(key).GetString() ?? throw new ArgumentException(key);
     private static float Number(JsonElement row,string key)
     { var value=row.GetProperty(key).GetSingle();Require(float.IsFinite(value),"Nonfinite mantle value.");return value; }
-    private static void Require(bool condition,string message) { if(!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition,string message) { if(!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

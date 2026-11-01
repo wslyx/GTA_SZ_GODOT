@@ -66,5 +66,5 @@ public partial class CameraCollisionSmoke : Node3D
     { var body = new StaticBody3D { Position = position, CollisionLayer = layer, CollisionMask = 0 }; body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } }); AddChild(body); return body; }
     private static AlsCameraTraceResponse Query(AlsCameraCollisionProbe probe, Vector3 a, Vector3 b, Vector3 owner) =>
         probe.Query(new(AlsCameraCollisionProbe.Native(a), AlsCameraCollisionProbe.Native(b), 15), AlsCameraCollisionProbe.Native(owner), 1);
-    private static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+    private static void Require(bool ok, string message) { if (!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

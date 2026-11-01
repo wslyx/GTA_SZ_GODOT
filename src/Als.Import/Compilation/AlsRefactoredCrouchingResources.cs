@@ -185,5 +185,5 @@ public sealed class AlsRefactoredCrouchingResources
     }
     private static string Text(JsonElement node, string name) => node.GetProperty(name).GetString()!;
     private static int Int(JsonElement node, string name) => node.GetProperty(name).GetInt32();
-    private static void Require(bool value, string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

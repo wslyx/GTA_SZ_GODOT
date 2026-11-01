@@ -204,5 +204,5 @@ public static class AlsCameraGraphCompiler
     {
         Require(float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && float.IsFinite(value), "Invalid camera number."); return value;
     }
-    private static void Require(bool value, string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

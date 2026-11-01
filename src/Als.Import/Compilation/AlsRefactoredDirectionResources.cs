@@ -138,5 +138,5 @@ public sealed class AlsRefactoredDirectionResources
     }
     private static string Text(JsonElement e, string name) => e.GetProperty(name).GetString()!;
     private static int Int(JsonElement e, string name) => e.GetProperty(name).GetInt32();
-    private static void Require(bool valid, string message) { if (!valid) throw new ArgumentException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

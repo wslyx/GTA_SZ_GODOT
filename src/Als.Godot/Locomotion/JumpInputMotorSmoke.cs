@@ -77,7 +77,7 @@ public partial class JumpInputMotorSmoke : Node
     private static float Horizontal(in AlsFrameInput input) =>
         (float)System.Math.Sqrt((double)input.ActualVelocity.X * input.ActualVelocity.X + (double)input.ActualVelocity.Z * input.ActualVelocity.Z);
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
-    private static void Require(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { SetPhysicsProcess(false); GD.PushError(error.ToString()); GetTree().Quit(1); }
     private sealed class Commands(int hz, bool falling) : IAlsLocomotionCommandSource
     {

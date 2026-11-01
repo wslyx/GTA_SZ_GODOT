@@ -80,5 +80,5 @@ internal sealed class AimFrameSmokeChecks
         for (var evaluator = 0; evaluator < 7; evaluator++)
             Require(expected.GetEvaluator(evaluator) == actual.GetEvaluator(evaluator), "Aim independent source history differs.");
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

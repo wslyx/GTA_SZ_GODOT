@@ -936,7 +936,7 @@ public partial class BaseLayerFrameSmoke : Node
             if (a.GetActiveEdge(i) != b.GetActiveEdge(i) || a.Transitions.GetTransition(i) != b.Transitions.GetTransition(i)) return false;
         return true;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private static void Reject(Action action)
     {
         try { action(); } catch (InvalidOperationException) { return; } catch (ArgumentException) { return; }

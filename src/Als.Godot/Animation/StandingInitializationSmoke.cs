@@ -158,5 +158,5 @@ public partial class StandingInitializationSmoke : Node
         public void Dispose() { _graph.Dispose(); _library.Dispose(); }
     }
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
-    private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

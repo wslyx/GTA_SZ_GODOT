@@ -1085,19 +1085,19 @@ const HELP_SECTIONS := [
 		["Esc", "暂停 / 关闭面板"], ["M", "大地图"],
 		["J", "城市手账"], ["F10", "图像设置"],
 		["P", "帧率显示"], ["L", "光照：晴日 / 夜色 / 日落"],
-		["Y", "天气：雨 / 晴"], ["C", "切换镜头"],
-		["K", "显隐鼠标"], ["?", "本帮助页"],
+		["Y", "天气：雨 / 晴"], ["C", "切换镜头（追尾 3 档 → 座舱）"],
+		["K", "放开 / 收回鼠标（截图用）"], ["?", "本帮助页"],
 	]},
 	{"title": "驾驶（轿车 · 默认模式）", "rows": [
 		["W / S", "油门 / 刹车·倒车"], ["A / D", "转向"],
 		["空格", "手刹"], ["F", "上下车（先停稳）"],
-		["E", "互动（剧情 / 乘车点）"], ["V", "看车"],
+		["E", "互动（剧情 / 乘车点）"], ["1 / 2 / 3", "对话选项"],
 		["R", "回到道路上"], ["H", "鸣笛"],
 		["T", "切换坦克"], ["G", "切换无人机"],
 	]},
 	{"title": "步行（下车后）", "rows": [
 		["W A S D", "移动（方向键亦可）"], ["Shift", "跑步"],
-		["C", "第一 / 第三人称"], ["F", "上最近的车"],
+		["C", "第一 / 第三人称（用 ALS 角色时仅第三人称）"], ["F", "上最近的车"],
 		["E", "互动"], ["G", "切换无人机"],
 	]},
 	{"title": "坦克（驾驶中按 T）", "rows": [
@@ -1122,6 +1122,9 @@ const HELP_SECTIONS := [
 
 var help_root: Control
 var help_visible := false
+## 当前模式（main_game.Mode）：用于在帮助页里高亮对应章节，-1 = 不高亮
+var help_mode := -1
+var _help_heads: Array = []
 
 
 func _build_help() -> void:
@@ -1140,29 +1143,30 @@ func _build_help() -> void:
 	# 以屏幕中心为锚的面板：820×720
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -410.0
-	panel.offset_right = 410.0
-	panel.offset_top = -360.0
-	panel.offset_bottom = 360.0
+	panel.offset_left = -465.0
+	panel.offset_right = 465.0
+	# 720p 下内容比 720 高一点，会逼出滚动条；面板高度按屏幕取，最多 720
+	panel.offset_top = -352.0
+	panel.offset_bottom = 352.0
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.043, 0.106, 0.153, 0.94)       ## #0b1b27f0 附近
 	sb.border_color = Color(0.737, 0.804, 0.757, 0.26)
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(10)
-	sb.content_margin_left = 28; sb.content_margin_right = 28
-	sb.content_margin_top = 20; sb.content_margin_bottom = 16
+	sb.content_margin_left = 26; sb.content_margin_right = 26
+	sb.content_margin_top = 12; sb.content_margin_bottom = 6
 	panel.add_theme_stylebox_override("panel", sb)
 	help_root.add_child(panel)
 
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 5)
 	panel.add_child(v)
 
-	var title := _mk_label("按键帮助", _spaced(_font(26), 4.0), 26,
+	var title := _mk_label("按键帮助", _spaced(_font(22), 3.0), 22,
 		Color(0.941, 0.945, 0.906))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
-	var sub := _mk_label("按 ? 或 Esc 关闭", _font(11), 11, Color(0.663, 0.729, 0.702))
+	var sub := _mk_label("按 ? 或 Esc 关闭", _font(10), 10, Color(0.663, 0.729, 0.702))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
 
@@ -1171,32 +1175,69 @@ func _build_help() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	scroll.add_child(box)
+	# ⚠️ 排版：六节共 50 行，单栏竖排在 720p 下必然溢出（实测最后一节被切）。
+	# 这里改成**左右两栏**：前 3 节在左、后 3 节在右，每节内部「键 | 说明」成对，
+	# 高度直接砍半，一屏放得下；ScrollContainer 仍留着兜更低的分辨率。
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 26)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(columns)
+	var halves: Array = []
+	for _i in 2:
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 5)
+		columns.add_child(col)
+		halves.append(col)
 
-	for section in HELP_SECTIONS:
-		var head := _mk_label(str(section["title"]), _font(13), 13,
+	var split := ceili(float(HELP_SECTIONS.size()) * 0.5)
+	_help_heads.clear()
+	for index in HELP_SECTIONS.size():
+		var section: Dictionary = HELP_SECTIONS[index]
+		var col: VBoxContainer = halves[0] if index < split else halves[1]
+		var head := _mk_label(str(section["title"]), _font(12), 12,
 			Color(0.545, 0.737, 0.671))
-		box.add_child(head)
-		# 4 列网格 = 两组「键 | 说明」并排，压住总高度
+		col.add_child(head)
+		_help_heads.append(head)
 		var grid := GridContainer.new()
-		grid.columns = 4
-		grid.add_theme_constant_override("h_separation", 22)
-		grid.add_theme_constant_override("v_separation", 7)
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 2)
 		for row in section["rows"]:
 			grid.add_child(_kbd_chip(str(row[0])))
-			var d := _mk_label(str(row[1]), _font(12), 12, Color(0.824, 0.875, 0.847))
+			var d := _mk_label(str(row[1]), _font(11), 11, Color(0.824, 0.875, 0.847))
 			d.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			grid.add_child(d)
-		box.add_child(grid)
+		col.add_child(grid)
+
+
+## 帮助页要用"你现在在哪个模式"来高亮章节；由 main_game 在切换模式/开页前调用。
+##
+## 模式枚举（main_game.Mode）：CAR=0 TANK=1 WALKING=2 OBSERVER=3 AIRCRAFT=4，
+## 而 HELP_SECTIONS 的顺序是 通用/驾驶/步行/坦克/观景无人机/观光飞机，
+## 两者不是一一对应，这里显式映射，别用下标硬凑。
+func set_help_mode(mode: int) -> void:
+	const SECTION_BY_MODE := {0: 1, 1: 3, 2: 2, 3: 4, 4: 5}
+	help_mode = int(SECTION_BY_MODE.get(mode, -1))
+	_refresh_help_highlight()
+
+
+func _refresh_help_highlight() -> void:
+	for i in _help_heads.size():
+		var head: Label = _help_heads[i]
+		var on := i == help_mode
+		head.add_theme_color_override("font_color",
+			Color(0.980, 0.850, 0.520) if on else Color(0.545, 0.737, 0.671))
+		head.text = ("▶ " if on else "") + str(HELP_SECTIONS[i]["title"])
 
 
 func toggle_help() -> bool:
 	help_visible = not help_visible
 	if help_root != null:
 		help_root.visible = help_visible
+		if help_visible:
+			_refresh_help_highlight()
 	return help_visible
 
 # ---------------------------------------------------------------------------

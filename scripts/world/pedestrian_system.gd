@@ -29,6 +29,18 @@ const PIVOT_LEG_R := Vector2(0.105, 0.89)
 const PIVOT_ARM_L := Vector2(-0.21, 1.35)
 const PIVOT_ARM_R := Vector2(0.21, 1.35)
 
+## pedestrian.glb 的前向轴 = **-Z**（实测，同 ebikes.glb / 轿车 / 飞机那条资产管线）。
+## 证据（从 data/city/pedestrian.glb 的 accessor min/max 量出来，踝在 z≈0 的腿轴上）：
+##   shoes  z ∈ [-0.205, +0.095]  —— 脚跟短、脚尖长 ⇒ 脚尖朝 -Z
+##   hair   z ∈ [-0.075, +0.092]，颅骨 z ∈ [-0.090, +0.090] —— 头发越过颅骨的
+##          一侧是 +Z（后脑）⇒ 脸朝 -Z
+##   body_trousers z ∈ [+0.080, +0.210]（y 1.02–1.34 = 背中部）—— 身上唯一在 +Z
+##          侧的部件是"背" ⇒ 人朝 -Z
+## 原版 Babylon 端做过 bakeTransformIntoVertices(Matrix.Scaling(1,1,-1))，把脚尖
+## 翻到 +Z 再配 R_y(yaw)，所以那边默认 +Z 是对的；Godot 直接按 glTF 载入**没有**
+## 这次镜像，必须走 MINUS_Z（rotation.y = -yaw），否则整街行人背对行进方向。
+const PED_FORWARD := CoordinateUtil.ModelForward.MINUS_Z
+
 var world: CityWorld
 var paths: Array = []     ## Vector4(ax, az, bx, bz)
 var walkers: Array = []
@@ -48,9 +60,23 @@ var _downed := 0
 ## place() 原本每 220m 全量扫 36969 条路径，是行驶中周期性卡顿的另一个来源。
 var _path_mids := PackedVector2Array()
 var _path_grid: PointGrid
-## 实例变换重写节流：56 行人 × 12 部件 ≈ 670 次/帧太重
+## 实例变换写入节流：56 行人 × 12 部件 ≈ 670 次 set_instance_transform 太重。
+##
+## 原实现是"每 PUSH_INTERVAL 全量重写一次"，代价是腿摆只有 10Hz —— 站近看
+## 行人就是**抽帧走**（位置在 _advance 里每帧推进，只有摆动角度被节流）。
+## 现在按距离分档：
+##   NEAR_RADIUS 内 —— 每帧重算并写入（恢复成帧率级摆动）；
+##   更远处       —— 仍按 PUSH_INTERVAL 写，省下的调用正好抵掉近处多出来的。
+## place() 之后强制全量重写一次（实例数变了，旧的变换缓存全部作废）。
+const NEAR_RADIUS := 40.0
 const PUSH_INTERVAL := 0.1
-var _push_timer := 0.0
+## 每个 walker 距上次写入的秒数（与 walkers 同长）
+var _push_age := PackedFloat32Array()
+## 每个 walker 的 5 个部件变换缓存（与 walkers 同长）：{部件名 → Transform3D}
+var _xf_cache: Array = []
+var _force_full := true
+## MultiMesh 当前已写入的实例数（-1 = 还没写过）
+var _mm_count := -1
 
 
 func setup(p_world: CityWorld) -> void:
@@ -101,6 +127,9 @@ func _load_asset() -> void:
 			var node := MultiMeshInstance3D.new()
 			node.multimesh = mm
 			node.name = "ped-%s" % key
+			# ⚠️ 这里**故意**不投影，与原版一致（`pedestrians.ts` 只设了
+			# `src.receiveShadows=true`，从未 addShadowCaster）。别当缺陷"修"掉：
+			# 开了就是 56×12 个实例进阴影 pass，且偏离 1:1。
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(node)
 			if not _parts.has(key):
@@ -149,6 +178,12 @@ func place(px: float, pz: float) -> void:
 		})
 	origin = p
 	_downed = 0
+	# 实例表重排了：清空变换缓存并强制下一帧全量重写
+	_xf_cache.clear()
+	_xf_cache.resize(walkers.size())
+	_push_age.resize(walkers.size())
+	_push_age.fill(0.0)
+	_force_full = true
 
 
 ## 把这一帧车的**实际位移**（碰撞回滚之后）交给碰撞检测。
@@ -182,6 +217,7 @@ func _count_downed() -> int:
 
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if not enabled or not _built:
 		return
 	var px := focus.x
@@ -190,14 +226,11 @@ func update_system(delta: float, focus: Vector3) -> void:
 		place(px, pz)
 	time += delta
 	_advance(delta)
-	# 节流：56 个行人 × 12 个 mesh 部件 ≈ 670 次 set_instance_transform，
-	# 每帧重写太重；走路动画 10Hz 足够流畅
-	_push_timer -= delta
-	if _push_timer > 0.0:
-		return
-	_push_timer = PUSH_INTERVAL
-	_push_instances()
+	_push_instances(delta, focus)
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Pedestrians", __hitch_ms])
 
 func _advance(dt: float) -> void:
 	for w in walkers:
@@ -225,77 +258,118 @@ func _advance(dt: float) -> void:
 		w["yaw"] = atan2(dx, dy)
 
 
-func _push_instances() -> void:
-	var lists := {}
+## 单个行人的 5 个部件变换（{部件名 → Transform3D}，根变换 × 枢轴旋转）
+func _walker_xf(w: Dictionary) -> Dictionary:
+	var sc := float(w["scale"])
+	var root_xf: Transform3D
+	var swing := 0.0
+	var body = w["body"]
+	if body != null:
+		# 倒地：位置取质心，姿态取 rx/ry/rz；模型的局部原点在**脚底**，
+		# 所以要减去质心偏移（它要跟着 basis 一起转、一起缩放）
+		var fall_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(body["ry"]), PED_FORWARD)) \
+			* Basis(Vector3.RIGHT, float(body["rx"])) \
+			* Basis(Vector3.FORWARD, float(body["rz"]))
+		fall_basis = fall_basis.scaled(Vector3(sc, sc, sc))
+		var pos := CoordinateUtil.to_world(float(body["x"]), float(body["z"]), float(body["y"])) \
+			- fall_basis * Vector3(0.0, IMPACT_SCRIPT.CENTRE_HEIGHT, 0.0)
+		root_xf = Transform3D(fall_basis, pos)
+	else:
+		var g := world.ground_height(float(w["x"]), -float(w["z"]))
+		var base := CoordinateUtil.to_world(float(w["x"]), float(w["z"]), g)
+		var root_yaw := float(w["yaw"])
+		swing = sin(time * float(w["speed"]) * 6.0 + float(w["phase"])) * GAIT_AMPLITUDE
+		# 根变换：朝向 + 缩放 + 落位（朝向见 PED_FORWARD 的实测说明）
+		root_xf = Transform3D(
+			Basis(Vector3.UP, CoordinateUtil.node_yaw(root_yaw, PED_FORWARD)).scaled(
+				Vector3(sc, sc, sc)), base)
+
+	var out := {}
+	for key in _parts:
+		var angle := 0.0
+		var pivot := Vector2.ZERO
+		match key:
+			"leftLeg":
+				angle = swing
+				pivot = PIVOT_LEG_L
+			"rightLeg":
+				angle = -swing
+				pivot = PIVOT_LEG_R
+			"leftArm":
+				angle = -swing * ARM_SCALE
+				pivot = PIVOT_ARM_L
+			"rightArm":
+				angle = swing * ARM_SCALE
+				pivot = PIVOT_ARM_R
+			_:
+				angle = 0.0
+				pivot = Vector2.ZERO
+
+		# 绕枢轴旋转：T(pivot) * R(θ) * T(-pivot)，作用在模型局部空间
+		var pivot_v := Vector3(pivot.x, pivot.y, 0.0)
+		var local_xf := Transform3D.IDENTITY
+		if not is_zero_approx(angle):
+			var to_pivot := Transform3D(Basis.IDENTITY, pivot_v)
+			var rot := Transform3D(Basis(Vector3.RIGHT, angle), Vector3.ZERO)
+			var from_pivot := Transform3D(Basis.IDENTITY, -pivot_v)
+			local_xf = to_pivot * rot * from_pivot
+
+		out[key] = root_xf * local_xf
+	return out
+
+
+## 只写"该写的那几个"实例。
+## 索引稳定：每个 walker 在每张 MultiMesh 里的下标就是它在 walkers 里的下标
+## （walkers 顺序只在 place() 时变，那时 _force_full 置真、全量重写）。
+func _push_instances(dt: float, focus: Vector3) -> void:
+	var n := walkers.size()
+	if n == 0:
+		# place() 在郊区可能一条人行道段都找不到（near 为空 → walkers 被清空）。
+		# 旧实现靠"列表为空 → instance_count = 0"顺便收尾；现在只写脏实例，
+		# 必须显式收掉，否则会留下一批钉在上一帧位置的人。
+		if _mm_count != 0:
+			for key in _parts:
+				for entry in _parts[key]:
+					var mm: MultiMesh = entry["mm"]
+					mm.instance_count = 0
+					mm.visible_instance_count = 0
+			_mm_count = 0
+		return
+	# 实例数变了（刚 place 过）→ 这一帧必须全量写
+	var full := _force_full or n != _mm_count
+	var eye := Vector2(focus.x, -focus.z)
+	var near_sq := NEAR_RADIUS * NEAR_RADIUS
+	var dirty := PackedByteArray()
+	dirty.resize(n)
+	dirty.fill(0)
+	var any_dirty := false
+	for i in n:
+		var w: Dictionary = walkers[i]
+		var age := _push_age[i] + dt
+		_push_age[i] = age
+		var is_near := Vector2(float(w["x"]), float(w["z"])).distance_squared_to(eye) <= near_sq
+		if not (full or is_near or age >= PUSH_INTERVAL):
+			continue
+		_push_age[i] = 0.0
+		_xf_cache[i] = _walker_xf(w)
+		dirty[i] = 1
+		any_dirty = true
+	if not any_dirty:
+		return
+
 	for key in _parts:
 		for entry in _parts[key]:
-			lists[entry["mm"]] = []
-
-	for w in walkers:
-		var sc := float(w["scale"])
-		var root_xf: Transform3D
-		var swing := 0.0
-		var body = w["body"]
-		if body != null:
-			# 倒地：位置取质心，姿态取 rx/ry/rz；模型的局部原点在**脚底**，
-			# 所以要减去质心偏移（它要跟着 basis 一起转、一起缩放）
-			var fall_basis := Basis(Vector3.UP, CoordinateUtil.node_yaw(float(body["ry"]))) \
-				* Basis(Vector3.RIGHT, float(body["rx"])) \
-				* Basis(Vector3.FORWARD, float(body["rz"]))
-			fall_basis = fall_basis.scaled(Vector3(sc, sc, sc))
-			var pos := CoordinateUtil.to_world(float(body["x"]), float(body["z"]), float(body["y"])) \
-				- fall_basis * Vector3(0.0, IMPACT_SCRIPT.CENTRE_HEIGHT, 0.0)
-			root_xf = Transform3D(fall_basis, pos)
-		else:
-			var g := world.ground_height(float(w["x"]), -float(w["z"]))
-			var base := CoordinateUtil.to_world(float(w["x"]), float(w["z"]), g)
-			var root_yaw := float(w["yaw"])
-			swing = sin(time * float(w["speed"]) * 6.0 + float(w["phase"])) * GAIT_AMPLITUDE
-			# 根变换：朝向 + 缩放 + 落位
-			root_xf = Transform3D(
-				Basis(Vector3.UP, CoordinateUtil.node_yaw(root_yaw)).scaled(Vector3(sc, sc, sc)), base)
-
-		for key in _parts:
-			var angle := 0.0
-			var pivot := Vector2.ZERO
-			match key:
-				"leftLeg":
-					angle = swing
-					pivot = PIVOT_LEG_L
-				"rightLeg":
-					angle = -swing
-					pivot = PIVOT_LEG_R
-				"leftArm":
-					angle = -swing * ARM_SCALE
-					pivot = PIVOT_ARM_L
-				"rightArm":
-					angle = swing * ARM_SCALE
-					pivot = PIVOT_ARM_R
-				_:
-					angle = 0.0
-					pivot = Vector2.ZERO
-
-			# 绕枢轴旋转：T(pivot) * R(θ) * T(-pivot)，作用在模型局部空间
-			var pivot_v := Vector3(pivot.x, pivot.y, 0.0)
-			var local_xf := Transform3D.IDENTITY
-			if not is_zero_approx(angle):
-				var to_pivot := Transform3D(Basis.IDENTITY, pivot_v)
-				var rot := Transform3D(Basis(Vector3.RIGHT, angle), Vector3.ZERO)
-				var from_pivot := Transform3D(Basis.IDENTITY, -pivot_v)
-				local_xf = to_pivot * rot * from_pivot
-
-			var xf := root_xf * local_xf
-			for entry in _parts[key]:
-				lists[entry["mm"]].append(xf)
-
-	for key in _parts:
-		for entry in _parts[key]:
-			var list: Array = lists[entry["mm"]]
 			var mm: MultiMesh = entry["mm"]
-			mm.instance_count = list.size()
-			mm.visible_instance_count = list.size()
-			for i in list.size():
-				mm.set_instance_transform(i, list[i])
+			if full:
+				mm.instance_count = n
+				mm.visible_instance_count = n
+			for i in n:
+				if dirty[i] == 1:
+					var cache: Dictionary = _xf_cache[i]
+					var xf: Transform3D = cache[key]
+					mm.set_instance_transform(i, xf)
+	_mm_count = n
+	_force_full = false
 
 
 func diagnostics() -> Dictionary:

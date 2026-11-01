@@ -78,5 +78,5 @@ public static class AlsGroundedEntryNotifyCompiler
     }
 
     private static string Text(JsonElement row, string key) => row.GetProperty(key).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

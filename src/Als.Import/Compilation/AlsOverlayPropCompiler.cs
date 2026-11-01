@@ -175,5 +175,5 @@ public static class AlsOverlayPropCompiler
         return Regex.Match(line,"(?:^|,)DefaultObject=\"([^\"]+)\"").Groups[1].Value;
     }
     private static string Text(JsonElement row,string name)=>row.GetProperty(name).GetString()!;
-    private static void Require(bool value,string message) { if(!value)throw new ArgumentException(message); }
+    private static void Require(bool value,string message) { if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

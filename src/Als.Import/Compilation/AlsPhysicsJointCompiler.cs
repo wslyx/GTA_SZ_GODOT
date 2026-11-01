@@ -108,5 +108,5 @@ public static class AlsPhysicsJointCompiler
     { var n = s.GetProperty(key).GetDouble(); Require(double.IsFinite(n) && n >= 0,"Invalid "+key); return n; }
     private static double Unit(JsonElement s,string key)
     { var n = N(s,key); Require(n <= 1,"Invalid "+key); return n; }
-    private static void Require(bool condition,string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition,string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

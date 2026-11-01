@@ -65,3 +65,16 @@
 *.scn binary
 *.res binary
 *.ctex binary
+
+# ------------------------------------------------------------
+# ALS 导入配置：**字节敏感，禁止换行转换**
+#
+# ALS 资产导出把每个文件的 SHA-256 烘焙进别的 json 里（layeringSha256 /
+# overlaySha256 / bindingDigest …），加载时逐字节比对。上面 `*.json text`
+# 会把它们统一成 LF，导致摘要链断裂、人物不显示。这四条记录要求 CRLF，
+# 必须原字节保存。（规则顺序：后写的覆盖先写的。）
+# ------------------------------------------------------------
+assets/config/v4_layering_inputs.json -text
+assets/config/v4_overlay_inputs.json -text
+assets/config/v4_physics_runtime_shapes.json -text
+assets/config/refactored_camera_inputs.json -text

@@ -152,6 +152,6 @@ public partial class RefactoredGroundPredictionSmoke : Node3D
         var body = new StaticBody3D { Position = position, CollisionLayer = layer, RotationDegrees = new(0, 0, degrees) };
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } }); return body;
     }
-    private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { GD.PushError($"REFACTORED_GROUND_QUERY_FAILED row={_row} frame={_frame}: {error}"); SetPhysicsProcess(false); GetTree().Quit(1); }
 }

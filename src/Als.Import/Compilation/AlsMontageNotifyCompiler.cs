@@ -104,5 +104,5 @@ public static class AlsMontageNotifyCompiler
     }
     private static int Intern(List<string> values,string value,StringComparer comparer)
     { var index=values.FindIndex(v=>comparer.Equals(v,value)); if(index>=0)return index; values.Add(value); return values.Count-1; }
-    private static void Require(bool condition,string message) { if(!condition)throw new ArgumentException(message); }
+    private static void Require(bool condition,string message) { if(!condition){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

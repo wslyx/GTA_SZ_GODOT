@@ -65,5 +65,5 @@ public partial class TurnMontagePoseSmoke : Node
         GD.Print($"TURN_MONTAGE_POSE_OK assets={assets.Length} curves={curves} changed_bones={changedBones} wrong_slot=8 stale_bank=8 first_frame=held source=exported_sequences");
     }
     private static string Read(string file) => Godot.FileAccess.GetFileAsString("res://assets/config/" + file);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

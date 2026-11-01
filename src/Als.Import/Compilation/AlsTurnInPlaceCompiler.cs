@@ -189,5 +189,5 @@ public static class AlsTurnInPlaceCompiler
     }
     private static float Number(string text)
     { var value = float.Parse(text, CultureInfo.InvariantCulture); Require(float.IsFinite(value), "Non-finite turn value."); return value; }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

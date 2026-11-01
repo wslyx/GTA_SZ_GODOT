@@ -84,5 +84,5 @@ public static class AlsRefactoredHeadGraphCompiler
     private static IEnumerable<JsonElement> Policies(JsonElement node)=>[node.GetProperty("runtime"),node.GetProperty("authoredProperties").GetProperty("Node")];
     private static string Name(JsonElement node)=>Text(node,"path").Split('.')[^1];
     private static string Text(JsonElement value,string field)=>value.GetProperty(field).GetString()!;
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

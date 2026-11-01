@@ -197,5 +197,5 @@ public sealed class AlsRefactoredLocomotionPoseProfile
             interpSpeedIncreasing=(double)a.Increasing,interpSpeedDecreasing=(double)a.Decreasing});
     }
     private static string Text(JsonElement n,string key)=>n.GetProperty(key).GetString()!;
-    private static void Require(bool ok,string message){if(!ok)throw new ArgumentException(message);}
+    private static void Require(bool ok,string message){if(!ok){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

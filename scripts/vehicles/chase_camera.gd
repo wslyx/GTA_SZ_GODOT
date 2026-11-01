@@ -43,6 +43,12 @@ const TANK_VIEWS := [
 	{"f": -22.0, "h": 11.0},
 ]
 ## 驾驶舱固定位姿（原版 CITY_DRIVER_POSE）
+## 场景最高点（米）—— 无人机 nearZ 自适应用。
+## 实测数据：`city.json` 地标最高 359.46（平安金融中心），街区网格最高 124.2。
+## 取地标值向上取整，宁可高估一点：高估 → clearance 偏小 → near 偏小 → 近处更精细，
+## 是安全方向；低估才会把深度精度浪费在远处。
+const SCENERY_TOP := 360.0
+
 const COCKPIT_POSITION := Vector3(0.0, 1.12, 0.05)
 const COCKPIT_LOOK_AHEAD := Vector3(0.0, 1.08, 18.0)
 
@@ -164,6 +170,19 @@ func follow_observer(dt: float) -> void:
 		-cos(observer_yaw) * cos(observer_pitch))
 	look_at_target(observer_position + dir * 50.0)
 	fov = rad_to_deg(FOV_OBSERVER)
+	# 近裁剪面随**离场景最高点的净空**放宽（原版 city-observer-depth.ts）：
+	#   净空越大说明相机越在"空旷的高处"，此时把深度精度让给远处；
+	#   贴着楼飞时净空≈0，退回 0.3 保住近处细节。
+	near = observer_near_clip(global_position.y)
+
+
+## 原版 observerNearClip(distance, cameraHeight, sceneryTop) 的等价式。
+## 我们的无人机是自由视角（不是绕焦点环绕），注视点固定在正前 50m，
+## 所以 orbitNear = clamp(50*0.003, .3, 4) 恒为 0.3 —— 与游戏内实际观感一致。
+func observer_near_clip(camera_height: float) -> float:
+	var orbit_near := clampf(50.0 * 0.003, 0.3, 4.0)
+	var clearance := maxf(0.0, camera_height - SCENERY_TOP)
+	return maxf(orbit_near, minf(128.0, clearance * 0.1))
 
 
 ## 飞机：相机位于机体后上方

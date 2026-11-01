@@ -104,5 +104,5 @@ public static class AlsGroundedUpdateCompiler
     }
     private static JsonElement Pin(JsonElement node, string name) => node.GetProperty("pins").EnumerateArray().Single(p => Text(p, "name") == name);
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool value, string message) { if (!value) throw new FormatException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

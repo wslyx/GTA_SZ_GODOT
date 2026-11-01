@@ -69,5 +69,5 @@ public static class AlsBodyInertiaCompiler
         e.GetProperty("maxDistanceCm").GetSingle(),e.GetProperty("maxRotationRatio").GetSingle(),e.GetProperty("maxInvInertiaComponentRatio").GetSingle(),
         e.GetProperty("inverseMassTolerance").GetSingle(),e.GetProperty("inverseInertiaTolerance").GetSingle(),e.GetProperty("extentToleranceCm").GetSingle());
     private static AlsDoubleVector V(JsonElement e)=>new(e[0].GetDouble(),e[1].GetDouble(),e[2].GetDouble());
-    private static void Require(bool b,string message){if(!b)throw new InvalidDataException(message);}
+    private static void Require(bool b,string message){if(!b){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); }}
 }

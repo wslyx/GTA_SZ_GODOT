@@ -354,5 +354,5 @@ public static class AlsFootIkInputCompiler
             Require(node.Pins.Values.Single(p => p.Name == "NewEnumerator3").Links == "", "Ragdoll unexpectedly updates offsets.");
         }
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

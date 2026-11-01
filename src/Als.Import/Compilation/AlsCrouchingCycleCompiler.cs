@@ -125,5 +125,5 @@ public static class AlsCrouchingCycleCompiler
     private static JsonElement Pin(JsonElement node, string name) => node.GetProperty("pins").EnumerateArray().Single(p => Text(p, "name") == name);
     private static JsonElement Data(JsonElement node) => node.GetProperty("properties").GetProperty("Node");
     private static string Text(JsonElement node, string name) => node.GetProperty(name).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

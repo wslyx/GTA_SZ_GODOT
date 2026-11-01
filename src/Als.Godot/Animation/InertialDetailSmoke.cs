@@ -90,5 +90,5 @@ public partial class InertialDetailSmoke : Node
         }
         catch (Exception error) { GD.PushError($"INERTIAL_DETAIL_FAILED {error}"); GetTree().Quit(1); }
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

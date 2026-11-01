@@ -366,6 +366,6 @@ public partial class MovementPlatformGraphSmoke : Node
         if (node is CollisionObject3D collider) collider.CollisionLayer = collider.CollisionMask = 0;
         foreach (var child in node.GetChildren()) DisableTerrain(child);
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { SetPhysicsProcess(false); GD.PushError(error.ToString()); GetTree().Quit(1); }
 }

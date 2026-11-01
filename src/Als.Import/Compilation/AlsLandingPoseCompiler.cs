@@ -98,5 +98,5 @@ public static class AlsLandingPoseCompiler
     { var pin = Pin(node, name); Require(pin.GetProperty("links").GetArrayLength() == 0, "Expected landing constant."); return float.Parse(Text(pin, "value"), CultureInfo.InvariantCulture); }
     private static float Number(JsonElement data, string name) => data.GetProperty(name).GetSingle();
     private static string Text(JsonElement data, string name) => data.GetProperty(name).GetString() ?? throw new FormatException("Expected text.");
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

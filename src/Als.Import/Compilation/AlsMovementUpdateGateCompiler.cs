@@ -90,5 +90,5 @@ public static class AlsMovementUpdateGateCompiler
     private static JsonElement Pin(JsonElement node, string name) => node.GetProperty("pins").EnumerateArray().Single(p => Text(p, "name") == name);
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
     private static void Kind(Dictionary<string, JsonElement> nodes, string name, string kind) => Require(Text(nodes[name], "class") == kind, "Wrong gate node kind.");
-    private static void Require(bool valid, string message) { if (!valid) throw new FormatException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

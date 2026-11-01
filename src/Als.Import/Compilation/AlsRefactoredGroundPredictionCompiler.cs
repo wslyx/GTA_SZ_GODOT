@@ -46,5 +46,5 @@ public static class AlsRefactoredGroundPredictionCompiler
     private static float Number(JsonElement value, string name)
     { var number = value.GetProperty(name).GetSingle(); Require(float.IsFinite(number), "Nonfinite prediction input."); return number; }
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

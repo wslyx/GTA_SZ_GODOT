@@ -36,5 +36,5 @@ public static class AlsAnimationUpdateGraphCompiler
             Require(outputs.Single(p=>p.Name==name).Links.Length==0,"An unhandled state now updates movement properties.");
         Node Call(string name) { var node=graph.One("K2Node_CallFunction",name); graph.Self(node); return node; }
     }
-    private static void Require(bool condition,string message) { if(!condition)throw new InvalidDataException(message); }
+    private static void Require(bool condition,string message) { if(!condition){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

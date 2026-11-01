@@ -369,6 +369,6 @@ public static class AlsLocomotionDetailCompiler
         else if (value.ValueKind == JsonValueKind.Array)
             foreach (var child in value.EnumerateArray()) RejectDuplicates(child);
     }
-    private static void Require(bool condition, string message) { if (!condition) throw Failure(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw Failure(message); } }
     private static AlsCompilationException Failure(string message) => new([new AlsValidationIssue("ALSDETAIL001", null, "$", message)]);
 }

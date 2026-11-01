@@ -105,5 +105,5 @@ public static class AlsAimLayerCompiler
     private static int Int(JsonElement value, string name) => value.GetProperty(name).GetInt32();
     private static double Number(JsonElement value, string name) => value.GetProperty(name).GetDouble();
     private static bool Bool(JsonElement value, string name) => value.GetProperty(name).GetBoolean();
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

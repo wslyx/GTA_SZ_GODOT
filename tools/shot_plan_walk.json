@@ -1,0 +1,8 @@
+{
+  "warmup": 8.0,
+  "gap": 3.0,
+  "settle": 4.0,
+  "shots": [
+    { "name": "w1_walk_front", "env": { "mode": "car", "onfoot": true, "light_mode": 0, "tier": "high" } }
+  ]
+}

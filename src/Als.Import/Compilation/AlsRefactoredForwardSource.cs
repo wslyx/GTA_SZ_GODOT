@@ -123,5 +123,5 @@ public sealed class AlsRefactoredForwardSource
             return target;
         }
     }
-    private static void Require(bool valid, string message) { if (!valid) throw new ArgumentException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

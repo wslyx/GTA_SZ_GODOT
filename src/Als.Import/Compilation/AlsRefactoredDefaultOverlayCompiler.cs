@@ -172,5 +172,5 @@ public static class AlsRefactoredDefaultOverlayCompiler
         Text(n, "class") == "AnimGraphNode_TwoWayBlend" ? "BlendNode" : "Node")];
     private static string Name(JsonElement n) => Text(n, "path").Split('.')[^1];
     private static string Text(JsonElement p, string key) => p.GetProperty(key).GetString()!;
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

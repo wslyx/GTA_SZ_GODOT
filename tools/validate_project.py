@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """对 GTA_SZ_GODOT 做静态体检。
 
-本项目约定「禁止编译校验」，所以这里用纯静态分析抓最容易出错的三类问题：
+本项目约定「禁止编译校验」，所以这里用纯静态分析抓最容易出错的四类问题：
   1. res:// 路径写错（preload / load / ResourceLoader.exists 的目标不存在）
   2. 括号 / 引号不平衡
   3. class_name 引用悬空（用了某个类名但没有脚本定义它）
+  4. 按键表不一致（帮助面板承诺的键 vs main_game 真正处理的键）
 
 用法：python tools/validate_project.py [项目根目录]
 """
@@ -472,6 +473,25 @@ for p in gd_files:
 
 for x in typed_loop:
     problems.append("语法兼容性 " + x)
+
+# ---------- 按键表一致性（帮助面板 vs 实际处理） ----------
+# 帮助页是手写字符串表，没有类型约束；实测抓到过"帮助写着按 K 显隐鼠标、
+# 代码里根本没这个键"这种悬空条目。这里复用 tools/check_keymap.py 的解析。
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+try:
+    import check_keymap as _km
+    _handled = _km.handled_keys(open(os.path.join(ROOT, "scripts/core/main_game.gd"),
+                                     encoding="utf-8").read())
+    _documented, _rows = _km.documented_keys(open(os.path.join(ROOT, "scripts/ui/panels_ui.gd"),
+                                                  encoding="utf-8").read())
+    for _k in sorted(_documented - _handled):
+        problems.append("按键表 帮助里写了、代码没处理：%s" % _k)
+    _MOVEMENT = {"W", "A", "S", "D", "Q", "E", "X", "UP", "DOWN", "LEFT", "RIGHT",
+                 "SHIFT", "SPACE", "ENTER", "C", "F", "G", "T", "B"}
+    for _k in sorted(_handled - _documented - _MOVEMENT - {"F9"}):
+        problems.append("按键表 代码处理了、帮助没写：%s" % _k)
+except Exception as _e:      # 解析失败不该让整个体检挂掉
+    problems.append("按键表 检查未能执行：%s" % _e)
 
 # ---------- 报告 ----------
 print("项目：%s" % ROOT)

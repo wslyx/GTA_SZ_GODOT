@@ -635,6 +635,7 @@ func _assign_lamps(focus: Vector3) -> void:
 
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	# 光照档过渡推进（静止时零开销）
 	_advance_look(delta)
 	_scan_timer -= delta
@@ -654,6 +655,9 @@ func update_system(delta: float, focus: Vector3) -> void:
 		sun.global_position = focus - dir_world * 800.0
 		sun.look_at(focus, Vector3.UP)
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Lighting", __hitch_ms])
 
 func diagnostics() -> Dictionary:
 	return {

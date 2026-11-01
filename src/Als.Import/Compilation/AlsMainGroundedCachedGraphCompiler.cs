@@ -94,5 +94,5 @@ public static class AlsMainGroundedCachedGraphCompiler
         foreach (var field in node.EnumerateObject().Where(p => p.Name.EndsWith("Function", StringComparison.Ordinal)))
             Require(Text(field.Value, "className") == "None" && Text(field.Value, "functionName") == "None", "Unsupported Main source lifecycle callback.");
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new FormatException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

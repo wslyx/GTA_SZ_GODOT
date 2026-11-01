@@ -163,6 +163,6 @@ public static class AlsOverlayPoseCompiler
     private static int Int(JsonElement p, string key) => p.GetProperty(key).GetInt32();
     private static float Number(JsonElement p, string key) => p.GetProperty(key).GetSingle();
     private static bool Bool(JsonElement p, string key) => p.GetProperty(key).GetBoolean();
-    private static void Require(bool condition, string message) { if (!condition) throw Failure(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw Failure(message); } }
     private static ArgumentException Failure(string message) => new(message);
 }

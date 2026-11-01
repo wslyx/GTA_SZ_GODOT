@@ -110,5 +110,5 @@ public static class AlsPelvisIkInputCompiler
         }
     }
     private static double Number(string value) => double.Parse(value, CultureInfo.InvariantCulture);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

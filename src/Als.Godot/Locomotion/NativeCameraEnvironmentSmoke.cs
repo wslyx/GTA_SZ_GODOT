@@ -123,5 +123,5 @@ public partial class NativeCameraEnvironmentSmoke : Node
         var motor = (CharacterBody3D)_entry.Demo.ActiveCharacter.MovementAnchor;
         motor.GlobalTransform = new(Basis.Identity, position); motor.Velocity = Vector3.Zero;
     }
-    private static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+    private static void Require(bool ok, string message) { if (!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

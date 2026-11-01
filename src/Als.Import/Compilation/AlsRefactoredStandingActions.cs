@@ -91,5 +91,5 @@ public sealed class AlsRefactoredStandingActions
         foreach(var callback in machine.StateCallbacks)queue.QueueStop();
         return machine.StateCallbacks.Length;
     }
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

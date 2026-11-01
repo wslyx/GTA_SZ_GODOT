@@ -399,13 +399,22 @@ func _load_furniture() -> void:
 # ---------------------------------------------------------------------------
 
 func update_system(delta: float, focus: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if not enabled or not _built:
 		return
 	# 种植层自带 22m 阈值与空中切换判断，让它先跑（林冠在重建中也不阻塞它）
 	if landscape != null and landscape.has_method("update_system"):
+		var __t1 := Time.get_ticks_msec()
 		landscape.update_system(delta, focus)
+		var __m1 := Time.get_ticks_msec() - __t1
+		if __m1 > 15:
+			print("[HITCH] Scenery.landscape %d ms" % __m1)
 	if meadow != null and meadow.has_method("update_system"):
+		var __t2 := Time.get_ticks_msec()
 		meadow.update_system(delta, focus)
+		var __m2 := Time.get_ticks_msec() - __t2
+		if __m2 > 15:
+			print("[HITCH] Scenery.meadow %d ms" % __m2)
 	# 林冠分帧重建：进行中的任务每帧只做一小块，避免一次重写上万实例导致卡顿
 	if int(_canopy_job["phase"]) != 0:
 		_canopy_step(focus)
@@ -419,12 +428,23 @@ func update_system(delta: float, focus: Vector3) -> void:
 	# 这样原地不动时不再每 2 秒卡一下。
 	if _timer > 0.0 and moved < 120.0:
 		return
+	var __t3 := Time.get_ticks_msec()
 	_canopy_start(focus, world.aerial)
+	var __m3 := Time.get_ticks_msec() - __t3
+	if __m3 > 15:
+		print("[HITCH] Scenery.canopy_start %d ms" % __m3)
 	_timer = 2.0
 	_canopy_last_focus = f2
 	_canopy_step(focus)
+	var __t4 := Time.get_ticks_msec()
 	_load_furniture()
+	var __m4 := Time.get_ticks_msec() - __t4
+	if __m4 > 15:
+		print("[HITCH] Scenery.furniture %d ms" % __m4)
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["Scenery", __hitch_ms])
 
 func diagnostics() -> Dictionary:
 	var counts := {}

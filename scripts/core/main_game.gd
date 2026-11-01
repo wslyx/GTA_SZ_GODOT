@@ -65,7 +65,16 @@ var _dragging := false
 ## motion.relative（捕获时真实 position 失真，见 _update_mouse_capture 注释）。
 var _beacon_cursor := Vector2.ZERO
 var _walk_first_person := false
+## K 键：强制显示光标（截图 / 点 UI 用）。置 true 时 _update_mouse_capture 不再抢光标，
+## 鼠标也不会转视角（转视角只在 MOUSE_MODE_CAPTURED 下生效）。
+var _cursor_free := false
 var _car_model: Node3D
+## 座舱（原版 createCityCockpit）：挂在车模下，只在座舱视角显示
+var _cockpit = null
+## 车漆反射探针（原版 createVehicleReflections）：挂在车模下，2Hz 节流捕获
+var _vehicle_reflections = null
+## 驾驶视角档位 0/1/2 = 追尾三档，3 = 座舱（原版 CITY_DRIVER_POSE）
+var _cam_phase := 0
 var _tank_model: Node3D
 ## 坦克实体炮塔 / 炮管节点（原版 city-tank.ts 的 turretTransform）。
 ## tank.glb 的层级是 tank_root → tank_turret(→ tank_barrel → 炮身各件)。
@@ -148,6 +157,7 @@ func _build_world() -> void:
 	world = CityWorld.new()
 	world.name = "CityWorld"
 	add_child(world)
+	print("[BOOT-T] CityWorld 已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	walk = CityWalk.new(
 		func(x: float, z: float) -> bool: return world.collision.blocked(x, z),
@@ -183,6 +193,7 @@ func _build_world() -> void:
 	_als_ground.update_around(prewarm_feet)   # 地面代理（含首批建筑体）随加载预铺
 	_als_host.EnterWorld(prewarm_feet, 0.0)
 	_als_host.ExitWorld()
+	print("[BOOT-T] ALS 预热完成 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# 子系统（用 preload 而非 set_script，确保脚本一定被解析）
 	world.sky = _add_system(SKY_SCRIPT, "SkySystem")
@@ -198,6 +209,7 @@ func _build_world() -> void:
 	world.pedestrians = _add_system(PED_SCRIPT, "PedestrianSystem")
 	world.ebikes = _add_system(EBIKE_SCRIPT, "EbikeSystem")
 	world.facades = _add_system(FACADE_SCRIPT, "FacadeStreamer")
+	print("[BOOT-T] 12 个子系统已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# 相机与灯光架
 	camera = ChaseCamera.new()
@@ -231,10 +243,13 @@ func _build_world() -> void:
 	maps.name = "MapUI"
 	add_child(maps)
 
+	print("[BOOT-T] UI/玩法系统已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 	# 车辆模型
 	_load_vehicle_models()
+	print("[BOOT-T] 车辆模型已载 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# 构建城市（各子系统的 setup 由 CityWorld 的步骤按原版顺序调用）
+	print("[BOOT-T] world.build() 前 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 	world.progress.connect(_on_progress)
 	world.built.connect(_on_built)
 	world.failed.connect(_on_failed)
@@ -252,6 +267,11 @@ const DISTANT_CITY_SCRIPT := preload("res://scripts/world/distant_city.gd")
 const SIGNALS_SCRIPT := preload("res://scripts/world/traffic_signals.gd")
 const TRAFFIC_SCRIPT := preload("res://scripts/world/traffic_system.gd")
 const PED_SCRIPT := preload("res://scripts/world/pedestrian_system.gd")
+## 座舱内舱 + 仪表（原版 city-cockpit.ts）。⚠️ 新脚本的 class_name 要等编辑器重扫
+## 才进全局类缓存，运行时直接 Cockpit.new() 会报找不到，故一律 preload。
+const COCKPIT_SCRIPT := preload("res://scripts/vehicles/cockpit.gd")
+## 主角车漆反射（B1 最后一块，原版 city-vehicle-reflections.ts）。同上 preload。
+const VEHICLE_REFLECTIONS_SCRIPT := preload("res://scripts/vehicles/vehicle_reflections.gd")
 const EBIKE_SCRIPT := preload("res://scripts/world/ebike_system.gd")
 const FACADE_SCRIPT := preload("res://scripts/world/facade_streamer.gd")
 ## ⚠️ 同 RIDER_SCRIPT：新增脚本的 class_name 要等编辑器重扫全局类缓存，
@@ -307,6 +327,17 @@ func _load_vehicle_models() -> void:
 		# 的 wheelRadius / wheelCentresGltf（原版 init 里 setPivotPoint 那段）。
 		_car_wheels = CAR_WHEELS_SCRIPT.new()
 		_car_wheels.setup(_car_model)
+		# 座舱内舱 + 仪表：裁掉模型自带的转向盘体积（原版同一套判定），
+		# 再挂仪表舱/方向盘/实时表盘。挂在车模下随车移动。
+		_cockpit = COCKPIT_SCRIPT.new()
+		_cockpit.name = "Cockpit"
+		_car_model.add_child(_cockpit)
+		_cockpit.setup(_car_model)
+		# 车漆反射（B1 最后一块）：2Hz 手动捕获的车顶探针
+		_vehicle_reflections = VEHICLE_REFLECTIONS_SCRIPT.new()
+		_vehicle_reflections.name = "VehicleReflections"
+		_car_model.add_child(_vehicle_reflections)
+		_vehicle_reflections.setup(camera)
 
 var _vehicle_materials: VehicleMaterials = null
 var _sport_details: SportDetails = null
@@ -406,6 +437,35 @@ func _on_built() -> void:
 		await RenderingServer.frame_post_draw
 		_als_host.ExitWorld()
 		camera.current = true
+
+	# —— 管线/上传预热：把已装载区块逐个"过一遍镜头" ——
+	# 区块第一次进入视野时 GPU 要做顶点缓冲上传 + 管线编译（实测行车途中
+	# 一次 26 帧 × 70–100ms 的爆发，四十六节）。加载画面本来就在渲染 3D
+	# 视口，把相机依次摆到各区块上方看一眼，就把这笔成本挪进加载期。
+	# ⚠️ headless 无绘制事件：巡游毫无意义且 frame_post_draw 永不触发会把
+	# session_ready 永久卡死（这个坑 ALS 块早就踩过并写了守卫，别再删）。
+	var cs = world.chunk_streamer
+	if cs != null and camera != null \
+			and DisplayServer.get_name() != "headless":
+		var origin := world.focus
+		var stops: Array = []
+		for e in cs.chunks:
+			if str(e.get("state", "")) != "loaded":
+				continue
+			var wp: Vector3 = CoordinateUtil.to_world(float(e["x"]), float(e["z"]), 0.0)
+			stops.append([wp.distance_squared_to(origin), wp])
+		stops.sort_custom(func(a, b): return a[0] < b[0])
+		var orig_tf := camera.global_transform
+		var warmed := 0
+		for stop in stops.slice(0, 16):
+			camera.global_position = (stop[1] as Vector3) + Vector3(0.0, 26.0, 34.0)
+			camera.look_at(stop[1], Vector3.UP)   # 斜俯视，避免与 UP 共线
+			await get_tree().process_frame
+			warmed += 1
+		camera.global_transform = orig_tf
+		camera.current = true
+		await RenderingServer.frame_post_draw
+		print("[BOOT-T] 管线预热完成 tours=%d（首见上传挪进加载期）" % warmed)
 
 	session_ready = true
 	MemProbe.mark("finish_loading 前")
@@ -522,6 +582,7 @@ func _on_key(k: InputEventKey) -> void:
 	# 只认 Esc / ? 关闭 —— 与设置页一样是模态的，期间不该误触载具或其它面板。
 	if panels.help_visible:
 		if code == KEY_ESCAPE or code == KEY_SLASH:
+			panels.set_help_mode(mode)   # 帮助页高亮当前模式那节
 			panels.toggle_help()
 		return
 	match code:
@@ -529,6 +590,7 @@ func _on_key(k: InputEventKey) -> void:
 			if panels.dialog_active:
 				panels.close_dialogue()
 			elif panels.help_visible:
+				panels.set_help_mode(mode)   # 帮助页高亮当前模式那节
 				panels.toggle_help()
 			elif panels.journal_visible:
 				panels.toggle_journal()
@@ -552,7 +614,11 @@ func _on_key(k: InputEventKey) -> void:
 				else:
 					_walk_first_person = not _walk_first_person
 					hud.toast("步行 · 第一人称" if _walk_first_person else "步行 · 第三人称")
+			elif mode == Mode.CAR:
+				# 驾驶模式：三档追尾 + 座舱（区间 4 档）
+				_cycle_camera_view()
 			else:
+				# 坦克等其它模式维持原行为（TANK_VIEWS 轮换），别被座舱档污染
 				camera.next_view()
 		KEY_F:
 			# 原版飞行 HUD 的按键表写明「G / F 返回驾驶」：飞行中 F 要能从飞机
@@ -603,6 +669,7 @@ func _on_key(k: InputEventKey) -> void:
 		KEY_SLASH:
 			# "?"（Shift+/）完整按键帮助：各模式（驾驶 / 步行 / 坦克 / 无人机 /
 			# 飞机）的全部按键分组列出，Esc 或 ? 关闭。
+			panels.set_help_mode(mode)   # 帮助页高亮当前模式那节
 			panels.toggle_help()
 		KEY_Y:
 			var on: bool = world.weather.toggle()
@@ -619,6 +686,12 @@ func _on_key(k: InputEventKey) -> void:
 			GraphicsQuality.save()
 		KEY_E:
 			_interact()
+		KEY_K:
+			# 显隐鼠标：截图、点菜单、录屏讲解都要能放开光标。
+			# 只翻标志位，真正的 mouse_mode 交给 _update_mouse_capture 统一裁决，
+			# 否则会和"暂停/大地图/设置页要光标"的既有逻辑打架。
+			_cursor_free = not _cursor_free
+			hud.toast("光标：自由（再按 K 收回）" if _cursor_free else "光标：已锁定", 1.6)
 		KEY_H:
 			if audio != null:
 				audio.cue("horn")
@@ -949,7 +1022,7 @@ func _update_mouse_capture() -> void:
 	#   settings_visible → F10 图像设置页（打开即 paused）；
 	#   pause_overlay.visible → Esc 暂停页；
 	#   big_map_visible → 大地图。
-	var want_cursor: bool = not session_ready \
+	var want_cursor: bool = _cursor_free or not session_ready \
 		or (panels != null and (panels.settings_visible \
 			or (panels.pause_overlay != null and panels.pause_overlay.visible))) \
 		or (maps != null and maps.big_map_visible)
@@ -1202,8 +1275,10 @@ func _process(delta: float) -> void:
 		audio.set_drive_state(speed, 0.55 if mode in [Mode.CAR, Mode.TANK] else 0.0, slipping)
 
 func _update_modes(dt: float) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if paused:
 		return
+	_cockpit_sync()
 	match mode:
 		Mode.CAR:
 			_step_car(dt)
@@ -1215,6 +1290,51 @@ func _update_modes(dt: float) -> void:
 			_step_observer(dt)
 		Mode.AIRCRAFT:
 			_step_aircraft(dt)
+
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 40:
+		print("[HITCH] 主循环模式步进 本帧 %d ms（mode=%d）" % [__hitch_ms, mode])
+
+## 截图探针用：按给定值把座舱仪表画一帧，并暂停物理 —— 否则下一帧
+## _step_car 会立刻用真实值（停车 0 km/h）覆盖掉，探针就永远只能拍到 000。
+func debug_cockpit_telemetry(speed_mps: float, steer: float, trip_m: float) -> void:
+	if _cockpit == null:
+		return
+	paused = true
+	_cockpit.update_telemetry(speed_mps, steer, false, GameState.light_mode == 2, trip_m, 1.0)
+
+
+## 驾驶视角循环：0/1/2 三档追尾 → 3 座舱 → 回到 0（原版 CITY_DRIVER_POSE 那一档）
+func _cycle_camera_view() -> void:
+	_cam_phase = (_cam_phase + 1) % 4
+	if _cam_phase == 3:
+		camera.set_mode(ChaseCamera.Mode.COCKPIT, true)
+		if _cockpit != null:
+			_cockpit.set_active(true)
+		hud.toast("驾驶 · 座舱视角（再按 C 回追尾）")
+	else:
+		if camera.mode == ChaseCamera.Mode.COCKPIT:
+			camera.set_mode(ChaseCamera.Mode.DRIVING, false)
+		camera.view = _cam_phase
+		if _cockpit != null:
+			_cockpit.set_active(false)
+		hud.toast(["驾驶 · 追尾（近）", "驾驶 · 追尾（近距）", "驾驶 · 航拍"][_cam_phase])
+
+
+## 座舱显隐与相机档位的每帧兜底：
+## 上车/下车/切观察/切飞行都会直接改 camera.set_mode()，这里保证
+## “不在座舱视角时内舱一定收起、相机不会卡在 COCKPIT 档”。
+func _cockpit_sync() -> void:
+	if _cockpit == null:
+		return
+	var in_cockpit := mode == Mode.CAR and camera.mode == ChaseCamera.Mode.COCKPIT
+	if in_cockpit == bool(_cockpit.active):
+		return
+	_cockpit.set_active(in_cockpit)
+	if not in_cockpit and camera.mode == ChaseCamera.Mode.COCKPIT:
+		camera.set_mode(ChaseCamera.Mode.DRIVING, false)
+	_cam_phase = 3 if in_cockpit else 0
+
 
 func _axis_key(pos_keys: Array, neg_keys: Array) -> float:
 	var v := 0.0
@@ -1285,15 +1405,34 @@ func _step_car(dt: float) -> void:
 	if _car_wheels != null and _car_wheels.part_count > 0:
 		_wheel_spin += car.speed * dt / _car_wheels.wheel_radius
 		_car_wheels.apply(_wheel_spin, car.steer)
-	# 相机偏航以 1-exp(-dt*3) 追车头（原版 cameraYaw 慢速跟随，转弯时相机甩在车后）
-	_camera_yaw = lerp_angle(_camera_yaw, car.yaw, 1.0 - exp(-dt * 3.0))
+	var cockpit_view := camera.mode == ChaseCamera.Mode.COCKPIT
+	if cockpit_view:
+		# 座舱刚性贴车：原版直接取 car.computeWorldMatrix()，没有追尾那种相机滞后
+		_camera_yaw = car.yaw
+	else:
+		# 相机偏航以 1-exp(-dt*3) 追车头（原版 cameraYaw 慢速跟随，转弯时相机甩在车后）
+		_camera_yaw = lerp_angle(_camera_yaw, car.yaw, 1.0 - exp(-dt * 3.0))
 	camera.yaw = _camera_yaw
 	camera.look_pitch = _look_pitch
-	# 注视点传**车头** yaw（原版 target 用 s.yaw，转弯时锁定车头而非相机方向）
-	camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false, car.yaw)
+	if cockpit_view:
+		camera.follow_cockpit(Vector3(car.x, 0.0, car.z))
+		if _cockpit != null:
+			_cockpit.update_telemetry(car.speed, car.steer,
+				throttle < 0.0 and car.speed > 0.5, GameState.light_mode == 2,
+				car.distance, dt)
+	else:
+		# 注视点传**车头** yaw（原版 target 用 s.yaw，转弯时锁定车头而非相机方向）
+		camera.follow_vehicle(Vector3(car.x, 0.0, car.z), car.speed, dt, false, car.yaw)
+	if _vehicle_reflections != null:
+		# 车漆反射的节流判定用**相机**位置（原版同款：相机 65m 外整个停掉）
+		_vehicle_reflections.update_vehicle(camera.global_position, dt)
 	lights.update_brake(throttle < 0.0 and car.speed > 0.5, car.speed < -0.5)
 	lights.place(_car_model.global_transform if _car_model != null else camera.global_transform)
-	_warm_als_ground(car.x, car.z)
+	# ⚠️ 地面代理只在**接近停车**时预热：高速行车时每跨 160m 格就重建一次
+	# 步行物理地面（实测 39–55ms/次，转弯时连续触发）——而那时玩家根本不在步行，
+	# 纯浪费。减速到 12m/s 以下才恢复预热，靠边停车时仍是现成的。
+	if absf(car.speed) < 12.0:
+		_warm_als_ground(car.x, car.z)
 
 func _step_tank(dt: float) -> void:
 	var throttle := _axis_key([KEY_W, KEY_UP], [KEY_S, KEY_DOWN])

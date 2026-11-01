@@ -81,5 +81,5 @@ public static class AlsPhysicsJointFrameCompiler
         var vector = new AlsDoubleVector(value[0].GetDouble(), value[1].GetDouble(), value[2].GetDouble());
         Require(vector.IsFinite, "Nonfinite joint frame vector."); return vector;
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidDataException(message); } }
 }

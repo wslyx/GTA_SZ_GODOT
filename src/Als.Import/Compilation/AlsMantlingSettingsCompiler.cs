@@ -113,5 +113,5 @@ public static class AlsMantlingSettingsCompiler
         var a=e.GetProperty(name); Require(a.GetArrayLength()==2,"Invalid mantle range.");
         var x=a[0].GetSingle();var y=a[1].GetSingle();Require(float.IsFinite(x)&&float.IsFinite(y),"Nonfinite mantle range.");return(x,y);
     }
-    private static void Require(bool ok,string message) { if(!ok) throw new ArgumentException(message); }
+    private static void Require(bool ok,string message) { if(!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

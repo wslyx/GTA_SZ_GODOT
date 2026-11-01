@@ -69,6 +69,7 @@ func setup(world: CityWorld) -> void:
 
 ## 每帧由 main_game._step_walk 以 ALS 马达世界坐标调用。
 func update_around(world_pos: Vector3) -> void:
+	var __hitch_t0 := Time.get_ticks_msec()
 	if _world == null:
 		return
 	var center := Vector2(world_pos.x, world_pos.z)
@@ -80,6 +81,9 @@ func update_around(world_pos: Vector3) -> void:
 		_rebuild_buildings(cell)
 		_building_cell = cell
 
+	var __hitch_ms := Time.get_ticks_msec() - __hitch_t0
+	if __hitch_ms > 15:
+		print("[HITCH] %s 本帧 %d ms" % ["AlsGround", __hitch_ms])
 
 func _rebuild_ground(center: Vector2) -> void:
 	var height_field: HeightField = _world.height_field

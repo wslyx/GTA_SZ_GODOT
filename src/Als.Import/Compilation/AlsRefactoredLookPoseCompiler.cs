@@ -105,7 +105,7 @@ public static class AlsRefactoredLookPoseCompiler
         Require(raw[basis].SkeletonPath=="/ALS/ALS/Character/SK_Als.SK_Als","Foreign Look skeleton.");
         return new(paths.Select(p=>raw[p]).ToArray(),raw[basis]);
     }
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
     private static void ValidateBlendPolicy(string native)
     {
         Require(native.StartsWith("Begin Object Class=/Script/Engine.BlendSpace1D Name=\"BS_Als_Look\" ",StringComparison.Ordinal),

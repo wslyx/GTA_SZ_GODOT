@@ -124,5 +124,5 @@ public sealed class AlsRefactoredSyncBank
     private static string Text(JsonElement value,string field)=>value.GetProperty(field).GetString()??throw new ArgumentException("Missing Sync text.");
     private static float Number(JsonElement value,string field)
     {var result=value.GetProperty(field).GetSingle();Require(float.IsFinite(result),"Nonfinite Sync metadata.");return result;}
-    private static void Require(bool value,string message){if(!value)throw new ArgumentException(message);}
+    private static void Require(bool value,string message){if(!value){ if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); }}
 }

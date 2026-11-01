@@ -94,5 +94,5 @@ public static class AlsJumpInputCompiler
     private static JsonElement Pin(JsonElement node, string name) => node.GetProperty("pins").EnumerateArray().Single(p => Text(p, "name") == name);
     private static string Text(JsonElement element, string name) => element.GetProperty(name).GetString()!;
     private static void Kind(JsonElement node, string kind) => Require(Text(node, "class") == kind, "Wrong jump node kind.");
-    private static void Require(bool valid, string message) { if (!valid) throw new FormatException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

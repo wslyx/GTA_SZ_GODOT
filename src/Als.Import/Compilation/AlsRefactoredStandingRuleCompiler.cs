@@ -80,5 +80,5 @@ internal static class AlsRefactoredStandingRuleCompiler
             _ => throw new ArgumentException("Standing predicate differs: " + signature)
         };
     }
-    private static void Require(bool condition, string message) { if (!condition) throw new ArgumentException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

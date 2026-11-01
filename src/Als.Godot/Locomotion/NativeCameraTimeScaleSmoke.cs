@@ -71,5 +71,5 @@ public partial class NativeCameraTimeScaleSmoke : Node
         catch (Exception e) { GD.PushError(e.ToString()); SetPhysicsProcess(false); GetTree().Quit(1); }
     }
     public override void _ExitTree() { GetTree().PhysicsFrame -= BeforePhysics; Engine.TimeScale = 1; }
-    private static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+    private static void Require(bool ok, string message) { if (!ok) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }

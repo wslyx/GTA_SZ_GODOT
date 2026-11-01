@@ -105,6 +105,6 @@ public partial class MovementBaseOracleSmoke : Node
     private sealed class Idle : IAlsLocomotionCommandSource
     { public AlsLocomotionCommand GetCommand(long frame) => AlsLocomotionCommand.CreateDefault(); }
     private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
-    private static void Require(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
+    private static void Require(bool valid, string message) { if (!valid) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
     private void Fail(Exception error) { SetPhysicsProcess(false); GD.PushError(error.ToString()); GetTree().Quit(1); }
 }

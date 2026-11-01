@@ -351,5 +351,5 @@ public static class AlsAimPoseCompiler
     private static bool Bool(JsonElement value, string name) => value.GetProperty(name).GetBoolean();
     private static float Number(string value) => float.Parse(value, CultureInfo.InvariantCulture);
     private static FormatException Failure(string message) => new(message);
-    private static void Require(bool value, string message) { if (!value) throw Failure(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw Failure(message); } }
 }

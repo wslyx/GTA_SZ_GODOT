@@ -22,6 +22,8 @@ signal built()
 ## 致命失败（对应原版 city-loading 的 error 态）：加载画面据此切到「载入中断 + 重新载入」
 signal failed(reason: String)
 
+## 幕墙逐窗格亮灯（A4）。⚠️ 新脚本的 class_name 不在全局类缓存，一律 preload。
+const TENCENT_WINDOWS_SCRIPT := preload("res://scripts/world/tencent_windows.gd")
 const BLOCK_SIZE := 640.0
 
 ## 原版可见半径（单位：米，数据尺度）
@@ -48,6 +50,8 @@ const CANDIDATE_SLAB_RE := "^landmark_(.+)_(water|park)$"
 const CANDIDATE_PARK_SLAB_MAX_SPAN := 1.5
 
 # --- 地基服务 ---------------------------------------------------------------
+## 桥面投影关闭只做一次
+var _bridge_shadow_done := false
 var height_field: HeightField
 var collision: CityCollision
 var graph: RoadGraph
@@ -57,6 +61,8 @@ var terrain_root: Node3D
 var roads_root: Node3D
 var buildings_root: Node3D
 var landmarks_root: Node3D
+## 腾讯滨海逐窗格亮灯（原版 city-landmark-lighting.ts）。detail 装载完成后建一次。
+var tencent_windows = null
 var facades_root: Node3D
 var scenery_root: Node3D
 var water_root: Node3D
@@ -360,13 +366,23 @@ var _phase := ""
 func _enqueue_step(paths: Array, parent: Node, meta: Variant = null) -> bool:
 	match _phase:
 		"":
+			# 启动性能打点：每批 GLB 的入队/完成时间（grep [BOOT-T]）
+			print("[BOOT-T] 装载开始 %s t=%.1fs" % [str(paths), _boot_clock()])
 			for p in paths:
 				loader.enqueue(str(p), parent, meta)
 			_phase = "wait"
 			return false
 		"wait":
-			return loader.is_idle()
+			if loader.is_idle():
+				print("[BOOT-T] 装载完成 %s t=%.1fs" % [str(paths), _boot_clock()])
+				return true
+			return false
 	return true
+
+
+## 进程启动以来的秒数（启动性能归因用）
+func _boot_clock() -> float:
+	return float(Time.get_ticks_msec()) / 1000.0
 
 
 # --- 步骤 1：地形 -----------------------------------------------------------
@@ -396,20 +412,49 @@ func _plan_road_surface() -> bool:
 
 # --- 步骤 3：海岸 -----------------------------------------------------------
 func _plan_coastal() -> bool:
-	return _enqueue_step([
+	var done := _enqueue_step([
 		"res://data/city/coastal-bridges.glb",
 		"res://data/city/coastal-shoreline.glb",
 		"res://data/city/opposite-shore.glb",
 	], landmarks_root, "coastal")
+	if done and not _bridge_shadow_done:
+		_bridge_shadow_done = true
+		_disable_bridge_shadows()
+	return done
 
 
-# --- 步骤 4：建筑 -----------------------------------------------------------
-## 流式模式下建筑改为逐 640m 区块加载（见 _plan_chunks + chunk_streamer.gd），
-## 这里跳过 monolithic 加载，避免 266MB 一次性进显存；manifest 缺失时回退老路径。
+## 深圳湾大桥的桥面不投影：12km 长、离水仅 2–4m 的超大 casting 体，阴影贴图
+## 完全解析不动 —— 它的影子会变成一条横跨海湾/广场的锯齿黑带（实测把整个
+## 中湾广场盖住）。现实里这么低的桥面影子只是贴水细线，没有比有更好。
+func _disable_bridge_shadows() -> void:
+	var n := 0
+	var stk: Array = [landmarks_root]
+	while not stk.is_empty():
+		var nd: Node = stk.pop_back()
+		for ch in nd.get_children():
+			stk.append(ch)
+		if nd is MeshInstance3D and String(nd.name).to_lower().begins_with("coastal_bridge_"):
+			(nd as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			n += 1
+	print("[CityWorld] 桥面投影已关闭 ×%d（超大 casting 体，阴影贴图解析不动）" % n)
+
+
 func _plan_buildings() -> bool:
 	if ChunkStreamer.manifest_available():
 		return true
 	return _enqueue_step(["res://data/city/buildings.glb"], buildings_root, "buildings")
+
+
+## 腾讯滨海幕墙：按索引拓扑恢复每块窗格，写 UV + 顶点色，换逐格发光着色器。
+## 只在 detail 那批网格还在的场景里建一次；候选地标阶段不重复。
+func _build_tencent_windows() -> void:
+	if tencent_windows != null or landmarks_root == null:
+		return
+	tencent_windows = TENCENT_WINDOWS_SCRIPT.new()
+	tencent_windows.name = "TencentWindows"
+	add_child(tencent_windows)
+	var report: Dictionary = tencent_windows.setup(landmarks_root)
+	print("[CityWorld] 腾讯幕墙窗格数据：%s" % str(report))
 
 
 # --- 步骤 5：地标 -----------------------------------------------------------
@@ -436,6 +481,7 @@ func _plan_landmarks() -> bool:
 	if _phase == "detail":
 		if not loader.is_idle():
 			return false
+		_build_tencent_windows()
 		_dispose_replaced("candidates")
 		_landmark_stage = 2
 		_phase = "candidates"
@@ -664,6 +710,12 @@ func _index_building_chunks() -> void:
 ## `detail == false`（候选地标）时，还要先过一道 isCandidateGroundSlab 闸门：
 ## 候选模型里的 `_water` / 扁平 `_park` 平板不属于地标本体，留着重则盖住路面
 ## （原版是 `m.dispose(false,false)` 直接销毁，见 city-world.ts 的候选装载循环）。
+## 候选去重：同一网格被实例化两份、完全共面（AABB 逐位相同）→ z-fighting
+## 闪烁。实测 landmark_baypark_concrete（4mm 薄板、841×182m）就有两份拷贝，
+## 叠在一起整片广场闪烁。键 = 名字 + 归一化变换；首份保留，后续释放。
+var _candidate_dedupe := {}
+
+
 func _collect_landmark_chunks(root: Node3D, detail: bool) -> void:
 	var re := RegEx.new()
 	re.compile("detail_block_(-?\\d+)_(-?\\d+)_")
@@ -672,11 +724,31 @@ func _collect_landmark_chunks(root: Node3D, detail: bool) -> void:
 		slab_re.compile(CANDIDATE_SLAB_RE)
 		_ensure_candidate_kinds()
 	var slabs := 0
+	var dups := 0
 	for mi in GlbLoader.meshes_of(root):
 		if not detail and _is_candidate_ground_slab(mi, slab_re):
 			mi.queue_free()
 			slabs += 1
 			continue
+		# 中湾广场的水泥薄板（4mm 厚、y=0.134）与下方 terrain_pavement /
+		# coastal_shore 条带（y≈0.1–0.4）只差几厘米，远距离深度精度分不开
+		# → 整片闪烁。terrain_pavement 现在是同款石材铺装（kind=1）且覆盖它，
+		# 这块板是冗余的，直接丢。
+		if not detail and mi.name.begins_with("landmark_baypark_concrete"):
+			mi.queue_free()
+			slabs += 1
+			continue
+		# 共面拷贝去重（只对候选做；变换取 0.01m/0.001rad 精度防浮点噪声）
+		var xf := mi.global_transform
+		var dup_key := "%s|%s" % [mi.name,
+			"%s|%s" % [xf.origin.snapped(Vector3(0.01, 0.01, 0.01)),
+				xf.basis.get_rotation_quaternion().get_euler().snapped(
+					Vector3(0.001, 0.001, 0.001))]]
+		if _candidate_dedupe.has(dup_key):
+			mi.queue_free()
+			dups += 1
+			continue
+		_candidate_dedupe[dup_key] = true
 		var m := re.search(mi.name)
 		if m != null:
 			var i := int(m.get_string(1))
@@ -690,6 +762,8 @@ func _collect_landmark_chunks(root: Node3D, detail: bool) -> void:
 			landmark_nodes.append(mi)
 	if slabs > 0:
 		print("[CityWorld] 候选地标：丢弃地面平板 %d 个" % slabs)
+	if dups > 0:
+		print("[CityWorld] 候选地标：去重共面拷贝 %d 个" % dups)
 
 
 ## 原版 isCandidateGroundSlab()：候选地标的 `_water` 平板一律丢；`_park` 平板

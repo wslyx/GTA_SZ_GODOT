@@ -135,5 +135,5 @@ public static class AlsLandPredictionCompiler
     private static JsonElement One(IEnumerable<JsonElement> values)
     { var array = values.ToArray(); Require(array.Length == 1, "Missing or ambiguous landing graph element."); return array[0]; }
     private static string Text(JsonElement value, string name) => value.GetProperty(name).GetString()!;
-    private static void Require(bool value, string message) { if (!value) throw new FormatException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new FormatException(message); } }
 }

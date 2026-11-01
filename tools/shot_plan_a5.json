@@ -1,0 +1,9 @@
+{
+  "warmup": 9.0,
+  "gap": 2.0,
+  "settle": 3.0,
+  "shots": [
+    { "name": "a5_pave_close", "env": { "mode": "observer", "observer_at": [-2296.4, -856.8, 4.0, 3.14, -78.0], "light_mode": 0, "tier": "high" } },
+    { "name": "a5_pave_wide",  "env": { "observer_at": [-2296.4, -856.8, 26.0, 3.14, -42.0], "light_mode": 0, "tier": "high" } }
+  ]
+}

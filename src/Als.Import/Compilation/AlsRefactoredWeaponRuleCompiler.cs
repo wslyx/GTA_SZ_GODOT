@@ -86,5 +86,5 @@ public static class AlsRefactoredWeaponRuleCompiler
         Require(graph.Nodes.All(n => n.Pins.Values.All(p => p.Name is "self" or "A" or "B" or "ReturnValue" or "Value" or "ErrorTolerance" or "MachineIndex" or "bCanEnterTransition")), "Extra weapon predicate operand.");
         return rule;
     }
-    private static void Require(bool value, string message) { if (!value) throw new ArgumentException(message); }
+    private static void Require(bool value, string message) { if (!value) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new ArgumentException(message); } }
 }

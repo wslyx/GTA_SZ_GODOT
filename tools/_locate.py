@@ -6,8 +6,14 @@ import json, math, sys
 import numpy as np
 from PIL import Image, ImageDraw
 
-CITY = r"D:/CodePro/game_ws/GTA_SZ_GODOT/data/city/city.json"
-REF = r"C:/Users/YIYAY/.workbuddy/clipboard-images/clipboard-2026-09-24T01-44-14-501Z-0d7b4f25.jpg"
+# 路径不写死盘符/用户名：城市数据跟着本脚本走，参照截图由命令行传入
+#   用法: python tools/_locate.py <参照截图.jpg>
+import os
+_HERE = os.path.dirname(os.path.abspath(__file__))
+CITY = os.path.join(_HERE, "..", "data", "city", "city.json")
+REF = sys.argv[1] if len(sys.argv) > 1 else ""
+if not REF or not os.path.exists(REF):
+    sys.exit("用法: python tools/_locate.py <参照截图.jpg>（原脚本默认指向某台机器上的剪贴板截图，已移除）")
 
 def build_ref():
     ref = Image.open(REF).convert("RGB")

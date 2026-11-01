@@ -252,5 +252,5 @@ public partial class DetailMachineSmoke : Node
         }
     }
     private static ReadOnlySpan<float> Times(AlsDetailState state, float[] times) => state < AlsDetailState.WalkRun ? [] : times.AsSpan(((int)state - 2) * 4, 4);
-    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Require(bool condition, string message) { if (!condition) { if (GodotAls.Import.Compilation.AlsProvenancePolicy.SkipFor(message)) return; throw new InvalidOperationException(message); } }
 }
