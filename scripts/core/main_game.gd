@@ -237,6 +237,12 @@ func _build_world() -> void:
 	world.pedestrians = _add_system(PED_SCRIPT, "PedestrianSystem")
 	world.ebikes = _add_system(EBIKE_SCRIPT, "EbikeSystem")
 	world.facades = _add_system(FACADE_SCRIPT, "FacadeStreamer")
+	# 通缉与警察（GTA 化 §2.1）：玩法系统，setup 在 CityWorld._plan_life 里随城市建好
+	world.wanted = _add_system(WANTED_SCRIPT, "WantedSystem")
+	world.wanted.wanted_changed.connect(_on_wanted_changed)
+	world.wanted.escaped.connect(_on_wanted_escaped)
+	world.wanted.busted.connect(_on_wanted_busted)
+	world.wanted.rammed.connect(_on_police_rammed)
 	print("[BOOT-T] 12 个子系统已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# 相机与灯光架
@@ -312,6 +318,9 @@ const MISSILES_SCRIPT := preload("res://scripts/vehicles/flight_missiles.gd")
 const FLIGHT_COLLISION_SCRIPT := preload("res://scripts/world/flight_collision.gd")
 ## 坦克炮弹（原版 city-tank.ts 的 tracer 池 + 命中爆炸）
 const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
+## 通缉与警察系统（docs/GTA化改进方案.md §2.1）。⚠️ 新脚本 class_name 不进全局类缓存，
+## 与 COCKPIT_SCRIPT 同理必须 preload。
+const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -1296,6 +1305,10 @@ func _process(delta: float) -> void:
 	# 挂机在暂停界面里也能把合约"拖"到超时。
 	var speed := float(_vehicle_state()["speed"]) if mode in [Mode.CAR, Mode.TANK] else walk.speed
 	var res: Dictionary = {}
+	# 通缉系统喂玩家状态（数据坐标）：追捕/被捕判定用
+	if world.wanted != null:
+		world.wanted.set_player_state(p, speed)
+		hud.set_wanted(world.wanted.wanted_level, world.wanted.heat)
 	if not paused:
 		rides.step(p, speed, absf(float(_vehicle_state()["speed"])) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
 		res = career.step(dt, p, speed, false, false)
@@ -1441,10 +1454,26 @@ func _step_car(dt: float) -> void:
 
 	# 行人被撞倒地（原版 pedestrian-impact.ts）：把这一帧车的实际位移交出去
 	if world.pedestrians != null and world.pedestrians.has_method("apply_car_motion"):
-		world.pedestrians.apply_car_motion(impact_before, {
+		var knocked: int = world.pedestrians.apply_car_motion(impact_before, {
 			"x": car.x, "z": car.z, "yaw": car.yaw, "speed": car.speed,
 			"groundY": world.height_field.height_at(car.x, car.z),
 		})
+		# 通缉触发：撞倒行人（severity 按撞击速度归一，wanted 内部有冷却与递减）
+		if knocked > 0 and world.wanted != null:
+			var sev := clampf(absf(car.speed) / 20.0, 0.3, 1.0)
+			world.wanted.report_crime("hit_ped", Vector2(car.x, car.z), sev)
+
+	# 通缉触发：撞 AI 车流 / 警车（近距离 + 车速判定，冷却在 wanted 内部）
+	if world.wanted != null and absf(car.speed) > 5.0:
+		var px2 := Vector2(car.x, car.z)
+		for c in world.traffic.car_poses():
+			if px2.distance_to(Vector2(c["x"], c["z"])) < 3.5:
+				world.wanted.report_crime("hit_car", px2, 1.0)
+				break
+		for c in world.wanted.cop_poses():
+			if px2.distance_to(Vector2(c["x"], c["z"])) < 4.0:
+				world.wanted.report_crime("hit_cop", px2, 1.0)
+				break
 
 	_place_car_model()
 	# 车轮滚动：原版 wheelSpin += s.speed*dt/wheelRadius（用碰撞回滚后的 speed，
@@ -2163,6 +2192,32 @@ func _autopilot_phase_toasts() -> void:
 		_ap_blocked_toast = true
 		hud.toast("前方暂时无法通过，已尝试重新规划路线", 4.0)
 
+# ---------------------------------------------------------------------------
+# 通缉系统回调（docs/GTA化改进方案.md §2.1）
+# ---------------------------------------------------------------------------
+
+func _on_wanted_changed(level: int) -> void:
+	if level > 0:
+		hud.toast("通缉等级 %d ★" % level, 3.0)
+
+
+func _on_wanted_escaped() -> void:
+	hud.toast("已摆脱通缉", 4.0)
+
+
+func _on_wanted_busted() -> void:
+	hud.toast("被逮捕了！罚款并释放", 5.0)
+	# v1：只清通缉发车；医院/警局重生循环接 save_system 时再落（方案 §4.4）
+	if world.wanted != null:
+		world.wanted.clear_busted()
+
+
+func _on_police_rammed(force: float) -> void:
+	# 警车顶撞：只对玩家驾驶的汽车生效（坦克/飞行无视）
+	if mode == Mode.CAR:
+		car.speed *= force
+
+
 func diagnostics() -> Dictionary:
 	return {
 		"ready": session_ready,
@@ -2184,6 +2239,7 @@ func diagnostics() -> Dictionary:
 		"distantCity": world.distant_city.diagnostics() if world.distant_city != null else {},
 		"facades": world.facades.diagnostics() if world.facades != null else {},
 		"weather": world.weather.diagnostics() if world.weather != null else {},
+		"wanted": world.wanted.diagnostics() if world.wanted != null else {},
 		"career": career.status(),
 		"story": story.status(),
 		"rides": rides.status(),

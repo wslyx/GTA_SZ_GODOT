@@ -96,6 +96,8 @@ var traffic = null
 var pedestrians = null
 var ebikes = null
 var facades = null
+## 通缉与警察（scripts/gameplay/wanted_system.gd）—— 玩法系统，随 _update_subsystems 步进
+var wanted = null
 ## 建筑区块动态流式（buildings.glb 切块后按 640m 区块加载/卸载）
 var chunk_streamer = null
 ## 沥青路面标定（原版 applyCinematicRoad）
@@ -261,7 +263,7 @@ func _process(delta: float) -> void:
 
 
 func _update_subsystems(delta: float) -> void:
-	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials]:
+	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials, wanted]:
 		if sys != null and sys.has_method("update_system"):
 			sys.update_system(delta, focus)
 
@@ -645,6 +647,8 @@ func _plan_life() -> bool:
 		pedestrians.setup(self)
 	if ebikes != null and ebikes.has_method("setup"):
 		ebikes.setup(self)
+	if wanted != null and wanted.has_method("setup"):
+		wanted.setup(self)
 	return true
 
 

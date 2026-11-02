@@ -321,6 +321,7 @@ func _build() -> void:
 	add_child(_root)
 
 	_build_header()
+	_build_wanted()
 	_build_topright()
 	_build_story_card()
 	_build_invitation()
@@ -345,6 +346,55 @@ func _build() -> void:
 	_root.add_child(_fps_label)
 
 	_on_viewport_resized()
+
+
+# ---------------------------------------------------------------------------
+# 通缉星（顶部居中 5 颗 ★；亮 #e8b64c，熄 22% 白；当前星随 heat 脉冲）
+# ---------------------------------------------------------------------------
+
+const WANTED_LIT := Color(0.910, 0.714, 0.298)      ## #e8b64c
+const WANTED_DIM := Color(1.0, 1.0, 1.0, 0.22)
+const WANTED_STAR_COUNT := 5
+
+var _wanted_labels: Array = []
+var _wanted_level := 0
+var _wanted_heat := 0.0
+
+
+func _build_wanted() -> void:
+	var star_size := int(round(clampf(_vw() * 0.014, 15.0, 22.0)))
+	var step := float(star_size) + 6.0
+	var total := step * float(WANTED_STAR_COUNT - 1)
+	for i in WANTED_STAR_COUNT:
+		var l := _label("★", _f_ui, star_size, WANTED_DIM)
+		# PRESET_CENTER_TOP 的锚点下 position.x 是相对中心线的偏移
+		l.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		l.position = Vector2(-total * 0.5 + step * float(i), _header_pad() + 4.0)
+		l.visible = false
+		_root.add_child(l)
+		_wanted_labels.append(l)
+
+
+## 通缉值 UI 入口（WantedSystem → main_game 调用）。level 0–5，heat 0–1。
+func set_wanted(level: int, heat: float) -> void:
+	_wanted_level = clampi(level, 0, WANTED_STAR_COUNT)
+	_wanted_heat = clampf(heat, 0.0, 1.0)
+	for i in _wanted_labels.size():
+		_wanted_labels[i].visible = i < _wanted_level
+
+
+func _update_wanted(delta: float) -> void:
+	if _wanted_level <= 0:
+		return
+	# 当前星（最右亮着的那颗）按 heat 做呼吸脉冲：快满时闪烁加快
+	var pulse := 0.72 + 0.28 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006 * (1.0 + _wanted_heat)))
+	for i in _wanted_labels.size():
+		if i == _wanted_level - 1:
+			var c := WANTED_LIT
+			c.a *= lerpf(1.0, pulse, _wanted_heat)
+			_wanted_labels[i].add_theme_color_override("font_color", c)
+		elif i < _wanted_level:
+			_wanted_labels[i].add_theme_color_override("font_color", WANTED_LIT)
 
 
 func _build_header() -> void:
@@ -840,6 +890,7 @@ func _layout_invitation(edge: float) -> void:
 func update_hud(delta: float) -> void:
 	if not enabled or player == null:
 		return
+	_update_wanted(delta)
 	_toast_timer -= delta
 	if _toast_timer <= 0.0 and _toast_label.text != "":
 		_toast_label.text = ""
