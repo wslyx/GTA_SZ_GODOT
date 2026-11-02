@@ -25,6 +25,10 @@ signal host_changed(session_id: int, room: String, player_name: String)
 signal room_data(sender_session_id: int, room: String, data: PackedByteArray)
 signal rooms_listed(rooms: Array)
 signal kicked(reason: String)
+## 服务器主动点对点推送（Data 包，sender=0 系统通道）
+signal server_data(data: PackedByteArray)
+## 点对点数据（Data 包，sender=其他玩家；游戏内暂未使用，先开放信号）
+signal data_received(sender_session_id: int, data: PackedByteArray)
 
 # ---- 命令字节（与服务端 KcpCommand 完全一致）----
 const CMD_HANDSHAKE := 0x02
@@ -225,6 +229,19 @@ func _handle_packet(packet: PackedByteArray) -> void:
 			_handle_leave_room(sid, payload)
 		CMD_ROOM_BROADCAST:
 			_handle_room_broadcast(sid, payload)
+		CMD_DATA:
+			# payload: [sender u64][data]。sender=0 为服务器主动推送（工单 2.6），
+			# 其他值为点对点转发。此前 CMD_DATA 未处理，服务器推送被静默丢弃。
+			if payload.size() >= 8:
+				var dbuf := StreamPeerBuffer.new()
+				dbuf.big_endian = false
+				dbuf.data_array = payload
+				var sender := dbuf.get_u64()
+				var data := payload.slice(8)
+				if sender == 0:
+					server_data.emit(data)
+				else:
+					data_received.emit(sender, data)
 		CMD_LIST_ROOMS:
 			_handle_list_rooms(payload)
 		_:

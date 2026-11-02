@@ -43,6 +43,10 @@ var auto_reconnect := true
 const MAX_RECONNECT_ATTEMPTS := 5
 ## 当前所在战局，空串表示未加入
 var current_room := ""
+## 战局权威玩家会话 ID（成员集中会话 ID 最小者，先加入者 ID 更小）。
+## 天气/昼夜档由权威玩家广播（world_state），全员可从同一成员集推算出
+## 同一权威 —— 无需服务端参与；权威离开后自动让位给次小 ID。
+var current_host := 0
 ## 是否处于"已连接且已加入战局"状态
 var in_session := false
 ## 最近一次往返延迟（毫秒），-1 表示未知
@@ -52,6 +56,21 @@ var current_mode := "walk"
 
 ## 模式来源 Callable（由 main_game 绑定，返回 walk/car/tank/plane/observer）
 var _mode_provider: Callable = Callable()
+
+## 姿态来源 Callable（由 main_game 绑定，返回 Node3D）：
+## 步行 → ALS 角色；载具 → 对应模型节点（含俯仰/侧倾全量姿态）；观战 → 追踪相机。
+## 上车后 ALS 角色被收起不再更新，必须换源，否则远程端看到冻结的步行位。
+var _pose_provider: Callable = Callable()
+## 最近一次上报用的姿态节点（雷达原点跟随用）
+var _last_pose_node: Node3D = null
+
+## 战局世界状态（天气/昼夜档）应用 Callable（由 main_game 绑定）：
+## 参数 (light: int, rain: bool)，仅在收到权威玩家的 world_state 时调用
+var _world_state_apply: Callable = Callable()
+
+## world_state 广播间隔（秒）—— 权威玩家周期广播，覆盖短暂丢包
+const WORLD_STATE_SEND_SEC := 5.0
+var _world_state_accum := 0.0
 
 ## 本地玩家节点（Node3D，通常是 AlsPlayerHost）
 var _local_player: Node3D = null
@@ -194,6 +213,13 @@ func _process(delta: float) -> void:
 			_state_accum = 0.0
 			_send_local_state()
 
+		# 战局世界状态（天气/昼夜）广播：仅权威玩家周期发送
+		if _is_authoritative():
+			_world_state_accum += delta
+			if _world_state_accum >= WORLD_STATE_SEND_SEC:
+				_world_state_accum = 0.0
+				_send_world_state()
+
 		# 心跳
 		_heartbeat_accum += delta
 		if _heartbeat_accum >= HEARTBEAT_INTERVAL:
@@ -260,6 +286,16 @@ func bind_mode_provider(provider: Callable) -> void:
 	_mode_provider = provider
 
 
+## 绑定姿态来源 Callable（无参，返回 Node3D；见 _pose_provider 注释）
+func bind_pose_provider(provider: Callable) -> void:
+	_pose_provider = provider
+
+
+## 绑定战局世界状态应用 Callable（参数 (light: int, rain: bool)）
+func bind_world_state_apply(apply: Callable) -> void:
+	_world_state_apply = apply
+
+
 ## 连接服务器并加入默认战局
 func join_session(p_host: String, p_port: int, p_name: String) -> void:
 	if _client != null:
@@ -286,6 +322,8 @@ func join_session(p_host: String, p_port: int, p_name: String) -> void:
 	_client.member_left.connect(_on_member_left)
 	_client.host_changed.connect(_on_host_changed)
 	_client.room_data.connect(_on_room_data)
+	_client.server_data.connect(_on_server_data)
+	_client.data_received.connect(_on_peer_data)
 	_client.rooms_listed.connect(func(rooms): _chat("战局列表", str(rooms)))
 	_client.pong.connect(func(rtt): last_rtt = rtt; _silence_accum = 0.0)
 	_client.connect_to_server(host, port, player_name, auth_token)
@@ -416,8 +454,8 @@ func _on_room_data(sender: int, room: String, data: PackedByteArray) -> void:
 		var remote := _ensure_remote(sender, "玩家%d" % (sender % 1000))
 		remote.apply_state(
 			state.position, state.yaw, str(state.get("mode", "walk")),
-			state.get("velocity", Vector3.ZERO))
-	elif data[0] == 0x7B:  # '{' JSON（聊天/系统公告等文本消息）
+			state.get("velocity", Vector3.ZERO), state.get("quat", Quaternion.IDENTITY))
+	elif data[0] == 0x7B:  # '{' JSON（聊天/系统公告/世界状态等文本消息）
 		var json := JSON.new()
 		if json.parse(data.get_string_from_utf8()) == OK and json.data is Dictionary:
 			match str(json.data.get("type", "")):
@@ -426,6 +464,9 @@ func _on_room_data(sender: int, room: String, data: PackedByteArray) -> void:
 				"announce":
 					# 系统公告（sender=0，服务端主动推送），聊天窗高亮展示
 					_chat("【公告】", str(json.data.get("text", "")))
+				"world_state":
+					# 天气/昼夜档同步（工单 1.4）：仅应用权威玩家的广播
+					_apply_world_state_if_authoritative(sender, json.data)
 	var _wd_cost := Time.get_ticks_usec() - _wd_t0
 	if _wd_cost > 50000:
 		_diag("⚠ 房间数据处理耗时 %d 微秒 sender=%d size=%d" % [
@@ -434,6 +475,47 @@ func _on_room_data(sender: int, room: String, data: PackedByteArray) -> void:
 
 # ---- 内部实现 ----
 
+## 战局权威玩家：成员集（自己 + 全部远程成员）中会话 ID 最小者。
+## 雪花 ID 单调递增（先加入者更小），全员从同一成员集可推算出同一权威；
+## 权威离开（member_left/超时剔除）后次小 ID 自动接任。
+func _is_authoritative() -> bool:
+	if _client == null:
+		return false
+	# ⚠️ 项目踩坑 #2：_client 故意无类型（class_name 冷缓存问题），
+	# _client.session_id 是 Variant，必须显式 int 类型，:= 会推断失败
+	var min_sid: int = _client.session_id
+	for sid in _remotes.keys():
+		if int(sid) < min_sid:
+			min_sid = int(sid)
+	current_host = min_sid
+	return min_sid == _client.session_id
+
+
+## 权威玩家广播 world_state（天气/昼夜档）
+func _send_world_state() -> void:
+	if _client == null or current_room == "":
+		return
+	var payload := JSON.stringify({
+		"type": "world_state",
+		"light": GameState.light_mode,
+		"rain": GameState.rain,
+	}).to_utf8_buffer()
+	_client.send_room_broadcast(current_room, payload)
+
+
+## 应用收到的 world_state：仅当发送者是当前推算的权威时生效
+## （冲突包——比如权威换届瞬间的旧权威广播——直接忽略，全员收敛一致）
+func _apply_world_state_if_authoritative(sender: int, msg: Dictionary) -> void:
+	if sender == _client.session_id:
+		return
+	if sender != current_host:
+		return
+	var light := int(msg.get("light", GameState.light_mode))
+	var rain := bool(msg.get("rain", GameState.rain))
+	if _world_state_apply.is_valid():
+		_world_state_apply.call(light, rain)
+
+
 ## 上报本地玩家状态（二进制 GameData：POSITION | ROTATION | WEAPON=移动模式）
 func _send_local_state() -> void:
 	if _local_player == null or not is_instance_valid(_local_player) or _client == null:
@@ -441,10 +523,18 @@ func _send_local_state() -> void:
 	var _wd_t0 := Time.get_ticks_usec()
 	# 每次上报前向模式提供者刷新当前模式（未绑定则维持上次值）
 	if _mode_provider.is_valid():
-		var m: String = str(_mode_provider.call())
-		if m != "":
-			current_mode = m
-	var xf := _local_player.global_transform
+		var mv = _mode_provider.call()
+		if str(mv) != "":
+			current_mode = str(mv)
+	# 姿态来源：优先姿态提供者（载具模式=模型节点，含俯仰/侧倾全量姿态；
+	# 步行=ALS 角色）。提供者未绑定或节点失效时回退本地玩家节点。
+	var pose_node: Node3D = _local_player
+	if _pose_provider.is_valid():
+		var pn = _pose_provider.call()
+		if pn is Node3D and is_instance_valid(pn):
+			pose_node = pn
+	_last_pose_node = pose_node
+	var xf := pose_node.global_transform
 	var pos := xf.origin
 	# 差分速度估计：相邻两次上报的位置差 / 时间差（米/秒）。
 	# 首次上报或瞬移（>200 m/s，如快速移动/重生）时置零，防止外推飞出。
@@ -458,7 +548,8 @@ func _send_local_state() -> void:
 				vel = Vector3.ZERO
 	_last_sent_pos = pos
 	_last_sent_ms = now_ms
-	# Godot 坐标系→发送原样数值，两端仅做中转不做换算
+	# Godot 坐标系→发送原样数值，两端仅做中转不做换算。
+	# 发送完整四元数（含俯仰/侧倾）：载具模型远程 1:1 复现需要它。
 	var q := xf.basis.get_rotation_quaternion()
 	_send_sequence += 1
 	var buf := StreamPeerBuffer.new()
@@ -490,6 +581,27 @@ func _send_local_state() -> void:
 		_diag("⚠ 状态上报耗时 %d 微秒（阈值 50000）" % _wd_cost)
 
 
+## 服务器主动推送（Data 包 sender=0）：文本或 JSON 展示到聊天窗
+func _on_server_data(data: PackedByteArray) -> void:
+	var text := data.get_string_from_utf8()
+	var json := JSON.new()
+	if json.parse(text) == OK and json.data is Dictionary:
+		match str(json.data.get("type", "")):
+			"announce":
+				_chat("【公告】", str(json.data.get("text", "")))
+			_:
+				_chat("【推送】", text)
+	else:
+		_chat("【推送】", text)
+
+
+## 点对点数据（Data 包，其他玩家）：文本展示到聊天窗
+func _on_peer_data(sender: int, data: PackedByteArray) -> void:
+	var text := data.get_string_from_utf8()
+	if text != "":
+		_chat("私信·%d" % (sender % 1000), text)
+
+
 func _is_binary_game_data(data: PackedByteArray) -> bool:
 	# 服务端 GameDataPacket.HEADER_SIZE = 16，且首两字节为 version=1, type=1
 	return data.size() >= 16 and data[0] == 0x01 and data[1] == 0x01
@@ -514,8 +626,11 @@ func _decode_game_data(data: PackedByteArray) -> Dictionary:
 		var qw := buf.get_float()
 		var basis := Basis(Quaternion(qx, qy, qz, qw))
 		result.yaw = basis.get_euler().y
+		# 完整四元数透传：载具模式远程端按原姿态挂载模型（保留俯仰/侧倾）
+		result.quat = Quaternion(qx, qy, qz, qw)
 	else:
 		result.yaw = 0.0
+		result.quat = Quaternion.IDENTITY
 	# WEAPON 字段被复用为移动模式标记（walk/car/tank/plane/observer）。
 	# ⚠️ 手动计算偏移切片，不用 buf.get_data()（部分版本返回 Array 无 get_string_from_utf8）
 	var off := 16
@@ -588,6 +703,8 @@ func _leave_session(reason: String, manual := true) -> void:
 func _cleanup_client() -> void:
 	current_room = ""
 	in_session = false
+	current_host = 0
+	_world_state_accum = 0.0
 	if _radar != null:
 		_radar.visible = false
 	for sid in _remotes.keys():
@@ -663,11 +780,16 @@ func _build_hud() -> void:
 
 ## 雷达数据提供者：把远程化身换算为本地玩家坐标系下的 (东, 南) 偏移（米）
 func _radar_entries() -> Array:
-	if _local_player == null or not is_instance_valid(_local_player):
+	# 雷达原点跟随最近一次上报用的姿态节点（载具模式下 ALS 角色被收起冻结，
+	# 若仍以它为原点，雷达会停在最后步行点）
+	var origin_node: Node3D = _local_player
+	if _last_pose_node != null and is_instance_valid(_last_pose_node):
+		origin_node = _last_pose_node
+	if origin_node == null or not is_instance_valid(origin_node):
 		return []
 	var _wd_t0 := Time.get_ticks_usec()
-	var origin := _local_player.global_position
-	var yaw: float = _local_player.global_rotation.y
+	var origin := origin_node.global_position
+	var yaw: float = origin_node.global_rotation.y
 	# 本地玩家朝向旋转：让雷达"上"对准玩家面朝方向（-Z 为面朝）
 	# 注意 Basis 只能乘 Vector3，先在 3D 旋转再取 xz 平面
 	var rot := Basis(Vector3.UP, -yaw)

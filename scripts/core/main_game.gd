@@ -136,6 +136,30 @@ func _net_mode_string() -> String:
 			return "observer"
 
 
+## 多人战局状态上报的姿态来源节点（NetSession 每次上报前调用）。
+##
+## 步行发 ALS 角色；载具模式发对应模型节点 —— 模型的 global_transform 含
+## 悬挂/俯仰/侧倾全量姿态，且与远程端挂载的同款 GLB 坐标约定一致（模型前向
+## 轴实测表见 README 第三节），远程端原样套用即可 1:1 对齐，无需换算。
+## 之前没有这一层时，上车后 ALS 角色被收起、_als_host 不再更新，
+## 远程玩家看到的是冻结在最后步行点的胶囊。观战模式发追踪相机（跟随视野）。
+func _net_pose_node() -> Node3D:
+	match mode:
+		Mode.CAR:
+			if _car_model != null:
+				return _car_model
+		Mode.TANK:
+			if _tank_model != null:
+				return _tank_model
+		Mode.AIRCRAFT:
+			if _plane_model != null:
+				return _plane_model
+		Mode.WALKING:
+			if _als_host != null and _als_walk_active:
+				return _als_host
+	return camera
+
+
 func _ready() -> void:	# ⚠️ 加载界面必须先于任何重活出现。
 	# PanelsUI._ready() 会在 add_child 的瞬间建好加载画面，但那一帧还没画到屏幕上；
 	# 如果紧接着就在同一帧里跑 CityData.load_core() / collision.build() 这类
@@ -185,6 +209,10 @@ func _build_world() -> void:
 	_als_orbit = _als_host.get_node_or_null("OrbitCamera")
 	# 多人战局：把 ALS 角色宿主绑定为本地玩家，NetSession 据此上报位置（未连接时零开销）
 	NetSession.bind_local_player(_als_host)
+	# 状态上报姿态来源：步行发 ALS 角色，载具/观战发对应模型节点（见 _net_pose_node）。
+	NetSession.bind_pose_provider(_net_pose_node)
+	# 战局天气/昼夜档同步：收到权威玩家的 world_state 时应用
+	NetSession.bind_world_state_apply(_apply_net_world_state)
 	NetSession.bind_mode_provider(_net_mode_string)
 	# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
 	# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
@@ -726,6 +754,25 @@ func _apply_light_mode() -> void:
 		world.water.on_light_mode(GameState.light_mode)
 	if lights != null:
 		lights.set_light_mode(GameState.light_mode)
+
+
+## 战局天气/昼夜档同步（工单 1.4）：应用权威玩家广播的 world_state。
+## 只有与本机当前状态不同时才动 —— 周期广播下重复应用会造成光照过渡动画反复播放。
+func _apply_net_world_state(light: int, rain: bool) -> void:
+	if world == null:
+		return
+	var changed := false
+	if int(GameState.light_mode) != light and world.lighting != null:
+		world.lighting.apply_mode(light, true)
+		GameState.set_light_mode(light)
+		changed = true
+	if GameState.rain != rain and world.weather != null:
+		world.weather.set_raining(rain)
+		GameState.rain = rain
+		changed = true
+	if changed:
+		_apply_light_mode()
+		hud.toast("战局状态同步：%s · %s" % [_light_mode_name(), "雨天" if rain else "晴"], 2.5)
 
 # ---------------------------------------------------------------------------
 # 模式切换
