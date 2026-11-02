@@ -216,6 +216,39 @@ func _count_downed() -> int:
 	return n
 
 
+## 射击命中（GTA化 §2.3）：数据坐标射线 from + dir*t（t ∈ [0.5, range_m]），
+## 取最近的未倒地行人（命中半径 0.7m）。命中即用小冲量刚体击倒
+## （复用车辆撞击的 create_body 链路），返回 {t, pos}，未命中 {}。
+func shoot_hit(from: Vector2, dir: Vector2, range_m: float) -> Dictionary:
+	if not enabled or not _built or walkers.is_empty():
+		return {}
+	var best_t := range_m
+	var best_w = null
+	for w in walkers:
+		if w["body"] != null:
+			continue
+		var rel := Vector2(w["x"], w["z"]) - from
+		var t := rel.dot(dir)
+		if t < 0.5 or t > best_t:
+			continue
+		if (rel - dir * t).length() > 0.7:
+			continue
+		best_t = t
+		best_w = w
+	if best_w == null:
+		return {}
+	var px := float(best_w["x"])
+	var pz := float(best_w["z"])
+	var person := {"x": px, "y": world.ground_height(px, -pz), "z": pz}
+	var impact := {
+		"velocity": Vector3(dir.x * 3.0, 1.2, dir.y * 3.0),
+		"spin": Vector3(dir.y * 4.0, 0.5, -dir.x * 4.0),
+	}
+	best_w["body"] = IMPACT_SCRIPT.create_body(person, impact)
+	_downed = _count_downed()
+	return {"t": best_t, "pos": Vector2(px, pz)}
+
+
 func update_system(delta: float, focus: Vector3) -> void:
 	var __hitch_t0 := Time.get_ticks_msec()
 	if not enabled or not _built:

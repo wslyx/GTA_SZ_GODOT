@@ -322,6 +322,7 @@ func _build() -> void:
 
 	_build_header()
 	_build_wanted()
+	_build_combat()
 	_build_topright()
 	_build_story_card()
 	_build_invitation()
@@ -395,6 +396,97 @@ func _update_wanted(delta: float) -> void:
 			_wanted_labels[i].add_theme_color_override("font_color", c)
 		elif i < _wanted_level:
 			_wanted_labels[i].add_theme_color_override("font_color", WANTED_LIT)
+
+
+# ---------------------------------------------------------------------------
+# 战斗 UI（GTA化 §2.3）：准星 / 弹药 / 血条
+# ---------------------------------------------------------------------------
+
+const CROSS_COLOR := Color(0.949, 0.945, 0.906, 0.9)
+const CROSS_HIT := Color(0.910, 0.714, 0.298, 1.0)   ## 命中反馈同通缉星亮色
+
+var _crosshair: Control = null
+var _cross_ticks: Array = []
+var _ammo_label: Label = null
+var _health_fill: ColorRect = null
+var _hit_mark_t := 0.0
+var _combat_visible := false
+
+
+func _build_combat() -> void:
+	# 准星：中心点 + 上下左右 4 条短线（ColorRect，无纹理依赖）
+	_crosshair = Control.new()
+	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
+	_crosshair.visible = false
+	_root.add_child(_crosshair)
+	var dot := ColorRect.new()
+	dot.color = CROSS_COLOR
+	dot.size = Vector2(3, 3)
+	dot.position = Vector2(-1.5, -1.5)
+	_crosshair.add_child(dot)
+	for i in 4:
+		var t := ColorRect.new()
+		t.color = CROSS_COLOR
+		t.size = Vector2(2, 7) if i % 2 == 0 else Vector2(7, 2)
+		var off := 9.0
+		if i == 0: t.position = Vector2(-1, -off - 7)
+		elif i == 1: t.position = Vector2(-1, off)
+		elif i == 2: t.position = Vector2(-off - 7, -1)
+		else: t.position = Vector2(off, -1)
+		_crosshair.add_child(t)
+		_cross_ticks.append(t)
+	# 弹药：屏幕中下（准星下方 64px）
+	_ammo_label = _label("", _f_num, 15, Color(0.949, 0.945, 0.906, 0.88))
+	_ammo_label.set_anchors_preset(Control.PRESET_CENTER)
+	_ammo_label.position = Vector2(-90, 64)
+	_ammo_label.size = Vector2(180, 22)
+	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ammo_label.visible = false
+	_root.add_child(_ammo_label)
+	# 血条：左上 wordmark/副标题下方 —— 宽 150、高 5 的暗槽 + 亮填充
+	var hp_slot := ColorRect.new()
+	hp_slot.color = Color(1, 1, 1, 0.14)
+	hp_slot.position = Vector2(_hud_edge(), _header_pad() + 64.0)
+	hp_slot.size = Vector2(150, 5)
+	_root.add_child(hp_slot)
+	_health_fill = ColorRect.new()
+	_health_fill.color = Color(0.42, 0.78, 0.60)
+	_health_fill.position = Vector2(0, 0)
+	_health_fill.size = Vector2(150, 5)
+	hp_slot.add_child(_health_fill)
+
+
+## 武器状态（weapon_system.hud_state() 透传）：{} = 空手隐藏整套战斗 UI
+func set_weapon(state: Dictionary) -> void:
+	_combat_visible = not state.is_empty()
+	_crosshair.visible = _combat_visible
+	_ammo_label.visible = _combat_visible
+	if _combat_visible:
+		if bool(state.get("reloading", false)):
+			_ammo_label.text = "装填中…"
+		else:
+			_ammo_label.text = "%d / %d  %s" % [state.get("ammo", 0), state.get("mag", 0), state.get("name", "")]
+
+
+## 血量 0–100
+func set_health(hp: float) -> void:
+	if _health_fill != null:
+		_health_fill.size.x = 150.0 * clampf(hp, 0.0, 100.0) / 100.0
+		_health_fill.color = Color(0.42, 0.78, 0.60) if hp > 30.0 else Color(0.89, 0.35, 0.30)
+
+
+## 命中反馈：4 条短线闪一下暖色
+func hit_mark() -> void:
+	_hit_mark_t = 0.18
+
+
+func _update_combat(delta: float) -> void:
+	if not _combat_visible:
+		return
+	_hit_mark_t = maxf(0.0, _hit_mark_t - delta)
+	var c := CROSS_HIT if _hit_mark_t > 0.0 else CROSS_COLOR
+	for t in _cross_ticks:
+		t.color = c
 
 
 func _build_header() -> void:
@@ -891,6 +983,7 @@ func update_hud(delta: float) -> void:
 	if not enabled or player == null:
 		return
 	_update_wanted(delta)
+	_update_combat(delta)
 	_toast_timer -= delta
 	if _toast_timer <= 0.0 and _toast_label.text != "":
 		_toast_label.text = ""

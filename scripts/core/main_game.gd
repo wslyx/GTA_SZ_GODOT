@@ -42,6 +42,13 @@ var career: CareerSystem
 var story: StorySystem
 var audio: ProceduralAudio
 
+## 武器系统（GTA化 §2.3）：RefCounted 纯数据，输入在 _step_walk 里驱动
+var weapons = WEAPON_SCRIPT.new()
+## 玩家生命 0–100：v1 伤害源只有 3 星+ 警察开火（车内免伤）
+var player_health := 100.0
+## 左键开火的边沿检测（半自动武器只在按下瞬间打一发）
+var _fire_pressed_last := false
+
 var mode: int = Mode.CAR
 ## 上次乘坐的地面载具（Mode.CAR / Mode.TANK）：下车时记录，上车时据此回到那一台。
 ##
@@ -243,6 +250,7 @@ func _build_world() -> void:
 	world.wanted.escaped.connect(_on_wanted_escaped)
 	world.wanted.busted.connect(_on_wanted_busted)
 	world.wanted.rammed.connect(_on_police_rammed)
+	world.wanted.player_shot.connect(_on_player_shot)
 	print("[BOOT-T] 12 个子系统已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# 相机与灯光架
@@ -321,6 +329,8 @@ const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
 ## 通缉与警察系统（docs/GTA化改进方案.md §2.1）。⚠️ 新脚本 class_name 不进全局类缓存，
 ## 与 COCKPIT_SCRIPT 同理必须 preload。
 const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
+## 武器系统（GTA化 §2.3）。同上必须 preload。
+const WEAPON_SCRIPT := preload("res://scripts/gameplay/weapon_system.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -749,6 +759,12 @@ func _on_key(k: InputEventKey) -> void:
 					if career.accept(int(contracts[ordinal - 1])):
 						hud.toast("已接下合约：%s" % career.status()["contract"], 3.0)
 						panels.refresh_journal()
+			elif mode == Mode.WALKING and ordinal <= 3:
+				# 武器切换（GTA化 §2.3）：1/2/3 选枪，再按同键收枪
+				var msg: String = weapons.select(ordinal - 1)
+				if not msg.is_empty():
+					hud.toast(msg, 2.5)
+				hud.set_weapon(weapons.hud_state())
 
 func _light_mode_name() -> String:
 	match GameState.light_mode:
@@ -1626,11 +1642,33 @@ func _step_walk(dt: float) -> void:
 		walk.speed = _als_host.HorizontalSpeed
 		walk.moving = walk.speed > 0.1
 		walk_eye_world = motor
+		# 武器开火（GTA化 §2.3）：仅步行持枪；方向 = 相机朝向的 2D 投影
+		_step_weapons(dt)
 		return
 	if not _walk_error_shown:
 		_walk_error_shown = true
 		push_error("[MainGame] 步行模式没有 ALS 角色驱动（旧步行回退已移除），" +
 			"角色将静止。请检查 ALS C# 程序集是否构建成功。")
+
+
+## 武器开火驱动（仅步行持枪时）。方向取相机 -Z 的数据坐标 2D 投影 ——
+## 本作命中判定全是二维（collision/pedestrian 都是平面数据），俯仰差 v1 忽略。
+func _step_weapons(dt: float) -> void:
+	if weapons.armed < 0:
+		_fire_pressed_last = false
+		hud.set_weapon({})
+		return
+	var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	var just := held and not _fire_pressed_last
+	_fire_pressed_last = held
+	var fwd := -camera.global_transform.basis.z
+	var dir := Vector2(fwd.x, -fwd.z)
+	dir = dir.normalized() if dir.length_squared() > 1e-6 else Vector2(0.0, 1.0)
+	var ev: Dictionary = weapons.step(dt, just, held, Vector2(walk.x, walk.z), dir, world)
+	if bool(ev.get("fired", false)) \
+			and (int(ev.get("hit_person", 0)) > 0 or bool(ev.get("hit_car", false))):
+		hud.hit_mark()
+	hud.set_weapon(weapons.hud_state())
 
 var walk_eye_world := Vector3.ZERO
 
@@ -2252,6 +2290,34 @@ func _on_police_rammed(force: float) -> void:
 	# 警车顶撞：只对玩家驾驶的汽车生效（坦克/飞行无视）
 	if mode == Mode.CAR:
 		car.speed *= force
+
+
+func _on_player_shot(dmg: float) -> void:
+	# v1 车内免伤：警察只对步行玩家开枪（方案 §2.3）
+	if mode != Mode.WALKING or paused:
+		return
+	player_health = maxf(0.0, player_health - dmg)
+	hud.set_health(player_health)
+	if player_health <= 0.0:
+		_respawn_player()
+
+
+## 倒地重生（GTA化 §2.3）：清通缉 + 就近路口苏醒。
+## ALS 角色传送必须按"先退出（马达位置写回 walk）→ 改落点 → 再进入"的顺序，
+## 直接改 walk.x 会被下一帧马达位置覆盖。
+func _respawn_player() -> void:
+	player_health = 100.0
+	hud.set_health(100.0)
+	if world.wanted != null:
+		world.wanted.clear_busted()
+	var nid := world.graph.nearest_main_node(Vector2(walk.x, walk.z))
+	if nid >= 0 and _als_walk_active:
+		_als_exit_world()
+		var np: Vector2 = world.graph.nodes[nid]
+		walk.x = np.x
+		walk.z = np.y
+		_als_enter_world()
+	hud.toast("你被击倒了 · 已在附近路口苏醒（通缉已清除）", 5.0)
 
 
 func diagnostics() -> Dictionary:

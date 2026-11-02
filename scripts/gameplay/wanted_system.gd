@@ -21,6 +21,7 @@ signal wanted_changed(level: int)
 signal busted
 signal escaped
 signal rammed(force: float)
+signal player_shot(dmg: float)
 
 # ---------------------------------------------------------------------------
 # 调参区（都按可玩性拍的中等值，接手后随便调）
@@ -57,6 +58,11 @@ const RAM_DIST := 4.0
 const RAM_SPEED := 8.0
 ## 3 星以上无视红灯（追捕强度）
 const RUN_SIGNAL_LEVEL := 3
+## 警察开火：3 星起、70m 内、每警车 1.3s 一发（命中率随距离衰减）。
+## 命中只发 player_shot 信号，掉血/死亡结算在 main_game（车载免伤，v1 只打步行玩家）。
+const COP_FIRE_MIN_LEVEL := 3
+const COP_FIRE_RANGE := 70.0
+const COP_FIRE_INTERVAL := 1.3
 
 ## 渲染（与 TrafficSystem 同款节流）
 const SYNC_INTERVAL := 0.1
@@ -369,6 +375,21 @@ func _step_cops(delta: float) -> void:
 					and _player_speed > RAM_SPEED:
 				rammed.emit(0.55)
 				break
+
+	# 警察开火（3 星起）：每辆警车独立冷却；命中率随距离衰减，伤害 8–14。
+	# 是否真的掉血由 main_game 按模式裁决（v1 车内免伤，只有步行会中弹）。
+	if wanted_level >= COP_FIRE_MIN_LEVEL and not busted_handled:
+		for c in cops:
+			var dist := Vector2(c["x"], c["z"]).distance_to(_player_pos)
+			if dist > COP_FIRE_RANGE:
+				continue
+			c["fire_t"] = float(c.get("fire_t", _rng.randf() * COP_FIRE_INTERVAL)) - delta
+			if float(c["fire_t"]) > 0.0:
+				continue
+			c["fire_t"] = COP_FIRE_INTERVAL
+			var hit_chance := clampf(0.55 - dist / 200.0, 0.08, 0.5)
+			if _rng.randf() < hit_chance:
+				player_shot.emit(_rng.randf_range(8.0, 14.0))
 
 
 ## 警车数据坐标位置（main_game 的撞警车判定用）
