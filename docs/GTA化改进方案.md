@@ -265,9 +265,13 @@ GPU 就绪资产包、远处全是 LOD2/3 与 impostor。本项目落地两项�
    **比源 GLB 旧时自动回退 GLB**（烘焙永不锁死旧数据）。已烘焙 150/150 块。
    重烘用法：`godot --headless --script res://tools/bake_chunk_scn.gd [-- --force]`
    注意 .scn 随包分发（原生资源无 .import 侧车，导出即用）。
-3. **区块 Impostor**（待做，aerial 观感质变）：块加载后 SubViewport 烘一张顶视
-   thumbnail（256² ≈ 0.25MB/块），卸载时保留作远景 billboard——补上 3–6km 的
-   细节真空。"远处的地图"其实是数据的照片。
+3. **区块 Impostor** ✅（2026-11-02，aerial 观感质变）：块加载后 SubViewport
+   顶视正交烘一张 256² thumbnail（共享主 World3D 渲染已加载块本体，up=数据北
+   与路网同向；S3TC 压缩 ≈13MB/150 块），卸载时保留，以 640m 地面贴片
+   （PlaneMesh FACE_Y，地面 +0.3m 防穿模，跟随昼夜光照）继续渲染该街区——
+   "远处的地图"其实是数据的照片。烘焙节流：2s 一张、加载器空闲才做，
+   150 块约 5 分钟渐进铺满；烘焙期间块被卸载也能正确补位。诊断加
+   `impostors / bakeQueue` 计数。
 4. **不需要抄的**：虚拟高度场地形（本项目平地 + ground_field 无此负担）、
    纹理 Mip 流送（Godot 无运行时 mip 流送，dedup 已是该约束下最优）、
    物理分块（city_collision 本就与渲染解耦）。

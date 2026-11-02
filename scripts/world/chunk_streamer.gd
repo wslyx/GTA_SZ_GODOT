@@ -78,6 +78,23 @@ var stats_loaded := 0
 var stats_unloaded := 0
 var stats_failed := 0
 
+# --- 区块 Impostor（§加载优化③）：补 3–6km 的细节真空 ----------------------
+## 原理（PUBG 式）：块**加载后**用 SubViewport 顶视烘一张 256² thumbnail，
+## 卸载后保留，以"铺在地上的照片"形式继续渲染该街区——远处的地图其实是
+## 数据的照片，而不是数据本身。
+const IMPOSTOR_SIZE := 256
+## Impostor 显示半径：未加载区块中心在此距离内且已有贴图时显示
+const IMPOSTOR_MAX_DIST := 9000.0
+## 烘焙节流：一次一张，间隔 2s（加载器空闲时才做），150 块 ≈ 5 分钟渐进铺满
+const BAKE_INTERVAL := 2.0
+var _impostors: Dictionary = {}     ## "i_j" → Texture2D（卸载后保留）
+var _impostor_nodes: Dictionary = {} ## "i_j" → MeshInstance3D（懒建，常驻）
+var _bake_viewport: SubViewport = null
+var _bake_cam: Camera3D = null
+var _bake_queue: Array = []         ## 待烘焙的 entry 列表
+var _bake_busy := false
+var _bake_timer := 0.0
+
 # --- 启动期预加载 -----------------------------------------------------------
 var _preload_keys: Array = []
 var _preload_total := 0
@@ -257,6 +274,12 @@ func update_system(delta: float, focus: Vector3) -> void:
 				for mi in GlbLoader.meshes_of(node):
 					if mi.cast_shadow != cast:
 						mi.cast_shadow = cast
+		# 1.5) Impostor 烘焙节流：一次一张、间隔 2s、加载器空闲才做
+		_bake_timer -= delta
+		if _bake_timer <= 0.0 and not _bake_busy \
+				and not _bake_queue.is_empty() and _loader.is_idle():
+			_bake_timer = BAKE_INTERVAL
+			_process_bake_queue()
 
 	# 2) 串行排队加载：LOAD_RADIUS 内评分最高的未加载区块
 	#    评分 = 距离² × (1 − 0.6 × 前进对齐度)，前进方向由焦点位移平滑估计
@@ -325,6 +348,8 @@ func _unload_chunk(e: Dictionary) -> void:
 	e["scene"] = null   # 丢弃 PackedScene 引用；CACHE_MODE_IGNORE 下引用归零即被 GC
 	e["state"] = "pending"
 	_failed.erase(key)
+	# Impostor：块走了，照片留下（已烘焙时）
+	_imp_show(e, true)
 	stats_unloaded += 1
 
 
@@ -358,6 +383,10 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 	e["scene"] = null
 	e["state"] = "loaded"
 	stats_loaded += 1
+	# Impostor：块已加载 → 藏掉地面贴片（贴片只替"未加载"的块）；排入烘焙队列
+	_imp_show(e, false)
+	if e["node"] != null:
+		_bake_queue.append(e)
 	# 维护 world.blocks，供 traffic / pedestrian / scenery 的 place() 就绪判断
 	if world != null:
 		world.blocks.append({
@@ -393,6 +422,101 @@ func _on_failed(path: String, _reason: String) -> void:
 	_retry_timer = FAILED_RETRY_DELAY
 
 
+# ---------------------------------------------------------------------------
+# 区块 Impostor（§加载优化③）：卸载后用烘焙的顶视照片继续渲染该街区
+# ---------------------------------------------------------------------------
+
+func _imp_key(e: Dictionary) -> String:
+	return "%d_%d" % [e["i"], e["j"]]
+
+
+## 显隐该块的地面贴片（懒建）。贴图尚未烘焙时直接返回——没照片不装。
+func _imp_show(e: Dictionary, show: bool) -> void:
+	var key := _imp_key(e)
+	if show and not _impostors.has(key):
+		return
+	var node: MeshInstance3D = _impostor_nodes.get(key, null)
+	if node == null:
+		node = _imp_create(e)
+	if node != null and is_instance_valid(node):
+		node.visible = show
+
+
+## 地面贴片：640m PlaneMesh 平铺在块中心地面 +0.3m（防 z-fight），跟随昼夜光照
+func _imp_create(e: Dictionary) -> MeshInstance3D:
+	var key := _imp_key(e)
+	var mesh := PlaneMesh.new()
+	mesh.size = Vector2(BLOCK_SIZE, BLOCK_SIZE)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _impostors[key]
+	mat.roughness = 0.95
+	mat.metallic = 0.0
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	mesh.material = mat
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.name = "impostor-%s" % key
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var g := world.ground_height(float(e["x"]), -float(e["z"]))
+	node.position = CoordinateUtil.to_world(float(e["x"]), float(e["z"]), g + 0.3)
+	add_child(node)
+	_impostor_nodes[key] = node
+	return node
+
+
+## 烘焙视口：共享主 World3D（own_world_3d 默认 false），渲染的是已加载区块本体
+func _ensure_bake_viewport() -> void:
+	if _bake_viewport != null and is_instance_valid(_bake_viewport):
+		return
+	_bake_viewport = SubViewport.new()
+	_bake_viewport.size = Vector2i(IMPOSTOR_SIZE, IMPOSTOR_SIZE)
+	_bake_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_bake_viewport.msaa_3d = Viewport.MSAA_DISABLED
+	add_child(_bake_viewport)
+	_bake_cam = Camera3D.new()
+	_bake_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_bake_cam.size = BLOCK_SIZE * 1.02
+	_bake_cam.far = 1500.0
+	_bake_viewport.add_child(_bake_cam)
+
+
+func _process_bake_queue() -> void:
+	if _bake_queue.is_empty():
+		return
+	var e: Dictionary = _bake_queue.pop_front()
+	if e["state"] != "loaded" or e["node"] == null or not is_instance_valid(e["node"]):
+		return
+	var key := _imp_key(e)
+	if _impostors.has(key):
+		return
+	_ensure_bake_viewport()
+	var wy := world.ground_height(float(e["x"]), -float(e["z"]))
+	var center := CoordinateUtil.to_world(float(e["x"]), float(e["z"]), wy)
+	# 顶视正交：up = 世界 -Z（= 数据北），照片与真实路网同向
+	_bake_cam.look_at_from_position(center + Vector3(0.0, 600.0, 0.0),
+		center, Vector3(0.0, 0.0, -1.0))
+	_bake_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_bake_busy = true
+	_imp_bake_capture(key)
+
+
+## 渲染完成后取回像素：压缩进 VRAM 格式（150 块 ≈ 13MB），并处理烘焙期间的卸载
+func _imp_bake_capture(key: String) -> void:
+	await RenderingServer.frame_post_draw
+	_bake_busy = false
+	if _bake_viewport == null or not is_instance_valid(_bake_viewport):
+		return
+	var img := _bake_viewport.get_texture().get_image()
+	if img == null or img.is_empty():
+		return
+	img.compress(Image.COMPRESS_S3TC, Image.COMPRESS_SOURCE_SRGB)
+	_impostors[key] = ImageTexture.create_from_image(img)
+	# 烘焙期间块若已卸载（玩家跑出半径），立刻把贴片顶上补位
+	var e: Dictionary = _by_key.get(key, {})
+	if not e.is_empty() and e["state"] != "loaded":
+		_imp_show(e, true)
+
+
 func diagnostics() -> Dictionary:
 	var loaded := 0
 	var shown := 0
@@ -407,4 +531,5 @@ func diagnostics() -> Dictionary:
 		"loadedTotal": stats_loaded, "unloadedTotal": stats_unloaded, "failed": stats_failed,
 		"pending": _loader.pending(), "current": _current_key,
 		"loadRadius": LOAD_RADIUS, "unloadRadius": UNLOAD_RADIUS, "aerial": _aerial,
+		"impostors": _impostors.size(), "bakeQueue": _bake_queue.size(),
 	}
