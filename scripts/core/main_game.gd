@@ -158,6 +158,21 @@ func _net_wanted_state() -> Array:
 	return [world.wanted.wanted_level, world.wanted.heat]
 
 
+## 全图数据体检（方案 B）：跑完输出 CSV 并退出。需要渲染（窗口会短暂弹出）。
+func _run_map_health() -> void:
+	var args := OS.get_cmdline_user_args()
+	var rep: Dictionary = MAP_HEALTH_SCRIPT.new().run(world, args.has("--quick"))
+	var st: Dictionary = rep["stat"]
+	var floats: Array = (rep["rows"] as Array).filter(
+		func(r: String) -> bool: return r.begins_with("float"))
+	print("[MapHealth] ==== 浮空 Top %d（按发现顺序）====" % mini(30, floats.size()))
+	for i in mini(30, floats.size()):
+		print("[MapHealth] ", floats[i])
+	print("[MapHealth] 汇总 ok=%d 浮空=%d 下陷=%d 空洞=%d → %s" % [
+		int(st["ok"]), int(st["float"]), int(st["sink"]), int(st["hole"]), str(rep["csv"])])
+	get_tree().quit(0)
+
+
 ## 多人战局状态上报的姿态来源节点（NetSession 每次上报前调用）。
 ##
 ## 步行发 ALS 角色；载具模式发对应模型节点 —— 模型的 global_transform 含
@@ -349,6 +364,8 @@ const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
 const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
 ## 武器系统（GTA化 §2.3）。同上必须 preload。
 const WEAPON_SCRIPT := preload("res://scripts/gameplay/weapon_system.gd")
+## 全图数据体检（方案 B）。同上必须 preload。
+const MAP_HEALTH_SCRIPT := preload("res://scripts/dev/map_health.gd")
 ## 街头任务系统（GTA化 §2.4）。同上必须 preload。
 const MISSION_SCRIPT := preload("res://scripts/gameplay/mission_system.gd")
 ## 街头商店（GTA化 §4.3）。同上必须 preload。
@@ -439,6 +456,10 @@ func _on_failed(reason: String) -> void:
 ## 的装配步骤按原版 init() 的顺序调用过了，这里**不能**重复 setup。
 func _on_built() -> void:
 	print("[MainGame] 城市构建完成，启动累计 %d ms" % Time.get_ticks_msec())
+	# 全图数据体检（方案 B）：godot --path . -- --map-health [-- --quick]，跑完自动退出
+	if OS.get_cmdline_user_args().has("--map-health"):
+		_run_map_health.call_deferred()
+		return
 	MemProbe.mark("on_built入口")
 	career.setup(world)
 	rides.setup(world)
