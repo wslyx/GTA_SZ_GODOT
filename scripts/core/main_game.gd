@@ -151,6 +151,13 @@ func _net_mode_string() -> String:
 			return "observer"
 
 
+## 多人战局：本地通缉状态（GTA化 §五，NetSession 15Hz 状态包的 WANTED 字段）
+func _net_wanted_state() -> Array:
+	if world == null or world.wanted == null:
+		return [0, 0.0]
+	return [world.wanted.wanted_level, world.wanted.heat]
+
+
 ## 多人战局状态上报的姿态来源节点（NetSession 每次上报前调用）。
 ##
 ## 步行发 ALS 角色；载具模式发对应模型节点 —— 模型的 global_transform 含
@@ -232,10 +239,6 @@ func _build_world() -> void:
 	# 通缉状态上报（GTA化 §五）：随 15Hz 状态包广播星级/热度，远程名牌缀星
 	NetSession.bind_wanted_provider(_net_wanted_state)
 
-func _net_wanted_state() -> Array:
-	if world == null or world.wanted == null:
-		return [0, 0.0]
-	return [world.wanted.wanted_level, world.wanted.heat]
 	# 预热：首次 EnterWorld 才构造角色（动画图等，耗时数秒）—— 在加载画面内
 	# 完成，避免首次 F 下车时游戏长时间卡死。构造后立刻停用隐藏，
 	# 之后每次下车取现成角色（EnterWorld 检测到已配置会跳过构造）。

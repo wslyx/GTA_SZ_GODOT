@@ -120,9 +120,10 @@ const DISTRICT_CORE_Z := 0.55
 var _district_counts := {"finance": 0, "old_town": 0, "waterfront": 0, "industrial": 0, "core": 0}
 
 ## 世界坐标 → 数据坐标（世界 z = -数据北，同 TrafficSystem 约定）→ 分区 tint。
-## 返回线性 RGB（shader 里直接乘反照率），中央返回白色 = 不染。
+## 中央区返回白色 = 不染（保持原版观感）；其余查表（线性 RGB，shader 里直接乘）。
 static func district_tint_for(world_pos: Vector3) -> Color:
-	return DISTRICT_TINTS[district_name_for(world_pos)]
+	var d := district_name_for(world_pos)
+	return Color(1.0, 1.0, 1.0) if d == "core" else DISTRICT_TINTS[d]
 
 
 static func district_name_for(world_pos: Vector3) -> String:
