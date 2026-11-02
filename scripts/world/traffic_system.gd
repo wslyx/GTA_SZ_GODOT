@@ -39,6 +39,10 @@ var cars: Array = []      ## {from,to,t,speed,x,z,yaw,group}
 var origin := Vector2.ZERO
 var enabled := true
 
+## 应急避让位（数据坐标，GTA化 §4.1）：警笛范围内（wanted 时 = 警车位置集），
+## 附近车流靠边停车让行。main_game 每帧写入。
+var yield_positions: Array = []
+
 var _source_meshes: Array = []
 var _multimeshes: Array = []   ## 每 group × 每个源 mesh 一个 MultiMesh
 var _mms_by_group: Array = []  ## group → [MultiMesh]（同步时免去每车扫 69 项）
@@ -250,6 +254,13 @@ func _sync_instances(px: float, pz: float, advance_dt := 0.0) -> void:
 		if signals != null:
 			hold = signals.signal_hold(c["x"], c["z"], c["yaw"])
 		var blocked := hold < HOLD_SIGNAL_DIST
+		# 应急避让（§4.1）：警车/应急车辆 22m 内靠边停车（3 星+警车闯灯时
+		# 车流让出路面，就是 GTA 里"警车逆行超车"那条街景的另一半）
+		if not blocked and not yield_positions.is_empty():
+			for yp in yield_positions:
+				if Vector2(float(yp["x"]), float(yp["z"])).distance_to(Vector2(c["x"], c["z"])) < 22.0:
+					blocked = true
+					break
 		if not blocked:
 			var fx := sin(c["yaw"])
 			var fz := cos(c["yaw"])

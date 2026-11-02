@@ -175,6 +175,8 @@ func place(px: float, pz: float) -> void:
 			"scale": 0.94 + float(i % 5) * 0.025,
 			"x": 0.0, "z": 0.0, "yaw": 0.0,
 			"body": null,
+			## 惊逃计时（GTA化 §4.1）：>0 时沿人行道加速逃离威胁方向
+			"panic_t": 0.0,
 		})
 	origin = p
 	_downed = 0
@@ -214,6 +216,29 @@ func _count_downed() -> int:
 		if w["body"] != null:
 			n += 1
 	return n
+
+
+## 惊逃（GTA化 §4.1）：threat（数据坐标）半径 radius 内的行人进入恐慌 ——
+## 加速逃离 6 秒，且把行进方向翻成"背离威胁"的一侧（行人只能沿人行道段走，
+## 逃跑 = 沿段加速 + 选对方向，视觉上足够"四散奔逃"）。
+## 触发源：开枪（main_game._step_weapons）、撞倒行人（_step_car）。
+func panic_at(threat: Vector2, radius: float) -> void:
+	if not enabled or walkers.is_empty():
+		return
+	for w in walkers:
+		if w["body"] != null:
+			continue
+		var wp := Vector2(w["x"], w["z"])
+		if wp.distance_to(threat) > radius:
+			continue
+		# 当前行进方向（数据坐标）：段向量 × dir 符号
+		var seg: Vector4 = w["seg"]
+		var sd := Vector2(seg.z - seg.x, seg.w - seg.y)
+		var moving := sd.normalized() * float(w["dir"])
+		# 朝着威胁走 → 掉头背向威胁跑
+		if moving.dot(wp - threat) < 0.0:
+			w["dir"] = -float(w["dir"])
+		w["panic_t"] = 6.0
 
 
 ## 射击命中（GTA化 §2.3）：数据坐标射线 from + dir*t（t ∈ [0.5, range_m]），
@@ -276,7 +301,13 @@ func _advance(dt: float) -> void:
 		var a := Vector2(seg.x, seg.y)
 		var b := Vector2(seg.z, seg.w)
 		var seg_len := maxf(0.1, a.distance_to(b))
-		w["t"] = float(w["t"]) + float(w["dir"]) * float(w["speed"]) * dt / seg_len
+		# 惊逃（GTA化 §4.1）：加速 ×2.2，倒计时归零后恢复散步
+		var panic := float(w["panic_t"])
+		var speed_mult := 1.0
+		if panic > 0.0:
+			w["panic_t"] = panic - dt
+			speed_mult = 2.2
+		w["t"] = float(w["t"]) + float(w["dir"]) * float(w["speed"]) * speed_mult * dt / seg_len
 		if float(w["t"]) > 1.0:
 			w["t"] = 1.0 - (float(w["t"]) - 1.0)
 			w["dir"] = -1.0

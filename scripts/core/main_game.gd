@@ -1412,6 +1412,12 @@ func _process(delta: float) -> void:
 			GameState.rain)
 		if world.wanted != null:
 			audio.set_siren(world.wanted.siren_level())
+	# 行为生态（§4.1）：通缉中警笛范围内的车流靠边让行
+	if world.traffic != null:
+		if world.wanted != null and world.wanted.wanted_level > 0:
+			world.traffic.yield_positions = world.wanted.cop_poses()
+		elif not world.traffic.yield_positions.is_empty():
+			world.traffic.yield_positions = []
 
 func _update_modes(dt: float) -> void:
 	var __hitch_t0 := Time.get_ticks_msec()
@@ -1541,6 +1547,8 @@ func _step_car(dt: float) -> void:
 		if knocked > 0 and world.wanted != null:
 			var sev := clampf(absf(car.speed) / 20.0, 0.3, 1.0)
 			world.wanted.report_crime("hit_ped", Vector2(car.x, car.z), sev)
+			# 行为生态（§4.1）：撞击点附近行人四散奔逃
+			world.pedestrians.panic_at(Vector2(car.x, car.z), 30.0)
 
 	# 通缉触发：撞 AI 车流 / 警车（近距离 + 车速判定，冷却在 wanted 内部）
 	if world.wanted != null and absf(car.speed) > 5.0:
@@ -1696,6 +1704,8 @@ func _step_weapons(dt: float) -> void:
 		# 枪声（GTA化 §4.2）：程序化合成，零音频文件
 		if audio != null:
 			audio.gunshot()
+		# 行为生态（§4.1）：枪声惊散 40m 内行人
+		world.pedestrians.panic_at(Vector2(walk.x, walk.z), 40.0)
 		if int(ev.get("hit_person", 0)) > 0 or bool(ev.get("hit_car", false)):
 			hud.hit_mark()
 	# 清场任务的进度来源：命中行人且带落点
