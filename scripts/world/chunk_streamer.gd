@@ -383,16 +383,19 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 	e["scene"] = null
 	e["state"] = "loaded"
 	stats_loaded += 1
-	# Impostor：块已加载 → 藏掉地面贴片（贴片只替"未加载"的块）；排入烘焙队列
-	_imp_show(e, false)
-	if e["node"] != null:
-		_bake_queue.append(e)
-	# 维护 world.blocks，供 traffic / pedestrian / scenery 的 place() 就绪判断
+	# 维护 world.blocks，供 traffic / pedestrian / scenery 的 place() 就绪判断。
+	# ⚠️ 必须在 impostor 逻辑**之前**：impostor 任何异常都不许打断挂载主链路
+	#（历史 bug：_imp_show 在贴图未烘焙时误建节点 → 读缺失键崩溃 → world.blocks
+	# 永远为空，下游全遭殃——现已双重防御 + 顺序隔离）。
 	if world != null:
 		world.blocks.append({
 			"node": node, "i": e["i"], "j": e["j"],
 			"x": e["x"], "z": e["z"], "road": false, "detail": false,
 		})
+	# Impostor：块已加载 → 藏掉地面贴片（贴片只替"未加载"的块）；排入烘焙队列
+	_imp_show(e, false)
+	if e["node"] != null:
+		_bake_queue.append(e)
 	var __ms := Time.get_ticks_msec() - __t0
 	if __ms > 12:
 		print("[HITCH] 区块挂载 %s 用时 %d ms（configure/dedup/阴影）" % [key, __ms])
@@ -433,11 +436,14 @@ func _imp_key(e: Dictionary) -> String:
 ## 显隐该块的地面贴片（懒建）。贴图尚未烘焙时直接返回——没照片不装。
 func _imp_show(e: Dictionary, show: bool) -> void:
 	var key := _imp_key(e)
-	if show and not _impostors.has(key):
-		return
 	var node: MeshInstance3D = _impostor_nodes.get(key, null)
-	if node == null:
-		node = _imp_create(e)
+	if show:
+		# 没照片就别装：贴图尚未烘焙时直接返回
+		if not _impostors.has(key):
+			return
+		if node == null:
+			node = _imp_create(e)
+	# show=false 且贴片不存在 = 启动期常态（每块都走这里），空操作，绝不触发创建
 	if node != null and is_instance_valid(node):
 		node.visible = show
 
@@ -445,6 +451,8 @@ func _imp_show(e: Dictionary, show: bool) -> void:
 ## 地面贴片：640m PlaneMesh 平铺在块中心地面 +0.3m（防 z-fight），跟随昼夜光照
 func _imp_create(e: Dictionary) -> MeshInstance3D:
 	var key := _imp_key(e)
+	if not _impostors.has(key):
+		return null   # 无照片不建（调用方 _imp_show 已保证，这里兜底）
 	var mesh := PlaneMesh.new()
 	mesh.size = Vector2(BLOCK_SIZE, BLOCK_SIZE)
 	var mat := StandardMaterial3D.new()
