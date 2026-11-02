@@ -988,6 +988,9 @@ func _toggle_vehicle_entry() -> void:
 			v2 = _vehicle_state()
 		var _t := Time.get_ticks_usec()
 		if not walk.can_enter(v2, 5.0, WALK_EXIT_OFFSET):
+			# 身边没自己的车：看 3m 内有没有 AI 车流车可以抢（GTA化 §2.2）
+			if _try_jack_traffic_car():
+				return
 			hud.toast("走近车门再按 F 上车")
 			_trace_mark("walk.can_enter=拒绝", _t)
 			return
@@ -1016,6 +1019,39 @@ func _toggle_vehicle_entry() -> void:
 		_t = Time.get_ticks_usec()
 		hud.toast("已上车 · C 切换驾驶镜头")
 		_trace_mark("hud.toast(已上车)", _t)
+
+## 抢车（GTA化 §2.2）：步行时身边没有自己的车、但 3m 内有 AI 车流车 → 抢过来开走。
+## 实现：目标车从车流 MultiMesh 里摘除，玩家自己的轿车模型/状态瞬移到目标车位姿
+## （视觉上即"那辆车变成了你的车"），随后走标准上车链路；通缉 +1★，
+## 附近车流收到惊散波（6 秒内提速逃散）。
+func _try_jack_traffic_car() -> bool:
+	if world == null or world.traffic == null or world.traffic.cars.is_empty():
+		return false
+	var target = world.traffic.nearest_car(Vector2(walk.x, walk.z), 3.0)
+	if target == null:
+		return false
+	var jx := float(target["x"])
+	var jz := float(target["z"])
+	var jyaw := float(target["yaw"])
+	# 先探测"把车摆到目标位姿后能不能上车"（落脚点被挡就不动手，别把车弄没了）
+	if not walk.can_enter({"x": jx, "z": jz, "yaw": jyaw, "speed": 0.0}, 5.0, WALK_EXIT_OFFSET):
+		return false
+	world.traffic.remove_car(target)
+	world.traffic.panic(Vector2(jx, jz))
+	# 玩家轿车摆到被抢车位姿；上一次坐的是坦克也要强制回轿车
+	_last_ground_vehicle = Mode.CAR
+	_flush_speed()
+	car.reset_to(jx, jz, jyaw)
+	# 走标准上车链路：此时 can_enter 必过（车就在 3m 内）
+	_toggle_vehicle_entry()
+	if mode != Mode.CAR:
+		# 极端情况（落脚点被挡）上车失败：把车留在原地，不算抢到
+		return false
+	if world.wanted != null:
+		world.wanted.report_crime("carjack", Vector2(jx, jz), 1.0)
+	hud.toast("抢车！通缉 +1★", 3.0)
+	return true
+
 
 func _vehicle_state() -> Dictionary:
 	if mode == Mode.TANK:

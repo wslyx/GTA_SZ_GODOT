@@ -263,7 +263,8 @@ func _sync_instances(px: float, pz: float, advance_dt := 0.0) -> void:
 					break
 
 		# 用同步间隔的真实流逝时间推进（原来是单帧 delta，车速缩水 6 倍）
-		c["t"] = float(c["t"]) + advance_dt * (0.0 if blocked else float(c["speed"])) / maxf(0.1, seg_len)
+		# 惊散波范围内的车临时提速（抢车/爆炸时的逃散反应）
+		c["t"] = float(c["t"]) + advance_dt * (0.0 if blocked else float(c["speed"]) * _panic_factor(c)) / maxf(0.1, seg_len)
 
 		# 到达节点后选下一条边
 		var guard := 0
@@ -324,6 +325,52 @@ func positions() -> Array:
 	for c in cars:
 		out.append(Vector2(c["x"], c["z"]))
 	return out
+
+
+# ---------------------------------------------------------------------------
+# 抢车接口（GTA化 §2.2，main_game._try_jack_traffic_car 调用）
+# ---------------------------------------------------------------------------
+
+## 数据坐标 pos 附近 max_dist 内最近的一辆车；没有返回 null。
+func nearest_car(pos: Vector2, max_dist: float):
+	var best = null
+	var best_d := max_dist
+	for c in cars:
+		var d := Vector2(c["x"], c["z"]).distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best = c
+	return best
+
+
+## 把一辆车从车流里摘除（被玩家抢走 / 诊断用）。传入 cars 里的字典引用。
+func remove_car(c) -> void:
+	cars.erase(c)
+
+
+## 惊散波：pos（数据坐标）附近 40m 内的车 6 秒内提速 1.6 倍（抢车/爆炸的群众反应）
+const PANIC_RADIUS := 40.0
+const PANIC_BOOST := 1.6
+const PANIC_SECONDS := 6.0
+var _panic_pos := Vector2.ZERO
+var _panic_until := -1.0
+
+
+func panic(pos: Vector2) -> void:
+	_panic_pos = pos
+	_panic_until = _now_sec() + PANIC_SECONDS
+
+
+func _now_sec() -> float:
+	return float(Time.get_ticks_msec()) / 1000.0
+
+
+func _panic_factor(c) -> float:
+	if _now_sec() >= _panic_until:
+		return 1.0
+	if Vector2(c["x"], c["z"]).distance_to(_panic_pos) > PANIC_RADIUS:
+		return 1.0
+	return PANIC_BOOST
 
 
 func car_poses() -> Array:

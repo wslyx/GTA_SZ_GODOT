@@ -88,12 +88,18 @@
 **验收**：撞倒 1 名行人 → 1 星 + 2 辆警车 15s 内到场；持续逃跑 → 星升高、警车变多；
 甩开 250m+ 冷却 → 逐星熄灭；F3 诊断可见 `wanted` 字段。headless 冒烟不报错。
 
-### 2.2 抢车与载具交互（下一期）
+### 2.2 抢车与载具交互 ✅ v1 已实施（2026-11-02）
 
-- E 键对 AI 车交互：驾驶员被"拽下"（ALS 有 ragdoll 基础）→ 换乘 → 该车转入玩家控制；
-  被抢 NPC 车辆标记 `panic`（急刹/逃逸）。通缉 +1 星（`carjack` 犯罪）。
-- `TrafficSystem.cars` 增加 `player_owned` 标记：被抢的车从 AI 流里摘出，丢弃时销毁。
-- 下车：F 键 → 车辆留在原地（玩家 OwnedVehicle 池，上限 3 辆）。
+- 步行按 F：先判自己的车（5m）；够不到时改判 **3m 内的 AI 车流车** → 抢车：
+  1. `TrafficSystem.nearest_car()` 选目标，`walk.can_enter()` 用目标位姿**预探测**
+     落脚点（被挡就不动手）；
+  2. 通过后目标车从车流摘除（`remove_car`），玩家轿车 `reset_to` 瞬移到目标位姿，
+     走标准上车链路 —— MultiMesh 少一辆、玩家车模型出现在同一位置，视觉无缝；
+  3. `report_crime("carjack")` 通缉 +1★；`TrafficSystem.panic()` 惊散波：
+     40m 内车流 6 秒内提速 1.6 倍逃散。
+- 下车：既有逻辑已是 GTA 式停车（模型留在原地 + ALS 障碍盒），无需改动。
+- 待补（v1.1）：抢车动画（拽驾驶员下车，依赖 ALS 交互动作）；
+  玩家 OwnedVehicle 多车留存池（当前被抢的车即玩家唯一轿车）。
 
 ### 2.3 武器与战斗（二期内）
 
@@ -141,4 +147,5 @@
 - [x] `scripts/ui/game_hud.gd` —— `set_wanted(level, heat)` 五星 UI
 - [x] `scripts/world/city_world.gd` —— 挂载 `wanted` 子系统
 - [x] `scripts/core/main_game.gd` —— 触发接线 + 诊断 + 挂载
-- [ ] 下一期：抢车交互（2.2）→ 武器（2.3）→ 任务链（2.4）
+- [x] 抢车交互（§2.2）：F 键抢 AI 车 + 惊散波 + 通缉 +1★
+- [ ] 武器战斗（§2.3）→ 任务链（§2.4）
