@@ -56,7 +56,7 @@ var world: CityWorld
 var active := false          ## manifest 已就绪、正在流式
 var enabled := true
 
-var chunks: Array = []       ## {i,j,x,z,file,state,node,scene}
+var chunks: Array = []       ## {i,j,x,z,file,load_path,state,node,scene}
 var _by_key: Dictionary = {} ## "i_j" → entry
 var _loader := GlbLoader.new()
 var _current_key := ""
@@ -67,6 +67,13 @@ var _aerial_delay := 0.0
 var _cooldown := 0.0
 var _vis_timer := 0.0
 var _aerial := false
+## 方向性预取（§加载优化②）：前进方向由焦点位移平滑估计，
+## 加载评分 = 距离² × (1 − PREFETCH_ALIGN × 前进对齐度)。
+## 高速直行时前方区块抢到队列头，身后刚出视野的块不再插队。
+const PREFETCH_ALIGN := 0.6
+var _vel_dir := Vector2(0.0, 1.0)
+var _prev_focus := Vector2.ZERO
+var _has_prev := false
 var stats_loaded := 0
 var stats_unloaded := 0
 var stats_failed := 0
@@ -110,6 +117,8 @@ func init_manifest() -> bool:
 			"i": i, "j": j,
 			"x": float(b["x"]), "z": float(b["z"]),
 			"file": str(b["file"]),
+			## 离线烘焙的 .scn 优先（跳过 GLB 解析/导入重映射，§加载优化①）
+			"load_path": _resolve_load_path(str(b["file"])),
 			"node": null, "scene": null,
 			"state": "pending",  # pending | loading | loaded | dead
 		}
@@ -119,6 +128,19 @@ func init_manifest() -> bool:
 	print("[ChunkStreamer] 区块清单 %d 块，加载半径 %.0fm / 卸载 %.0fm"
 		% [chunks.size(), LOAD_RADIUS, UNLOAD_RADIUS])
 	return true
+
+
+## 区块加载路径：优先离线烘焙的 .scn（tools/bake_chunk_scn.gd 产物）。
+## .scn 比 .glb 旧（源资产更新过）时回退 GLB —— 烘焙永远不会"锁死"旧数据。
+static func _resolve_load_path(glb_path: String) -> String:
+	if not glb_path.ends_with(".glb"):
+		return glb_path
+	var scn := glb_path.trim_suffix(".glb") + ".scn"
+	if not ResourceLoader.exists(scn):
+		return glb_path
+	var scn_t := FileAccess.get_modified_time(scn)
+	var glb_t := FileAccess.get_modified_time(glb_path)
+	return scn if scn_t >= glb_t else glb_path
 
 
 func set_aerial(v: bool) -> void:
@@ -148,7 +170,7 @@ func begin_preload(focus_data: Vector2) -> int:
 	for key in _preload_keys:
 		var e: Dictionary = _by_key[key]
 		e["state"] = "loading"
-		_loader.enqueue(e["file"], world.chunks_root, key, ResourceLoader.CACHE_MODE_IGNORE)
+		_loader.enqueue(str(e["load_path"]), world.chunks_root, key, ResourceLoader.CACHE_MODE_IGNORE)
 	print("[ChunkStreamer] 预加载出生点 %.0fm 内建筑区块 %d 块（%.0fm 外由运行时流式补齐）"
 		% [PRELOAD_RADIUS, _preload_total, LOAD_RADIUS])
 	return _preload_total
@@ -236,7 +258,13 @@ func update_system(delta: float, focus: Vector3) -> void:
 					if mi.cast_shadow != cast:
 						mi.cast_shadow = cast
 
-	# 2) 串行排队加载：LOAD_RADIUS 内最近的未加载区块
+	# 2) 串行排队加载：LOAD_RADIUS 内评分最高的未加载区块
+	#    评分 = 距离² × (1 − 0.6 × 前进对齐度)，前进方向由焦点位移平滑估计
+	var moved := Vector2(fx, fz) - _prev_focus
+	if _has_prev and moved.length() > 2.0:
+		_vel_dir = _vel_dir.lerp(moved.normalized(), 0.25).normalized()
+	_has_prev = true
+	_prev_focus = Vector2(fx, fz)
 	if not _loader.is_idle():
 		_loader.poll()
 		return
@@ -254,17 +282,23 @@ func update_system(delta: float, focus: Vector3) -> void:
 	var load_r := LOAD_RADIUS_AERIAL if _aerial else LOAD_RADIUS
 	var lr2 := load_r * load_r
 	var best := ""
-	var best_d2 := INF
+	var best_score := INF
 	for e in chunks:
 		if e["state"] != "pending":
 			continue
 		if _failed.has("%d_%d" % [e["i"], e["j"]]) and _retry_timer > 0.0:
 			continue
-		var dx := float(e["x"]) - fx
-		var dz := float(e["z"]) - fz
-		var d2 := dx * dx + dz * dz
-		if d2 <= lr2 and d2 < best_d2:
-			best_d2 = d2
+		var dvec := Vector2(float(e["x"]) - fx, float(e["z"]) - fz)
+		var d2 := dvec.length_squared()
+		if d2 > lr2:
+			continue
+		var score := d2
+		if d2 > 1.0:
+			# 前进对齐度 [0,1]：正对移动方向的区块最多打 6 折距离分
+			var align := clampf(_vel_dir.dot(dvec / sqrt(d2)), 0.0, 1.0)
+			score = d2 * (1.0 - PREFETCH_ALIGN * align)
+		if score < best_score:
+			best_score = score
 			best = "%d_%d" % [e["i"], e["j"]]
 	if best == "":
 		if _retry_timer <= 0.0:
@@ -276,7 +310,7 @@ func update_system(delta: float, focus: Vector3) -> void:
 	entry["state"] = "loading"
 	_current_key = best
 	_cooldown = LOAD_COOLDOWN
-	_loader.enqueue(entry["file"], world.chunks_root, best, ResourceLoader.CACHE_MODE_IGNORE)
+	_loader.enqueue(str(entry["load_path"]), world.chunks_root, best, ResourceLoader.CACHE_MODE_IGNORE)
 
 
 func _unload_chunk(e: Dictionary) -> void:
