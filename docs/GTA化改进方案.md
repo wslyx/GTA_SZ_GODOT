@@ -119,11 +119,25 @@
 - **待补（v1.1）**：枪声（procedural_audio 加噪声包络，`cue()` 是 match 静默
   兜底，加 "gunshot" 分支即可）、持枪模型/动画、车辆伤害、drive-by。
 
-### 2.4 任务链（二期内）
+### 2.4 任务链 ✅ v1 已实施（2026-11-02）
 
-- JSON 数据驱动任务：`{trigger_pos, type: deliver/race/eliminate, reward, steps[]}`。
-- 触发点从路网主分量 + landmark 列表选；奖励进金钱（为商店铺路）。
-- 竞速任务复用 `road_graph.route()` 生成检查点折线。
+- **`scripts/gameplay/mission_system.gd`**（RefCounted）+ **`data/game/missions.json`**：
+  任务模板（名称/文案/赏金/限时/参数）全部在 JSON；触发点/目标点**运行时**从
+  路网 degree≥2 节点选（城市坐标不写死，换图不用改数据）；JSON 缺失时用内置兜底。
+- **三种任务**：
+  - `deliver` 送货：光标触发 → 目标点 20m 内完成；限时 = JSON 或按路程推导
+    （同生涯合约的 11m/s + 60s 底）；
+  - `race` 竞速：`graph.route()` 折线按 350m 采样检查点，按序 30m 内过点，
+    限时按折线总长 / 12m/s 放宽 35%；
+  - `eliminate` 清场：目标街区半径内用武器放倒 N 人（`note_hit()` 进度上报，
+    通缉会自然涨，脱身是任务的一部分）。
+- **光标经济**：同时最多 2 个任务光标（300–1500m 内），20s 周期或走远 1500m 才重排，
+  触发半径 12m；光标/目标用 `maps.set_destination_marker()` 上图（只设标记，
+  不触发自动驾驶；玩家在用自动驾驶时不动他的标记）。
+- **失败条件**：超时 / 被捕 / 被击倒 → toast + 光标重铺；赏金走 `GameState.add_cash`
+  （与生涯共用钱包，随存档持久化）。
+- **待补（v1.1）**：任务完成度存档（当前可重复接）、mission UI 面板（当前 toast +
+  地图标记）、eliminate 的敌对 NPC（当前打路人算数）。
 
 ---
 
@@ -161,4 +175,5 @@
 - [x] `scripts/core/main_game.gd` —— 触发接线 + 诊断 + 挂载
 - [x] 抢车交互（§2.2）：F 键抢 AI 车 + 惊散波 + 通缉 +1★
 - [x] 武器战斗（§2.3）：三把枪 + 2D 弹道 + 行人击倒 + 警察开火 + 血量/死亡重生
-- [ ] 任务链（§2.4）
+- [x] 任务链（§2.4）：JSON 模板 + deliver/race/eliminate + 光标上图 + 赏金入账
+- [ ] 二级（地图精致：分区色板/路面贴花/烘焙光照/室内天台）

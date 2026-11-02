@@ -1551,6 +1551,13 @@ func clear_destination() -> void:
 	hide_route_choice()
 
 
+## 任务标记（GTA化 §2.4）：只设标记不 emit destination_picked ——
+## 不触发路线规划/自动驾驶（那是玩家选目的地才有的行为）。
+func set_destination_marker(pos: Vector2, marker_name: String) -> void:
+	_dest = {"pos": pos, "name": marker_name}
+	_map_canvas.queue_redraw()
+
+
 ## 原版 placeMapLabels：64px 网格 + 逐格重叠测试的确定性排布。
 ##
 ## 候选按 priority 降序（同优先级按 id 字典序）依次落位；每个候选按序尝试自己的

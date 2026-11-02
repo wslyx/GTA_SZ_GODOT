@@ -44,6 +44,8 @@ var audio: ProceduralAudio
 
 ## 武器系统（GTA化 §2.3）：RefCounted 纯数据，输入在 _step_walk 里驱动
 var weapons = WEAPON_SCRIPT.new()
+## 街头任务系统（GTA化 §2.4）：数据驱动任务 + 路网动态选址
+var missions = MISSION_SCRIPT.new()
 ## 玩家生命 0–100：v1 伤害源只有 3 星+ 警察开火（车内免伤）
 var player_health := 100.0
 ## 左键开火的边沿检测（半自动武器只在按下瞬间打一发）
@@ -331,6 +333,8 @@ const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
 const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
 ## 武器系统（GTA化 §2.3）。同上必须 preload。
 const WEAPON_SCRIPT := preload("res://scripts/gameplay/weapon_system.gd")
+## 街头任务系统（GTA化 §2.4）。同上必须 preload。
+const MISSION_SCRIPT := preload("res://scripts/gameplay/mission_system.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -421,6 +425,8 @@ func _on_built() -> void:
 	career.setup(world)
 	rides.setup(world)
 	story.setup(world, career)
+	# 街头任务（GTA化 §2.4）：需要路网图选触发/目标点
+	missions.setup(world)
 	MemProbe.mark("career/rides/story 后")
 
 	hud.setup(world, self)
@@ -1365,6 +1371,21 @@ func _process(delta: float) -> void:
 		rides.step(p, speed, absf(float(_vehicle_state()["speed"])) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
 		res = career.step(dt, p, speed, false, false)
 		story.note_position(p)
+		# 街头任务（GTA化 §2.4）：事件文案 + 地图光标同步
+		var mev: Dictionary = missions.step(dt, p, speed)
+		if not mev.is_empty():
+			var mtext := str(mev.get("text", ""))
+			if not mtext.is_empty():
+				hud.toast(mtext, 4.5)
+			if str(mev.get("event", "")) == "completed" and audio != null:
+				audio.cue("arrival")
+			if mev.has("marker") and not autopilot.active:
+				# 玩家在用自动驾驶时不动地图标记（那是他自己的目的地）
+				var mk: Dictionary = mev["marker"]
+				if mk.is_empty():
+					maps.clear_destination()
+				else:
+					maps.set_destination_marker(mk["pos"], str(mk["name"]))
 	if res.get("completed", false):
 		hud.toast(str(res["message"]), 4.0)
 		if audio != null:
@@ -1668,6 +1689,9 @@ func _step_weapons(dt: float) -> void:
 	if bool(ev.get("fired", false)) \
 			and (int(ev.get("hit_person", 0)) > 0 or bool(ev.get("hit_car", false))):
 		hud.hit_mark()
+	# 清场任务的进度来源：命中行人且带落点
+	if int(ev.get("hit_person", 0)) > 0 and ev.has("hit_pos"):
+		missions.note_hit(ev["hit_pos"])
 	hud.set_weapon(weapons.hud_state())
 
 var walk_eye_world := Vector3.ZERO
@@ -2284,6 +2308,10 @@ func _on_wanted_busted() -> void:
 	# v1：只清通缉发车；医院/警局重生循环接 save_system 时再落（方案 §4.4）
 	if world.wanted != null:
 		world.wanted.clear_busted()
+	# 街头任务：被捕即失败
+	var mf: Dictionary = missions.on_busted()
+	if not mf.is_empty() and not str(mf.get("text", "")).is_empty():
+		hud.toast(str(mf["text"]), 4.5)
 
 
 func _on_police_rammed(force: float) -> void:
@@ -2310,6 +2338,10 @@ func _respawn_player() -> void:
 	hud.set_health(100.0)
 	if world.wanted != null:
 		world.wanted.clear_busted()
+	# 街头任务：被击倒即失败
+	var mf: Dictionary = missions.on_busted()
+	if not mf.is_empty() and not str(mf.get("text", "")).is_empty():
+		hud.toast(str(mf["text"]), 4.5)
 	var nid := world.graph.nearest_main_node(Vector2(walk.x, walk.z))
 	if nid >= 0 and _als_walk_active:
 		_als_exit_world()
@@ -2342,6 +2374,7 @@ func diagnostics() -> Dictionary:
 		"facades": world.facades.diagnostics() if world.facades != null else {},
 		"weather": world.weather.diagnostics() if world.weather != null else {},
 		"wanted": world.wanted.diagnostics() if world.wanted != null else {},
+		"missions": missions.status(),
 		"career": career.status(),
 		"story": story.status(),
 		"rides": rides.status(),

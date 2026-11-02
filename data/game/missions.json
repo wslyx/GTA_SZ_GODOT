@@ -1,0 +1,33 @@
+{
+  "missions": [
+    {
+      "id": "deliver-1", "type": "deliver", "name": "湾边急件",
+      "brief": "有个包裹要送到湾边去，路上别惹警察。",
+      "reward": 500, "time_limit": 0,
+      "trigger_min": 300, "trigger_max": 1200,
+      "target_min": 600, "target_max": 2500
+    },
+    {
+      "id": "deliver-2", "type": "deliver", "name": "深夜快送",
+      "brief": "夜里的单子，送得越快赏钱越多。",
+      "reward": 700, "time_limit": 0,
+      "trigger_min": 300, "trigger_max": 1500,
+      "target_min": 1000, "target_max": 3200
+    },
+    {
+      "id": "race-1", "type": "race", "name": "滨海竞速",
+      "brief": "沿检查点跑完全程，别在中途把车撞散了。",
+      "reward": 800, "time_limit": 0,
+      "trigger_min": 300, "trigger_max": 1200,
+      "checkpoints": 5, "leg_min": 1500, "leg_max": 4000
+    },
+    {
+      "id": "eliminate-1", "type": "eliminate", "name": "清理街区",
+      "brief": "这一带不太平，去目标街区放倒 4 个人，干完赶紧甩掉通缉。",
+      "reward": 650, "time_limit": 0,
+      "trigger_min": 300, "trigger_max": 1000,
+      "target_min": 300, "target_max": 900,
+      "targets": 4, "area_radius": 150
+    }
+  ]
+}

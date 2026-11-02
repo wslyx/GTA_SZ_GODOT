@@ -141,6 +141,7 @@ func _trace_shot(from: Vector2, dir: Vector2, range_m: float, kick: float,
 	# 判定落点事件：行人 > 车 > 墙（距离最近者赢，上面已经按 t 剪枝）
 	if ped_t > 0.0 and (wall_t < 0.0 or ped_t <= wall_t):
 		out["hit_person"] = int(out["hit_person"]) + 1
+		out["hit_pos"] = ped["pos"]
 		# 开枪 + 打中人都算治安事件（wanted 内部冷却去抖）
 		if world.wanted != null:
 			world.wanted.report_crime("weapon", ped["pos"], 1.0)
