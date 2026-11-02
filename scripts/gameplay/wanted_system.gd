@@ -397,6 +397,18 @@ func cop_poses() -> Array:
 	return cops
 
 
+## 警笛强度 0–1（procedural_audio.set_siren 用）：1 星起有底噪，最近警车越近越响
+func siren_level() -> float:
+	if wanted_level <= 0:
+		return 0.0
+	var nearest := INF
+	for c in cops:
+		nearest = minf(nearest, Vector2(c["x"], c["z"]).distance_to(_player_pos))
+	if not is_finite(nearest):
+		return 0.3
+	return clampf(0.3 + 0.7 * (1.0 - nearest / 300.0), 0.0, 1.0)
+
+
 # ---------------------------------------------------------------------------
 # 渲染（MultiMesh，白警涂装；同 TrafficSystem 的装配方式）
 # ---------------------------------------------------------------------------

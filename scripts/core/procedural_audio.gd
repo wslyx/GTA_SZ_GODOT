@@ -47,13 +47,28 @@ var slipping := false
 var _phase_motor := 0.0
 var _phase_tri := 0.0
 var _lcg := 1
-var _noise_state := [0.0, 0.0, 0.0]
+## 滤波器状态池：0 滚动 / 1 风 / 2 打滑（原版）＋
+## 3 城市底噪 / 4 分区特色声 / 5 雨声（GTA化 §4.2 扩展）
+var _noise_state := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 var _impact_gap := 0.0
 var _bgm_sample := 0
 var _bgm_phase := 0.0
 var _explosion_env := 0.0
 var _horn_env := 0.0
 var _unlocked := false
+
+# --- 环境音 / 警笛 / 枪声（GTA化 §4.2）---
+## 当前分区（architecture_materials 的 district 名）：决定特色环境声
+var _amb_kind := "core"
+var _raining := false
+## 警笛强度 0–1（wanted → main_game 每帧喂，内部平滑）
+var _siren := 0.0
+var _siren_target := 0.0
+var _siren_lfo := 0.0     ## 滑频周期相位（wail）
+var _siren_tone := 0.0    ## 警笛音调相位
+var _amb_lfo := 0.0       ## 海浪起伏 LFO
+var _hum_phase := 0.0     ## 工业电力嗡鸣相位
+var _gun_env := 0.0       ## 枪声包络（快衰减）
 
 ## 播放偏好（原版 city-audio.ts 的 AudioPreferences，暂停页可调）：
 ##   effects = 车辆 / 环境音量，music = 海湾晚风 · BGM 音量
@@ -172,6 +187,28 @@ func cue(name: String) -> void:
 			_horn_env = 0.5
 
 
+# ---------------------------------------------------------------------------
+# 环境音 / 警笛 / 枪声（GTA化 §4.2）—— 全程序化合成，零音频文件
+# ---------------------------------------------------------------------------
+
+## 分区环境声：main_game 每帧（或按需）喂当前分区名与雨情。
+## 未知分区名按 core 处理。
+func set_world_audio(district: String, raining: bool) -> void:
+	_amb_kind = district
+	_raining = raining
+
+
+## 警笛强度 0–1（wanted_system.siren_level() → main_game 每帧喂）
+func set_siren(v: float) -> void:
+	_siren_target = clampf(v, 0.0, 1.0)
+
+
+## 枪声：白噪爆破 + 快衰减（半自动连点也各自触发，不做间隔限制 ——
+## 射速上限 750rpm = 80ms，天然不会糊成一片）
+func gunshot() -> void:
+	_gun_env = 1.0
+
+
 func _process(delta: float) -> void:
 	if not enabled:
 		if player.playing:
@@ -189,6 +226,10 @@ func _process(delta: float) -> void:
 	_impact_gap = maxf(0.0, _impact_gap - delta)
 	_explosion_env = maxf(0.0, _explosion_env - delta * 1.6)
 	_horn_env = maxf(0.0, _horn_env - delta * 2.2)
+	# 枪声衰减要快（爆破感来自短包络）
+	_gun_env = maxf(0.0, _gun_env - delta * 9.0)
+	# 警笛强度平滑进场/退场（避免出入视野时咔哒）
+	_siren = lerpf(_siren, _siren_target, minf(1.0, delta * 2.5))
 
 	# BGM 音量 = music_volume × 静音（原版 applyPreferences 的 music 总线）
 	if bgm_player != null:
@@ -222,14 +263,49 @@ func _sample() -> float:
 	if slipping:
 		slip = _filter(2, n, SLIP_BANDPASS_HZ) * 0.14
 
+	# --- 环境底噪（GTA化 §4.2）：城市嗡鸣 + 分区特色 + 雨 ---
+	# 城市基础层：远距离车流/人声的低频混合（所有分区都有，音量很低）
+	var city := _filter(3, n, 220.0) * 0.016
+	var amb := 0.0
+	match _amb_kind:
+		"waterfront":
+			# 海浪：低通噪声 × 慢 LFO 起伏（~8s 一个浪头）
+			_amb_lfo = fposmod(_amb_lfo + 0.12 / SAMPLE_RATE, 1.0)
+			amb = _filter(4, n, 320.0) * (0.55 + 0.45 * sin(_amb_lfo * TAU)) * 0.045
+		"industrial":
+			# 电力嗡鸣：55Hz 正弦 + 低频噪声（变压器的听感）
+			_hum_phase = fposmod(_hum_phase + 55.0 / SAMPLE_RATE, 1.0)
+			amb = (sin(_hum_phase * TAU) * 0.5 + _filter(4, n, 140.0) * 0.7) * 0.030
+		"old_town":
+			# 街市：中频细碎人声/店铺感
+			amb = _filter(4, n, 500.0) * 0.020
+		"finance":
+			# 商务区：比基础层略高一点的宽频风噪（玻璃幕墙区空旷回响感）
+			amb = _filter(4, n, 900.0) * 0.012
+		_:
+			amb = 0.0
+	var rain := 0.0
+	if _raining:
+		rain = _filter(5, n, 3000.0) * 0.030
+
+	# --- 警笛：滑频 wail（700±240Hz，0.16Hz 周期）---
+	var siren := 0.0
+	if _siren > 0.001:
+		_siren_lfo = fposmod(_siren_lfo + 0.16 / SAMPLE_RATE, 1.0)
+		var sf := 700.0 + 240.0 * sin(_siren_lfo * TAU)
+		_siren_tone = fposmod(_siren_tone + sf / SAMPLE_RATE, 1.0)
+		siren = sin(_siren_tone * TAU) * 0.05 * _siren
+
 	# --- BGM：已改为预渲染循环（prepare_bgm → bgm_player），不再逐样本合成 ---
 
 	# --- 一次性事件 ---
 	var boom := _noise() * _explosion_env * 0.5
+	var gun := _noise() * _gun_env * 0.30
 	var horn := sin(_bgm_phase * TAU * 2.0) * _horn_env * 0.12
 	_bgm_phase = fposmod(_bgm_phase + 320.0 / SAMPLE_RATE, 1.0)
 
-	return clampf(motor + tri + roll + wind + slip + boom + horn, -1.0, 1.0)
+	return clampf(motor + tri + roll + wind + slip
+		+ city + amb + rain + siren + boom + gun + horn, -1.0, 1.0)
 
 
 ## 把一整段《海湾晚风》循环离线渲染成 16-bit WAV，交给独立播放器循环播放。

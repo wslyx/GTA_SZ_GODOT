@@ -1406,6 +1406,12 @@ func _process(delta: float) -> void:
 		if mode == Mode.CAR:
 			slipping = Input.is_key_pressed(KEY_SPACE) and absf(car.speed) > 6.0
 		audio.set_drive_state(speed, 0.55 if mode in [Mode.CAR, Mode.TANK] else 0.0, slipping)
+		# 环境音（GTA化 §4.2）：分区底噪 + 雨 + 警笛（全程序化合成）
+		audio.set_world_audio(
+			ArchitectureMaterials.district_name_for(CoordinateUtil.to_world(p.x, p.y, 0.0)),
+			GameState.rain)
+		if world.wanted != null:
+			audio.set_siren(world.wanted.siren_level())
 
 func _update_modes(dt: float) -> void:
 	var __hitch_t0 := Time.get_ticks_msec()
@@ -1686,9 +1692,12 @@ func _step_weapons(dt: float) -> void:
 	var dir := Vector2(fwd.x, -fwd.z)
 	dir = dir.normalized() if dir.length_squared() > 1e-6 else Vector2(0.0, 1.0)
 	var ev: Dictionary = weapons.step(dt, just, held, Vector2(walk.x, walk.z), dir, world)
-	if bool(ev.get("fired", false)) \
-			and (int(ev.get("hit_person", 0)) > 0 or bool(ev.get("hit_car", false))):
-		hud.hit_mark()
+	if bool(ev.get("fired", false)):
+		# 枪声（GTA化 §4.2）：程序化合成，零音频文件
+		if audio != null:
+			audio.gunshot()
+		if int(ev.get("hit_person", 0)) > 0 or bool(ev.get("hit_car", false)):
+			hud.hit_mark()
 	# 清场任务的进度来源：命中行人且带落点
 	if int(ev.get("hit_person", 0)) > 0 and ev.has("hit_pos"):
 		missions.note_hit(ev["hit_pos"])
