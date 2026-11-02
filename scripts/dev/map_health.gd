@@ -32,20 +32,7 @@ func run(world: CityWorld, quick: bool) -> Dictionary:
 	var hf = world.height_field
 
 	# ---- 1) 收集视觉地面三角形（世界坐标 → 数据坐标，north = -z）----
-	var roots: Array = [world.terrain_root, world.roads_root, world.landmarks_root,
-		world.buildings_root, world.chunks_root]
-	for r in roots:
-		if r != null:
-			_collect(r)
-	# 公园缓坡补面（distant_system 程序化生成的 ground-relief 节点）+
-	# 远山 / 近山（mountain-relief 瓦片）—— 都是 SurfaceTool 网格**无材质**，
-	# 走 all_materials 路径；height_field 的 relief/mountain delta 以它们为视觉对应层
-	if world.distant != null:
-		if world.distant.relief_node != null:
-			_collect(world.distant.relief_node, true)
-		for mn in world.distant.mountain_nodes:
-			if mn is Node:
-				_collect(mn, true)
+	collect_visual_ground(world, false)
 	print("[MapHealth] 视觉地面三角形 %d / 格桶 %d" % [_tris.size() / 9, _bins.size()])
 
 	# ---- 2) 采样点 ----
@@ -105,7 +92,30 @@ func run(world: CityWorld, quick: bool) -> Dictionary:
 # 视觉三角形收集（世界坐标 → 数据坐标 north = -z）
 # ---------------------------------------------------------------------------
 
-func _collect(root: Node, all_materials := false) -> void:
+## 收集全城视觉地面三角形。供本类 run() 与 bake_height_fix（B-2 烘焙）共用。
+##
+## for_height_fix=true（烘焙修正高度网格用）时跳过两类：
+##   · coastal_bridge_* 桥面 —— 桥下要通行，max 栅格化会把桥面高度糊到桥下水域；
+##     桥面高度仍由 HeightField 原生 bridge_lift 层负责（onRoad 闸门）；
+##   · rain_* 雨面覆盖层 —— 不是地面。
+func collect_visual_ground(world: CityWorld, for_height_fix := false) -> void:
+	var roots: Array = [world.terrain_root, world.roads_root, world.landmarks_root,
+		world.buildings_root, world.chunks_root]
+	for r in roots:
+		if r != null:
+			_collect(r, false, for_height_fix)
+	# 公园缓坡补面（distant_system 程序化生成的 ground-relief 节点）+
+	# 远山 / 近山（mountain-relief 瓦片）—— 都是 SurfaceTool 网格**无材质**，
+	# 走 all_materials 路径；height_field 的 relief/mountain delta 以它们为视觉对应层
+	if world.distant != null:
+		if world.distant.relief_node != null:
+			_collect(world.distant.relief_node, true, false)
+		for mn in world.distant.mountain_nodes:
+			if mn is Node:
+				_collect(mn, true, false)
+
+
+func _collect(root: Node, all_materials := false, skip_bridge := false) -> void:
 	var n := 0
 	var stack: Array = [root]
 	while not stack.is_empty():
@@ -113,6 +123,9 @@ func _collect(root: Node, all_materials := false) -> void:
 		if nd is MeshInstance3D:
 			var mi := nd as MeshInstance3D
 			if mi.mesh != null:
+				if skip_bridge and (mi.name.begins_with("coastal_bridge_")
+						or mi.name.begins_with("rain")):
+					continue
 				var xform := mi.global_transform
 				for s in mi.mesh.get_surface_count():
 					var m := mi.mesh.surface_get_material(s)

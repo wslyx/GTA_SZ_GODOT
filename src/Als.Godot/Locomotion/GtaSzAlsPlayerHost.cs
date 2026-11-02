@@ -41,6 +41,31 @@ public partial class GtaSzAlsPlayerHost : Node3D
     /// <summary>角色当前是否受玩家控制（步行模式）。</summary>
     public bool Active { get; private set; }
 
+    /// <summary>GDScript 侧直接引用的 overlay 常量（与 AlsOverlayKind 对齐）。</summary>
+    public const int OverlayDefault = (int)AlsOverlayKind.Default;
+    public const int OverlayRifle = (int)AlsOverlayKind.Rifle;
+    public const int OverlayPistol2H = (int)AlsOverlayKind.Pistol2H;
+
+    /// <summary>
+    /// 当前请求的 overlay（持枪/持物姿态）。GTA 侧每帧按武器状态设置：
+    /// 手枪 → Pistol2H，冲锋枪/霰弹枪 → Rifle，空手 → Default。
+    /// 运行时据此驱动举枪 overlay 动画层**和**枪模 prop（AlsP3WorkerRoot 的
+    /// Props.Capture 直接吃命令里的 RequestedOverlay）。
+    /// ⚠️ 此前这里写死 AlsOverlayKind.Default，"aim" 只切 RotationMode.Aiming，
+    /// 角色永远不举枪 —— 手枪瞄准姿态整个缺失（GTA化 §2.3 的 v1 待补项）。
+    /// </summary>
+    public AlsOverlayKind RequestedOverlay { get; set; } = AlsOverlayKind.Default;
+
+    /// <summary>
+    /// 越肩瞄准开关（透传 OrbitCamera.ShoulderAim）。
+    /// GTA 侧：持枪且按住 aim（右键）时置 true —— 相机右移拉近，角色让出准星。
+    /// </summary>
+    public bool ShoulderAim
+    {
+        get => _orbitCamera is not null && _orbitCamera.ShoulderAim;
+        set { if (_orbitCamera is not null) _orbitCamera.ShoulderAim = value; }
+    }
+
     /// <summary>动画运行时资源是否就绪（资源加载失败时为 false，宿主静默降级）。</summary>
     public bool RuntimeReady => _runtimeConfigured && !_failed;
 
@@ -207,7 +232,7 @@ public partial class GtaSzAlsPlayerHost : Node3D
                     new AlsFrameIdentity(nextFrame, active.Handle.CharacterId, active.Handle.Generation),
                     _orbitCamera.Yaw,
                     _orbitCamera.Pitch,
-                    AlsOverlayKind.Default);
+                    RequestedOverlay);
             }
         }
         catch (Exception exception)

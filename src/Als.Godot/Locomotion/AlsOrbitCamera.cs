@@ -23,6 +23,19 @@ public partial class AlsOrbitCamera : Node3D
 
     public Vector3 FollowOffset { get; } = new(0f, 0.53f, 0f);
 
+    private float _aimBlend;
+
+    /// <summary>
+    /// 越肩瞄准（GTA 侧每帧设置：持枪且按住 aim 时为 true）。
+    /// 生效时相机向**右**偏移并把视距拉近，让角色让出屏幕中心 —— 否则第三人称
+    /// 角色正好顶在准星下面，瞄准射击时人挡着准星。
+    /// 偏移量按 _aimBlend 平滑过渡（约 0.17s），松开 aim 回到正常跟随。
+    /// </summary>
+    public bool ShoulderAim { get; set; }
+
+    /// <summary>越肩偏移的平滑系数（0=跟随 1=完全越肩）。</summary>
+    public float AimBlend => _aimBlend;
+
     public Node3D? Target =>
         _target is not null && GodotObject.IsInstanceValid(_target)
             ? _target
@@ -76,11 +89,29 @@ public partial class AlsOrbitCamera : Node3D
 
     public override void _Process(double delta)
     {
+        // 越肩混合：偏移与视距都按同一系数平滑，避免切瞄准时的硬跳。
+        _aimBlend = Mathf.MoveToward(_aimBlend, ShoulderAim ? 1f : 0f, (float)delta * 6f);
+        if (_springArm is not null)
+        {
+            _springArm.SpringLength = Mathf.Lerp(SpringLengthNormal, SpringLengthAim, _aimBlend);
+        }
         if (_target is not null && GodotObject.IsInstanceValid(_target))
         {
-            GlobalPosition = _target.GlobalPosition + FollowOffset;
+            // 右偏在**相机朝向空间**里做：yaw 转动时偏移方向跟着视线走。
+            var right = GlobalTransform.Basis.X;
+            GlobalPosition = _target.GlobalPosition + FollowOffset
+                + right * (ShoulderLateral * _aimBlend);
         }
     }
+
+    /// <summary>正常跟随视距（米）。</summary>
+    public const float SpringLengthNormal = 4.2f;
+
+    /// <summary>越肩瞄准视距（米）：拉近到肩后，准星更贴近枪口指向。</summary>
+    public const float SpringLengthAim = 1.9f;
+
+    /// <summary>越肩横向偏移（米，向右）。</summary>
+    public const float ShoulderLateral = 0.55f;
 
     public override void _Input(InputEvent @event)
     {

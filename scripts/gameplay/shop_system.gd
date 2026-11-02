@@ -26,12 +26,17 @@ var world: CityWorld
 var owned_guns: Array = [true, false, false]
 var total_spent := 0
 var purchase_count := 0
+## 商店位置（id → 数据坐标 Vector2）。⚠️ 不能写回 SHOPS —— 它是 const，
+## Godot 4 里 const 容器深度只读，`s["pos"] = ...` 会抛
+## "Invalid assignment on read-only value (on base: 'Dictionary')"，
+## 位置永远写不进去，near_shop 永远返回 {}（商店整个失效）。
+var _pos := {}
 
 
 func setup(p_world: CityWorld, career, _weapons) -> void:
 	world = p_world
 	for s in SHOPS:
-		s["pos"] = career.place_position(str(s["place"]))
+		_pos[str(s["id"])] = career.place_position(str(s["place"]))
 	_load()
 
 
@@ -56,7 +61,7 @@ func _save() -> void:
 ## pos（数据坐标）附近半径内的商店；不在任何商店旁返回 {}
 func near_shop(pos: Vector2) -> Dictionary:
 	for s in SHOPS:
-		var sp: Vector2 = s.get("pos", Vector2.ZERO)
+		var sp: Vector2 = _pos.get(str(s["id"]), Vector2.ZERO)
 		if sp != Vector2.ZERO and pos.distance_to(sp) < SHOP_RADIUS:
 			return s
 	return {}

@@ -86,6 +86,7 @@ func load_all() -> void:
 	load_mountains()
 	load_relief()
 	load_crossings()
+	_load_height_fix()
 
 
 var _loaded_all := false
@@ -465,14 +466,166 @@ func bridge_lift(east: float, north: float) -> float:
 ## 再叠 2.8m"。旧实现写成 `base += bridge_lift(...)`，桥下水深为负 / 地形抬高
 ## 时车身高度会跟着漂，而且和 `roads.glb` 里已经烘好的桥面几何对不上。
 func height_at(east: float, north: float) -> float:
+	# B-2 修正高度网格（§八）：从视觉地形栅格化烘焙，物理与视觉同源。
+	# 覆盖区内用修正值**取代**原生层叠（lianhua/mountain/relief），
+	# 未覆盖（水面/桥下/网格外）回退原生管线。
+	#
+	# ⚠️ 桥面标高与咖啡馆地板不能一起被取代：
+	#   · 烘焙时刻意排除了 coastal_bridge_* 桥面（桥下要通行，max 栅格化会
+	#     把桥面糊到桥下水域），桥面高度只由 bridge_lift 提供。若在覆盖区内
+	#     直接 return 修正值，桥头引桥（落在陆地网格里、被覆盖）就会掉回地面，
+	#     车一上桥就钻进桥底 —— 即之前修过的"过桥穿模"回归。
+	#   · cafe_floor 是地标回调，不属于地形，同理必须继续生效。
 	var base := 0.0
-	base += lianhua_height(east, north)
-	base += mountain_delta(east, north)
-	base += relief_height(east, north)
+	var covered := false
+	if _has_fix:
+		var fv := _fix_sample(east, north)
+		if not is_nan(fv):
+			base = fv
+			covered = true
+	if not covered:
+		base += lianhua_height(east, north)
+		base += mountain_delta(east, north)
+		base += relief_height(east, north)
 	base = maxf(base, bridge_lift(east, north))
 	if cafe_floor.is_valid():
 		base = cafe_floor.call(east, north, base)
 	return base
+
+
+# ---------------------------------------------------------------------------
+# B-2 修正高度网格（scripts/dev/bake_height_fix.gd 产物 height-grid.bin）
+# ---------------------------------------------------------------------------
+
+const FIX_BIN := "res://data/city/height-fix/height-grid.bin"
+## 文件头字节数：'SHF1' + cols/rows(u32) + east0/north0/step(f32)
+const FIX_HEADER := 24
+var _fix_heights := PackedFloat32Array()
+var _fix_cols := 0
+var _fix_rows := 0
+var _fix_e0 := 0.0
+var _fix_n0 := 0.0
+var _fix_step := 8.0
+var _has_fix := false
+
+
+## 文件损坏/版本不符时静默回退原生管线（宁要旧行为也不要崩溃）
+##
+## ⚠️ 旧实现用 StreamPeerBuffer.get_buffer() 做长度校验 —— **StreamPeerBuffer 没有
+## 这个方法**（`get_buffer` 在 StreamPeer 上），第一行就抛
+##   Invalid call. Nonexistent function 'get_buffer' in base 'StreamPeerBuffer'
+## 于是整张修正网格从未被加载，_has_fix 恒为 false，物理高度场一直退回旧的
+## 36m 山体网格 —— 坡地悬空（§八 的 585 处浮空）根本没被修掉。
+## 另外逐格 get_float() 要 111 万次 GDScript 调用（启动多卡 1–2 秒）。
+## 现在改成 PackedByteArray 直接解码头 + 一次性 to_float32_array()。
+func _load_height_fix() -> void:
+	if not FileAccess.file_exists(FIX_BIN):
+		return
+	var f := FileAccess.open(FIX_BIN, FileAccess.READ)
+	if f == null:
+		push_warning("[HeightField] height-fix 打不开：%s" % FIX_BIN)
+		return
+	var buf := f.get_buffer(f.get_length())
+	f = null
+	if buf.size() < FIX_HEADER or buf.decode_u32(0) != 0x31464853:   # "SHF1"
+		push_warning("[HeightField] height-fix 魔数不符，忽略")
+		return
+	var cols := int(buf.decode_u32(4))
+	var rows := int(buf.decode_u32(8))
+	var e0 := buf.decode_float(12)
+	var n0 := buf.decode_float(16)
+	var step := buf.decode_float(20)
+	var n := cols * rows
+	if cols < 2 or rows < 2 or step <= 0.0 or buf.size() < FIX_HEADER + n * 4:
+		push_warning("[HeightField] height-fix 数据不完整（%dx%d step=%.2f 文件 %d 字节），忽略"
+			% [cols, rows, step, buf.size()])
+		return
+	var h := buf.slice(FIX_HEADER, FIX_HEADER + n * 4).to_float32_array()
+	if h.size() != n:
+		push_warning("[HeightField] height-fix 高度数组长度不符，忽略")
+		return
+	_fix_cols = cols
+	_fix_rows = rows
+	_fix_e0 = e0
+	_fix_n0 = n0
+	_fix_step = step
+	_fix_heights = h
+	_has_fix = true
+	print("[HeightField] 修正高度网格 %dx%d（%dm 步长，覆盖 %d%%）" % [cols, rows,
+		int(round(step)), _fix_coverage_pct()])
+
+
+func _fix_coverage_pct() -> int:
+	var cov := 0
+	var total := _fix_heights.size()
+	for i in range(0, total, 16):
+		if _fix_heights[i] > -9000.0:
+			cov += 1
+	return int(100.0 * cov / maxf(1.0, float(total / 16)))
+
+
+## 双线性采样；四角有未覆盖格时按已覆盖权重归一；全未覆盖返回 NAN
+func _fix_sample(east: float, north: float) -> float:
+	var fx := (east - _fix_e0) / _fix_step
+	var fz := (north - _fix_n0) / _fix_step
+	var ix := int(floor(fx))
+	var iz := int(floor(fz))
+	if ix < 0 or iz < 0 or ix >= _fix_cols - 1 or iz >= _fix_rows - 1:
+		return NAN
+	var tx := fx - float(ix)
+	var tz := fz - float(iz)
+	var base00 := iz * _fix_cols + ix
+	var h00 := _fix_heights[base00]
+	var h10 := _fix_heights[base00 + 1]
+	var h01 := _fix_heights[base00 + _fix_cols]
+	var h11 := _fix_heights[base00 + _fix_cols + 1]
+	# ---- 陡变格不插值（重要）----
+	# 8m 见方内高差 > 6m（≈ 坡度 75% 以上）只可能出现在三种地方：
+	#   · 陡崖（南山/小南山有 180m 的近乎垂直陡壁）
+	#   · 盘山公路回头弯 —— 上下两层路面水平间距常常只有 8–16m，
+	#     单值高度场天生表达不了
+	#   · 高台/下穿/上跨匝道的边缘
+	# 双线性在这里会**跨两层表面**插值：实测把 0.1m 的下层路面插到 44m；
+	# 纯取最近角点则是抛硬币（实测把崖底的路抬到 122m）。两种都不能用。
+	# 改用"原生层叠管线指路"：拿原生的粗网格值当"我现在在哪一层"的判据，
+	# 在四个角点里挑高度最接近它的那个 —— 崖底挑到谷底值、崖顶挑到崖顶值、
+	# 回头弯上下两层各自挑对自己的层。原生值本身±5m 的精度在这里够用，
+	# 因为它只用来**选层**，最终高度仍取视觉网格。
+	if h00 > -9000.0 and h10 > -9000.0 and h01 > -9000.0 and h11 > -9000.0:
+		var hmax := maxf(maxf(h00, h10), maxf(h01, h11))
+		var hmin := minf(minf(h00, h10), minf(h01, h11))
+		if hmax - hmin > 6.0:
+			var hint := lianhua_height(east, north) + mountain_delta(east, north) \
+				+ relief_height(east, north)
+			var best := h00
+			var bestd := absf(h00 - hint)
+			for v in [h10, h01, h11]:
+				var d: float = absf(v - hint)
+				if d < bestd:
+					bestd = d
+					best = v
+			return best
+	var w00 := (1.0 - tx) * (1.0 - tz)
+	var w10 := tx * (1.0 - tz)
+	var w01 := (1.0 - tx) * tz
+	var w11 := tx * tz
+	var sum := 0.0
+	var wsum := 0.0
+	if h00 > -9000.0:
+		sum += h00 * w00
+		wsum += w00
+	if h10 > -9000.0:
+		sum += h10 * w10
+		wsum += w10
+	if h01 > -9000.0:
+		sum += h01 * w01
+		wsum += w01
+	if h11 > -9000.0:
+		sum += h11 * w11
+		wsum += w11
+	if wsum < 1e-6:
+		return NAN
+	return sum / wsum
 
 
 ## 世界坐标（Godot）下的地面高度

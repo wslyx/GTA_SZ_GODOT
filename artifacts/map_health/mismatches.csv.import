@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://ba8qnu2g7jvqu"
+
+[deps]
+
+files=["res://artifacts/map_health/mismatches.east.translation", "res://artifacts/map_health/mismatches.north.translation", "res://artifacts/map_health/mismatches.hf.translation", "res://artifacts/map_health/mismatches.visual.translation", "res://artifacts/map_health/mismatches.diff.translation"]
+
+source_file="res://artifacts/map_health/mismatches.csv"
+dest_files=["res://artifacts/map_health/mismatches.east.translation", "res://artifacts/map_health/mismatches.north.translation", "res://artifacts/map_health/mismatches.hf.translation", "res://artifacts/map_health/mismatches.visual.translation", "res://artifacts/map_health/mismatches.diff.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

@@ -416,14 +416,20 @@ var _combat_visible := false
 
 func _build_combat() -> void:
 	# 准星：中心点 + 上下左右 4 条短线（ColorRect，无纹理依赖）
+	# ⚠️ 全部 mouse_filter=IGNORE：准星钉在屏幕正中央，而**捕获模式下鼠标事件
+	# 的 position 恒为屏幕中心** —— Control/ColorRect 默认 STOP 会把每一帧
+	# InputEventMouseMotion 吃在 GUI 层，_unhandled_input 永远收不到，
+	# 表现就是"一掏枪（准星可见）视角就卡死"（右键瞄准时尤其明显）。
 	_crosshair = Control.new()
 	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.visible = false
 	_root.add_child(_crosshair)
 	var dot := ColorRect.new()
 	dot.color = CROSS_COLOR
 	dot.size = Vector2(3, 3)
 	dot.position = Vector2(-1.5, -1.5)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.add_child(dot)
 	for i in 4:
 		var t := ColorRect.new()
@@ -434,6 +440,7 @@ func _build_combat() -> void:
 		elif i == 1: t.position = Vector2(-1, off)
 		elif i == 2: t.position = Vector2(-off - 7, -1)
 		else: t.position = Vector2(off, -1)
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_crosshair.add_child(t)
 		_cross_ticks.append(t)
 	# 弹药：屏幕中下（准星下方 64px）

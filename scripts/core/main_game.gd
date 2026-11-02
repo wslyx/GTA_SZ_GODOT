@@ -173,6 +173,14 @@ func _run_map_health() -> void:
 	get_tree().quit(0)
 
 
+## B-2 修正高度网格烘焙（§八）：godot --path . -- --bake-heights，跑完自动退出
+func _run_bake_heights() -> void:
+	var t0 := Time.get_ticks_msec()
+	var rep: Dictionary = BAKE_HEIGHTS_SCRIPT.bake(world)
+	print("[HeightFix] 烘焙完成 %d ms → %s" % [Time.get_ticks_msec() - t0, str(rep)])
+	get_tree().quit(0 if bool(rep.get("ok", false)) else 1)
+
+
 ## 多人战局状态上报的姿态来源节点（NetSession 每次上报前调用）。
 ##
 ## 步行发 ALS 角色；载具模式发对应模型节点 —— 模型的 global_transform 含
@@ -364,8 +372,14 @@ const TANK_SHELLS_SCRIPT := preload("res://scripts/vehicles/tank_shells.gd")
 const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
 ## 武器系统（GTA化 §2.3）。同上必须 preload。
 const WEAPON_SCRIPT := preload("res://scripts/gameplay/weapon_system.gd")
+## AlsOverlayKind 取值（镜像 GtaSzAlsPlayerHost 里的枚举，GDScript 侧用常量避免耦合）
+const ALS_OVERLAY_DEFAULT := 0
+const ALS_OVERLAY_RIFLE := 5
+const ALS_OVERLAY_PISTOL2H := 7
 ## 全图数据体检（方案 B）。同上必须 preload。
 const MAP_HEALTH_SCRIPT := preload("res://scripts/dev/map_health.gd")
+## 修正高度网格烘焙（B-2）。同上必须 preload。
+const BAKE_HEIGHTS_SCRIPT := preload("res://scripts/dev/bake_height_fix.gd")
 ## 街头任务系统（GTA化 §2.4）。同上必须 preload。
 const MISSION_SCRIPT := preload("res://scripts/gameplay/mission_system.gd")
 ## 街头商店（GTA化 §4.3）。同上必须 preload。
@@ -459,6 +473,10 @@ func _on_built() -> void:
 	# 全图数据体检（方案 B）：godot --path . -- --map-health [-- --quick]，跑完自动退出
 	if OS.get_cmdline_user_args().has("--map-health"):
 		_run_map_health.call_deferred()
+		return
+	# B-2 修正高度网格烘焙：godot --path . -- --bake-heights
+	if OS.get_cmdline_user_args().has("--bake-heights"):
+		_run_bake_heights.call_deferred()
 		return
 	MemProbe.mark("on_built入口")
 	career.setup(world)
@@ -1750,6 +1768,16 @@ func _step_walk(dt: float) -> void:
 ## 武器开火驱动（仅步行持枪时）。方向取相机 -Z 的数据坐标 2D 投影 ——
 ## 本作命中判定全是二维（collision/pedestrian 都是平面数据），俯仰差 v1 忽略。
 func _step_weapons(dt: float) -> void:
+	# 持枪姿态（GTA化 §2.3 v2）：武器状态 → ALS overlay。
+	# 手枪 = 双手持枪（Pistol2H），冲锋枪/霰弹枪 = 步枪持姿（Rifle），空手 = Default。
+	# ALS 运行时据此同时驱动举枪动画层与枪模 prop；"aim"（右键）在 ALS 输入适配里
+	# 已切 RotationMode.Aiming，叠加后即完整瞄准姿态。
+	# ⚠️ 此前宿主把 overlay 写死 Default，按右键只转头不举枪 —— 手枪瞄准缺失。
+	if _als_host != null and _als_host.RuntimeReady:
+		_als_host.RequestedOverlay = ALS_OVERLAY_PISTOL2H if weapons.armed == 0 \
+			else (ALS_OVERLAY_RIFLE if weapons.armed > 0 else ALS_OVERLAY_DEFAULT)
+		# 越肩瞄准：持枪 + 按住右键 → 相机右移拉近，角色让出屏幕中心的准星。
+		_als_host.ShoulderAim = weapons.armed >= 0 and Input.is_action_pressed("aim")
 	if weapons.armed < 0:
 		_fire_pressed_last = false
 		hud.set_weapon({})
@@ -1757,8 +1785,20 @@ func _step_weapons(dt: float) -> void:
 	var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	var just := held and not _fire_pressed_last
 	_fire_pressed_last = held
-	var fwd := -camera.global_transform.basis.z
-	var dir := Vector2(fwd.x, -fwd.z)
+	# 弹道方向：从**当前激活相机**取（步行模式是 ALS 轨道相机，不是 ChaseCamera），
+	# 且射向"准星指向的远点"而不是相机正前方向 —— 第三人称枪口和相机不重合，
+	# 越肩偏移后直接用相机前向，子弹会明显偏出准星。取 60m 远点做收敛，
+	# 与最长弹程（冲锋枪 50m）同量级，2D 命中判定不受俯仰影响。
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		cam = camera
+	var fwd := -cam.global_transform.basis.z
+	var eye := cam.global_position
+	var dir := Vector2(eye.x + fwd.x * 60.0, -(eye.z + fwd.z * 60.0)) \
+		- Vector2(walk.x, walk.z)
+	if dir.length_squared() < 0.01:
+		# 相机几乎垂直向下/向上时 2D 投影退化，退回相机前向的平面投影
+		dir = Vector2(fwd.x, -fwd.z)
 	dir = dir.normalized() if dir.length_squared() > 1e-6 else Vector2(0.0, 1.0)
 	var ev: Dictionary = weapons.step(dt, just, held, Vector2(walk.x, walk.z), dir, world)
 	if bool(ev.get("fired", false)):
