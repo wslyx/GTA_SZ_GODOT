@@ -417,15 +417,15 @@ func _load_car_asset() -> void:
 	var path := "res://data/city/traffic-car.glb"
 	if not ResourceLoader.exists(path):
 		path = "res://data/city/car.glb"
-	if not ResourceLoader.exists(path):
-		push_warning("[WantedSystem] 缺少警车车辆模型，警车将不可见（逻辑照跑）")
-		return
-	var scene := load(path) as PackedScene
-	if scene == null:
-		return
-	var inst := scene.instantiate()
-	_source_meshes = GlbLoader.meshes_of(inst)
-	inst.queue_free()
+	if ResourceLoader.exists(path):
+		var scene := load(path) as PackedScene
+		if scene != null:
+			var inst := scene.instantiate()
+			_source_meshes = GlbLoader.meshes_of(inst)
+			inst.queue_free()
+	if _source_meshes.is_empty():
+		push_warning("[WantedSystem] 缺少警车车辆模型，警灯仍可见（逻辑照跑）")
+	_build_lightbars()
 	for mi in _source_meshes:
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -437,6 +437,48 @@ func _load_car_asset() -> void:
 		add_child(node)
 		_multimeshes.append({"mm": mm})
 	_mesh_built = true
+
+
+## 警灯频闪（§2.1 v1.1）：车顶灯条用**程序化 BoxMesh**（无模型资产），
+## 红/蓝两组 MultiMesh 在 10Hz 同步时交替写入 —— 单色 5Hz 闪烁、整体 10Hz，
+## 与车身同步同一个 tick，不增加每帧成本。
+const LIGHTBAR_SIZE := Vector3(0.92, 0.13, 0.36)
+const LIGHTBAR_HEIGHT := 1.02   ## 车顶上方（traffic-car.glb 车高约 1.4m，灯条贴顶）
+var _bar_red_mm: MultiMesh = null
+var _bar_blue_mm: MultiMesh = null
+var _bar_toggle := false
+
+
+func _build_lightbars() -> void:
+	_bar_red_mm = MultiMesh.new()
+	_bar_red_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_bar_red_mm.mesh = _bar_mesh(Color(1.0, 0.08, 0.05))
+	var red_node := MultiMeshInstance3D.new()
+	red_node.multimesh = _bar_red_mm
+	red_node.name = "police-bar-red"
+	red_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(red_node)
+	_bar_blue_mm = MultiMesh.new()
+	_bar_blue_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_bar_blue_mm.mesh = _bar_mesh(Color(0.08, 0.30, 1.0))
+	var blue_node := MultiMeshInstance3D.new()
+	blue_node.multimesh = _bar_blue_mm
+	blue_node.name = "police-bar-blue"
+	blue_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(blue_node)
+
+
+## 自发光灯条网格：暗底色 + 强自发光（昼夜都醒目）
+func _bar_mesh(color: Color) -> Mesh:
+	var box := BoxMesh.new()
+	box.size = LIGHTBAR_SIZE
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color * 0.3
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 3.0
+	box.material = mat
+	return box
 
 
 ## 复制一份网格，把「车漆面」染成警用白
@@ -459,8 +501,6 @@ func _police_mesh(src_mesh: Mesh) -> Mesh:
 
 
 func _sync_instances() -> void:
-	if not _mesh_built or _multimeshes.is_empty():
-		return
 	var visible_xfs: Array = []
 	for c in cops:
 		if Vector2(c["x"], c["z"]).distance_to(_player_pos) > 950.0:
@@ -474,12 +514,26 @@ func _sync_instances() -> void:
 		visible_xfs.append(xf)
 	# 每个 MultiMesh（一个源 mesh 部件）都要有每车一个实例
 	# 本系统所有 mesh 共享同一份实例列表（每车每个源 mesh 一个实例）
-	for e in _multimeshes:
-		var mm: MultiMesh = e["mm"]
-		mm.instance_count = visible_xfs.size()
-		mm.visible_instance_count = visible_xfs.size()
+	if _mesh_built:
+		for e in _multimeshes:
+			var mm: MultiMesh = e["mm"]
+			mm.instance_count = visible_xfs.size()
+			mm.visible_instance_count = visible_xfs.size()
+			for i in visible_xfs.size():
+				mm.set_instance_transform(i, visible_xfs[i])
+	# 警灯频闪：本次 tick 写入其中一色（10Hz 同步 → 单色 5Hz 闪烁），另一色清空
+	if _bar_red_mm != null and _bar_blue_mm != null:
+		_bar_toggle = not _bar_toggle
+		var active: MultiMesh = _bar_red_mm if _bar_toggle else _bar_blue_mm
+		var idle: MultiMesh = _bar_blue_mm if _bar_toggle else _bar_red_mm
+		active.instance_count = visible_xfs.size()
+		active.visible_instance_count = visible_xfs.size()
 		for i in visible_xfs.size():
-			mm.set_instance_transform(i, visible_xfs[i])
+			var xf: Transform3D = visible_xfs[i]
+			active.set_instance_transform(i, Transform3D(
+				xf.basis, xf.origin + Vector3.UP * LIGHTBAR_HEIGHT))
+		idle.instance_count = 0
+		idle.visible_instance_count = 0
 
 
 # ---------------------------------------------------------------------------

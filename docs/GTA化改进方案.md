@@ -70,8 +70,9 @@
 - **脱捕**：见衰减；清星时 toast "已摆脱通缉"。
 - 渲染：复用 `data/city/traffic-car.glb`，车漆面改**黑白警用涂装**（白车身黑引擎盖的
   双色靠两个 group：group0 白车身、group1 黑盖，实现为两个 MultiMesh 集合）；
-  警灯 v1 先不做频闪（MultiMesh 逐实例颜色成本高），v1.1 用"红/蓝两张贴图各一个
-  MultiMesh 交替显隐"实现。
+  **警灯频闪** ✅（2026-11-02 v1.1）：车顶灯条为程序化 BoxMesh（无模型资产），
+  自发光红/蓝两组 MultiMesh 在 10Hz 车身同步 tick 交替写入（单色 5Hz 闪烁），
+  车模缺失时灯条仍渲染（逻辑照跑）。
 - 诊断：`diagnostics()` 返回 `{level, heat, cops, nearest_cop_m, state}`，
   并入 `main_game.diagnostics()`。
 
