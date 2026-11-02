@@ -1412,6 +1412,17 @@ func _process(delta: float) -> void:
 				_near_shop_id = sid
 				if sid != "":
 					hud.toast("按 E 进入%s" % shop["name"], 2.5)
+		# 任务进度常驻栏（HUD 完善包）：任务名 + 进度 + 剩余时间
+		var mst: Dictionary = missions.status()
+		if mst.has("active"):
+			var tl := float(mst.get("time_limit", 0.0))
+			var tline := "不限时" if tl <= 0.0 else "%.0fs" % maxf(0.0, tl - float(mst.get("elapsed", 0.0)))
+			var prog := ""
+			if int(mst.get("total", 0)) > 0:
+				prog = "%d/%d · " % [int(mst.get("progress", 0)), int(mst["total"])]
+			hud.set_mission("任务：%s · %s%s" % [mst["active"], prog, tline])
+		else:
+			hud.set_mission("")
 	if res.get("completed", false):
 		hud.toast(str(res["message"]), 4.0)
 		if audio != null:
@@ -2134,6 +2145,21 @@ func odometer() -> float:
 
 func data_position() -> Vector2:
 	return _player_position_data()
+
+
+## 小地图动态标记（HUD 完善包，map_ui._draw_minimap_plane 调）：
+## 警车红点（通缉中）+ 任务光标/目标金点
+func minimap_blips() -> Array:
+	var out: Array = []
+	if world == null:
+		return out
+	if world.wanted != null and world.wanted.wanted_level > 0:
+		var red := Color(0.92, 0.25, 0.20)
+		for c in world.wanted.cop_poses():
+			out.append({"x": c["x"], "z": c["z"], "color": red, "r": 4.0})
+	for b in missions.blips():
+		out.append(b)
+	return out
 
 func data_yaw() -> float:
 	match mode:

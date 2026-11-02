@@ -369,4 +369,24 @@ func status() -> Dictionary:
 		s["elapsed"] = snappedf(float(active["elapsed"]), 0.1)
 		s["time_limit"] = float(active.get("time_limit", 0.0))
 		s["progress"] = int(active.get("count", 0))
+		# 总量：eliminate = 目标人数；race = 检查点数（deliver 无进度计数）
+		if str(active["type"]) == "eliminate":
+			s["total"] = int(active.get("need", 0))
+		elif str(active["type"]) == "race":
+			s["total"] = (active.get("checkpoints", []) as Array).size()
 	return s
+
+
+## 小地图标记（HUD 完善包）：无任务时 = 任务光标（金点）；有任务时 = 当前目标
+func blips() -> Array:
+	var out: Array = []
+	var gold := Color(0.91, 0.71, 0.30)
+	if active.is_empty():
+		for o in offers:
+			out.append({"x": o["pos"].x, "z": o["pos"].y, "color": gold, "r": 4.5})
+		return out
+	var m: Dictionary = active.get("marker", {})
+	if not m.is_empty() and m["pos"] is Vector2:
+		var mp: Vector2 = m["pos"]
+		out.append({"x": mp.x, "z": mp.y, "color": gold, "r": 5.0})
+	return out

@@ -409,6 +409,7 @@ var _crosshair: Control = null
 var _cross_ticks: Array = []
 var _ammo_label: Label = null
 var _health_fill: ColorRect = null
+var _mission_label: Label = null
 var _hit_mark_t := 0.0
 var _combat_visible := false
 
@@ -454,6 +455,19 @@ func _build_combat() -> void:
 	_health_fill.position = Vector2(0, 0)
 	_health_fill.size = Vector2(150, 5)
 	hp_slot.add_child(_health_fill)
+	# 任务进度常驻栏（HUD 完善包）：血条正下方，无任务时隐藏
+	_mission_label = _label("", _f_ui, 12, Color(0.949, 0.945, 0.906, 0.85))
+	_mission_label.position = Vector2(_hud_edge(), _header_pad() + 74.0)
+	_mission_label.visible = false
+	_root.add_child(_mission_label)
+
+
+## 任务进度（missions.status() 摘要；空串 = 隐藏）
+func set_mission(text: String) -> void:
+	if _mission_label == null:
+		return
+	_mission_label.text = text
+	_mission_label.visible = not text.is_empty()
 
 
 ## 武器状态（weapon_system.hud_state() 透传）：{} = 空手隐藏整套战斗 UI

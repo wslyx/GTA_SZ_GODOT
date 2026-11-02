@@ -1172,6 +1172,18 @@ func _draw_minimap_plane() -> void:
 			_plane_draw.draw_polyline(rl, Color(0.141, 0.243, 0.224), 5.25, true)
 			_plane_draw.draw_polyline(rl, Color(0.600, 0.878, 0.745), 3.0, true)
 
+	# —— 动态标记（GTA化 HUD 完善包）：警车红点 + 任务光标/目标金点 ——
+	# 仍在玩家相对变换里画；超出小地图视野半径的不画（圆形裁切前先省掉）
+	if player.has_method("minimap_blips"):
+		for b in player.minimap_blips():
+			var bx := float(b["x"]) - pos.x
+			var bz := float(b["z"]) - pos.y
+			if bx * bx + bz * bz > 600.0 * 600.0:
+				continue
+			_plane_draw.draw_circle(
+				Vector2(bx * MINIMAP_SCALE, -bz * MINIMAP_SCALE),
+				float(b.get("r", 4.0)), b["color"])
+
 	_plane_draw.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
