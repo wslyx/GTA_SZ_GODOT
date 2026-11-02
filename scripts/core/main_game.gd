@@ -46,6 +46,12 @@ var audio: ProceduralAudio
 var weapons = WEAPON_SCRIPT.new()
 ## 街头任务系统（GTA化 §2.4）：数据驱动任务 + 路网动态选址
 var missions = MISSION_SCRIPT.new()
+## 街头商店（GTA化 §4.3）：军品店 + 面馆，购买经对话面板
+var shops = SHOP_SCRIPT.new()
+## 当前正在选购的商店（E 进店时记下，数字键确认后清空）
+var _shop_active := {}
+## 上一次贴近的商店 id（用于"按 E 进店"的边沿提示）
+var _near_shop_id := ""
 ## 玩家生命 0–100：v1 伤害源只有 3 星+ 警察开火（车内免伤）
 var player_health := 100.0
 ## 左键开火的边沿检测（半自动武器只在按下瞬间打一发）
@@ -335,6 +341,8 @@ const WANTED_SCRIPT := preload("res://scripts/gameplay/wanted_system.gd")
 const WEAPON_SCRIPT := preload("res://scripts/gameplay/weapon_system.gd")
 ## 街头任务系统（GTA化 §2.4）。同上必须 preload。
 const MISSION_SCRIPT := preload("res://scripts/gameplay/mission_system.gd")
+## 街头商店（GTA化 §4.3）。同上必须 preload。
+const SHOP_SCRIPT := preload("res://scripts/gameplay/shop_system.gd")
 
 func _add_system(script: GDScript, node_name: String) -> Node3D:
 	var n: Node3D = script.new()
@@ -427,6 +435,9 @@ func _on_built() -> void:
 	story.setup(world, career)
 	# 街头任务（GTA化 §2.4）：需要路网图选触发/目标点
 	missions.setup(world)
+	# 街头商店（GTA化 §4.3）：位置挂在生涯站点上；读回已购枪的存档
+	shops.setup(world, career, weapons)
+	weapons.owned = shops.owned_guns
 	MemProbe.mark("career/rides/story 后")
 
 	hud.setup(world, self)
@@ -1386,6 +1397,14 @@ func _process(delta: float) -> void:
 					maps.clear_destination()
 				else:
 					maps.set_destination_marker(mk["pos"], str(mk["name"]))
+		# 商店接近提示（§4.3）：边沿触发一次
+		if mode == Mode.WALKING and not panels.dialog_active:
+			var shop: Dictionary = shops.near_shop(p)
+			var sid := str(shop.get("id", ""))
+			if sid != _near_shop_id:
+				_near_shop_id = sid
+				if sid != "":
+					hud.toast("按 E 进入%s" % shop["name"], 2.5)
 	if res.get("completed", false):
 		hud.toast(str(res["message"]), 4.0)
 		if audio != null:
@@ -2015,6 +2034,18 @@ func _interact() -> void:
 	if rres.get("ok", false):
 		hud.toast(str(rres["message"]), 3.0)
 
+	# 商店（§4.3）：步行贴近时 E 进店选购（对话面板 + 数字键）
+	if on_foot:
+		var shop: Dictionary = shops.near_shop(p)
+		if not shop.is_empty():
+			_shop_active = shop
+			var menu: Dictionary = shops.menu_for(shop)
+			var lines: Array = []
+			for o in menu["options"]:
+				lines.append({"text": str(o["text"])})
+			panels.show_dialogue(str(menu["line"]), lines, "shop")
+			return
+
 	# 手账里可接单：靠近生活驿站时按 E 打开手账
 	for site in rides.sites:
 		if p.distance_to(Vector2(site["x"], site["z"])) < 16.0:
@@ -2036,6 +2067,36 @@ func _resolve_dialogue(idx: int) -> void:
 			career.choose_dialogue_option(_pending_level_up_dialogue, idx)
 			hud.toast("关系 +%d" % int(_pending_level_up_dialogue["options"][idx].get("relationship", 0)), 3.0)
 			_pending_level_up_dialogue = {}
+	elif kind == "shop":
+		# 商店选购（§4.3）：数字键确认 → 扣钱 → 按动作应用效果
+		if not _shop_active.is_empty():
+			var pr: Dictionary = shops.purchase(_shop_active, idx)
+			if bool(pr.get("ok", false)):
+				_apply_purchase(pr)
+			hud.toast(str(pr["text"]), 3.0)
+		_shop_active = {}
+
+
+## 商店购买效果应用（购买判定与扣钱在 shop_system 里）
+func _apply_purchase(r: Dictionary) -> void:
+	match str(r["action"]):
+		"ammo":
+			weapons.refill_all()
+			hud.set_weapon(weapons.hud_state())
+		"buy_gun":
+			weapons.owned = shops.owned_guns
+			hud.set_weapon(weapons.hud_state())
+		"heal":
+			player_health = 100.0
+			hud.set_health(100.0)
+
+
+## §4.4 惩罚扣款：实扣 min(应付, 现金)，返回实扣金额（钱包不为负）
+func _charge(amount: int) -> int:
+	var actual: int = mini(amount, GameState.cash)
+	if actual > 0:
+		GameState.add_cash(-actual)
+	return actual
 
 # ---------------------------------------------------------------------------
 # 供 HUD / 地图查询的接口
@@ -2323,7 +2384,13 @@ func _on_wanted_escaped() -> void:
 
 
 func _on_wanted_busted() -> void:
-	hud.toast("被逮捕了！罚款并释放", 5.0)
+	# §4.4 惩罚循环：罚款 + 没收武器（只剩手枪、弹匣清空）
+	var fine := _charge(200)
+	shops.confiscate()
+	weapons.confiscate()
+	weapons.owned = shops.owned_guns
+	hud.set_weapon({})
+	hud.toast("被逮捕了！罚款 ¥%d，武器被没收" % fine, 5.0)
 	# v1：只清通缉发车；医院/警局重生循环接 save_system 时再落（方案 §4.4）
 	if world.wanted != null:
 		world.wanted.clear_busted()
@@ -2357,6 +2424,8 @@ func _respawn_player() -> void:
 	hud.set_health(100.0)
 	if world.wanted != null:
 		world.wanted.clear_busted()
+	# §4.4 惩罚循环：医院治疗费（保留武器，被捕才没收）
+	var fee := _charge(300)
 	# 街头任务：被击倒即失败
 	var mf: Dictionary = missions.on_busted()
 	if not mf.is_empty() and not str(mf.get("text", "")).is_empty():
@@ -2368,7 +2437,7 @@ func _respawn_player() -> void:
 		walk.x = np.x
 		walk.z = np.y
 		_als_enter_world()
-	hud.toast("你被击倒了 · 已在附近路口苏醒（通缉已清除）", 5.0)
+	hud.toast("你被击倒了 · 医院治疗费 ¥%d（通缉已清除）" % fee, 5.0)
 
 
 func diagnostics() -> Dictionary:
@@ -2394,6 +2463,8 @@ func diagnostics() -> Dictionary:
 		"weather": world.weather.diagnostics() if world.weather != null else {},
 		"wanted": world.wanted.diagnostics() if world.wanted != null else {},
 		"missions": missions.status(),
+		"shops": {"owned": shops.owned_guns, "spent": shops.total_spent,
+			"purchases": shops.purchase_count},
 		"career": career.status(),
 		"story": story.status(),
 		"rides": rides.status(),

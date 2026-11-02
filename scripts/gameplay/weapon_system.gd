@@ -31,10 +31,14 @@ const CAR_HIT_RADIUS := 1.6
 var armed := -1
 ## 各枪弹匣余量（与 WEAPONS 同长）
 var _ammo: Array = []
+## 拥有表（GTA化 §4.3 商店门控）：手枪默认有，冲锋枪/霰弹枪在军品店购买。
+## 真值来源是 shop_system.owned_guns（持久化），这里只是运行时镜像。
+var owned: Array = [true, false, false]
 ## 换弹剩余秒
 var _reload_left := 0.0
 ## 射击间隔剩余秒
 var _fire_cd := 0.0
+var _trigger_held := false
 var _rng := RandomNumberGenerator.new()
 
 
@@ -57,15 +61,36 @@ func reloading() -> bool:
 
 
 ## 换枪/收枪：再按同一数字键 = 收枪。返回提示文案（空串 = 无变化）。
+## 未拥有的枪会拒绝（商店门控 §4.3）。
 func select(index: int) -> String:
 	if index < 0 or index >= WEAPONS.size():
 		return ""
+	if not bool(owned[index]):
+		return "%s 还没买（去军品店看看）" % WEAPONS[index]["name"]
 	if armed == index:
 		armed = -1
 		return "已收枪"
 	armed = index
 	_reload_left = 0.0
 	return "已切换：%s（弹匣 %d/%d · 左键开火）" % [WEAPONS[index]["name"], _ammo[armed], WEAPONS[index]["mag"]]
+
+
+## 补满所有已拥有枪的弹匣（军品店"补弹"）
+func refill_all() -> void:
+	for i in WEAPONS.size():
+		if bool(owned[i]):
+			_ammo[i] = int(WEAPONS[i]["mag"])
+	_reload_left = 0.0
+
+
+## 被捕没收（§4.4）：只剩手枪且弹匣清空，强制收枪
+func confiscate() -> void:
+	owned = [true, false, false]
+	_ammo[0] = int(WEAPONS[0]["mag"])
+	for i in range(1, _ammo.size()):
+		_ammo[i] = 0
+	armed = -1
+	_reload_left = 0.0
 
 
 ## 每帧驱动。just_pressed：本帧刚按下左键；held：左键按住。

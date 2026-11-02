@@ -18,6 +18,8 @@ const KEY_AUDIO := "shenchengji.audio.v1.json"
 const KEY_FULL_STATE := "shenchengji-save-v1.json"
 const KEY_CAREER := "shenchengji-career-v1.json"
 const KEY_STORY := "shenchengji-story-v1.json"
+## 商店购买记录（GTA化 §4.3）：已购枪 / 累计消费
+const KEY_SHOP := "shenchengji-shop-v1.json"
 
 signal city_life_saved()
 signal full_state_saved()
@@ -125,6 +127,7 @@ func load_full_state() -> bool:
 ## （不要用 `for k: String in ...` 这种带类型标注的循环变量写法，语法兼容性不确定。）
 const SAVE_KEYS := [
 	KEY_CITY_LIFE, KEY_FULL_STATE, KEY_GRAPHICS, KEY_AUDIO, KEY_CAREER, KEY_STORY,
+	KEY_SHOP,
 ]
 
 
@@ -214,6 +217,10 @@ func load_section(key: String) -> Dictionary:
 
 func career_key() -> String:
 	return KEY_CAREER
+
+
+func shop_key() -> String:
+	return KEY_SHOP
 
 
 func story_key() -> String:
