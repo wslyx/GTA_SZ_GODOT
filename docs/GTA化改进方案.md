@@ -210,11 +210,20 @@
      钱包 `GameState.add_cash` 随全局存档持久化。
    - 待补（v1.1）：警察局出现点（当前被捕原地释放）、罚金随星级浮动。
 
-## 五、多人同步（三期，需扩 kcp_tauri 协议）
+## 五、多人同步 ✅ v1 已实施（2026-11-02）
 
-- binary_protocol 增 `WANTED` 消息（1 字节星级 + 1 字节 heat/255），
-  `RoomBroadcast` 转发；远程玩家头顶显示其通缉星。
-- 警察仍由**各客户端本地模拟**追自己（GTA 线上模式同款，避免服务器权威 NPC 的成本）。
+- **协议**：`kcp_tauri` 的 `binary_protocol.rs` 增 **WANTED 字段（bit9，0x0200）**：
+  载荷 2 字节 = 星级 u8（0-5，越界钳制）+ 热度 u8（heat×255），排在 VELOCITY 之后
+  （尾部）。roundtrip 单测 + 撞位防回归测试已覆盖，`cargo test` 7/7 通过。
+- **转发**：服务器对 GameData 是透明转发（只拆目标会话 ID，不解析载荷），
+  **零服务端流程改动**——旧客户端不带 bit9 自然兼容，新客户端解码时按位跳过。
+- **客户端（GTA_SZ_GODOT）**：
+  - `net_session.gd`：`bind_wanted_provider(Callable)`（main_game 返回
+    `[level, heat]`），15Hz 状态包按位附加 WANTED；解码按 field_mask 消费；
+  - `net_remote_player.gd`：`wanted_level` 属性，名牌缀星（"漫游者07 ★★★"）；
+  - `main_game.gd`：`_net_wanted_state()` 把本地 WantedSystem 的星级/热度接进上报。
+- 警察仍由**各客户端本地模拟**追自己（GTA 线上模式同款，避免服务器权威 NPC 成本）。
+- 待补（v1.1）：小地图显示他人通缉、通缉者高亮描边。
 
 ---
 

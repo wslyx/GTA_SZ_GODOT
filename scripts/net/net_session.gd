@@ -68,6 +68,10 @@ var _last_pose_node: Node3D = null
 ## 参数 (light: int, rain: bool)，仅在收到权威玩家的 world_state 时调用
 var _world_state_apply: Callable = Callable()
 
+## 通缉状态来源 Callable（由 main_game 绑定，GTA化 §五）：
+## 返回 [level: int 0-5, heat: float 0-1]，随 15Hz 状态包上报（WANTED 字段）
+var _wanted_provider: Callable = Callable()
+
 ## world_state 广播间隔（秒）—— 权威玩家周期广播，覆盖短暂丢包
 const WORLD_STATE_SEND_SEC := 5.0
 var _world_state_accum := 0.0
@@ -296,6 +300,11 @@ func bind_world_state_apply(apply: Callable) -> void:
 	_world_state_apply = apply
 
 
+## 绑定通缉状态来源（GTA化 §五）：main_game 传 Callable，返回 [level, heat]
+func bind_wanted_provider(provider: Callable) -> void:
+	_wanted_provider = provider
+
+
 ## 连接服务器并加入默认战局
 func join_session(p_host: String, p_port: int, p_name: String) -> void:
 	if _client != null:
@@ -454,7 +463,8 @@ func _on_room_data(sender: int, room: String, data: PackedByteArray) -> void:
 		var remote := _ensure_remote(sender, "玩家%d" % (sender % 1000))
 		remote.apply_state(
 			state.position, state.yaw, str(state.get("mode", "walk")),
-			state.get("velocity", Vector3.ZERO), state.get("quat", Quaternion.IDENTITY))
+			state.get("velocity", Vector3.ZERO), state.get("quat", Quaternion.IDENTITY),
+			int(state.get("wanted", 0)))
 	elif data[0] == 0x7B:  # '{' JSON（聊天/系统公告/世界状态等文本消息）
 		var json := JSON.new()
 		if json.parse(data.get_string_from_utf8()) == OK and json.data is Dictionary:
@@ -554,11 +564,20 @@ func _send_local_state() -> void:
 	_send_sequence += 1
 	var buf := StreamPeerBuffer.new()
 	buf.big_endian = false
+	# field_mask：POSITION|ROTATION|WEAPON|VELOCITY（0x0033），
+	# 通缉状态来源可用时再加 WANTED（0x0200，GTA化 §五）
+	var wanted := [-1, 0.0]
+	var mask := 0x0033
+	if _wanted_provider.is_valid():
+		var w: Array = _wanted_provider.call()
+		if w.size() >= 2:
+			wanted = [clampi(int(w[0]), 0, 5), clampf(float(w[1]), 0.0, 0.99)]
+			mask |= 0x0200
 	buf.put_8(0x01)                      # version
 	buf.put_8(0x01)                      # msg_type = GameData
 	buf.put_u64(int(Time.get_unix_time_from_system() * 1000.0))  # timestamp
 	buf.put_u32(_send_sequence)          # sequence
-	buf.put_u16(0x0033)                  # field_mask: POSITION|ROTATION|WEAPON|VELOCITY
+	buf.put_u16(mask)                    # field_mask
 	buf.put_float(pos.x)
 	buf.put_float(pos.y)
 	buf.put_float(pos.z)
@@ -575,6 +594,10 @@ func _send_local_state() -> void:
 	buf.put_float(vel.x)
 	buf.put_float(vel.y)
 	buf.put_float(vel.z)
+	# WANTED 字段（bit9，位于 VELOCITY 之后）：星级 u8 + heat×255 u8
+	if int(wanted[0]) >= 0:
+		buf.put_8(int(wanted[0]))
+		buf.put_8(int(round(float(wanted[1]) * 255.0)))
 	_client.send_room_broadcast(current_room, buf.data_array)
 	var _wd_cost := Time.get_ticks_usec() - _wd_t0
 	if _wd_cost > 50000:
@@ -650,6 +673,11 @@ func _decode_game_data(data: PackedByteArray) -> Dictionary:
 		buf.seek(off)
 		result.velocity = Vector3(
 			buf.get_float(), buf.get_float(), buf.get_float())
+		off += 12
+	# WANTED 字段（bit9，GTA化 §五）：星级 u8 + heat×255 u8。
+	# 旧客户端不发此位 —— 自然跳过，远程名牌无星。
+	if field_mask & 0x0200 and off + 2 <= data.size():
+		result.wanted = data[off]
 	return result
 
 

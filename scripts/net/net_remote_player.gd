@@ -33,6 +33,9 @@ var move_mode := "walk" :
 		move_mode = value
 		_apply_mode_visual()
 
+## 通缉星级 0-5（WANTED 字段，GTA化 §五）：>0 时名牌缀星
+var wanted_level := 0
+
 ## 载具 GLB 场景路径（与发送端 main_game 用的同一批资产）
 const VEHICLE_SCENES := {
 	"car": "res://data/city/car.glb",
@@ -159,8 +162,12 @@ func _process(_delta: float) -> void:
 
 ## 收到远程玩家的最新状态（服务端 RoomBroadcast 的二进制 GameData）
 func apply_state(pos: Vector3, yaw: float, mode := "walk", vel := Vector3.ZERO,
-		quat := Quaternion.IDENTITY) -> void:
+		quat := Quaternion.IDENTITY, wanted := 0) -> void:
 	move_mode = mode
+	# 通缉星（GTA化 §五）：0-5，>0 时名牌缀星
+	if wanted != wanted_level:
+		wanted_level = clampi(wanted, 0, 5)
+		_refresh_label()
 	_snapshots.append({
 		"t": Time.get_ticks_msec(), "pos": pos, "yaw": yaw,
 		"quat": quat, "vel": vel,
@@ -222,16 +229,21 @@ func _color_from_id(id: int) -> Color:
 	return Color.from_hsv(hue, 0.65, 0.9)
 
 
-## 昵称牌文本：昵称 +（非步行时的）模式徽标
+## 昵称牌文本：昵称 +（非步行时的）模式徽标 +（通缉时的）星级
 func _refresh_label() -> void:
 	if _label == null:
 		return
+	var text := ""
 	match move_mode:
 		"car":
-			_label.text = "%s（车）" % player_name
+			text = "%s（车）" % player_name
 		"tank":
-			_label.text = "%s（坦克）" % player_name
+			text = "%s（坦克）" % player_name
 		"plane":
-			_label.text = "%s（飞机）" % player_name
+			text = "%s（飞机）" % player_name
 		_:
-			_label.text = player_name
+			text = player_name
+	# 通缉星缀尾（WANTED 字段，GTA化 §五）
+	if wanted_level > 0:
+		text += " " + "★".repeat(wanted_level)
+	_label.text = text
