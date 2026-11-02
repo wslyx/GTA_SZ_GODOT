@@ -143,13 +143,30 @@
 
 ## 三、二级：地图精致度
 
-1. **分区色板**：`architecture_materials.gd` 按城市象限换 4 套建筑色板/材质密度
-   （老城暖砖 / 金融玻璃 / 海滨低层 / 工业灰），`CityData` 增分区查询函数。
-2. **地标剪影**：挑 3 个手工地标（塔/桥/体育场）进 `distant_city.gd` 远景层。
-3. **路面贴花**：`road_surface.gd` 纹理 atlas 扩：车道线/斑马线/井盖/油渍；
-   路缘石几何（30cm 高差）只做 detail 区块。
-4. **烘焙光照**：detail 区块静态建筑 LightmapGI 一版；与 `lighting_director` 动态天光分层。
-5. **室内与天台**：5–10 个功能室内 + 天台可达（`rooftop_layer` 补楼梯交互）。
+1. **分区色板** ✅ v1 已实施（2026-11-02）
+   - 实现：`architecture_pbr.gdshader` 增 `instance uniform vec3 district_tint`
+     （只乘反照率，不动窗光自发光）；`architecture_materials.gd` 按 MeshInstance
+     **世界坐标**判分区并 `set_instance_shader_parameter` 染色——材质仍按
+     profile 键共享，**材质数零增长**，染色纯 GPU。
+   - 分区（城市 extent x∈±6788 / z∈±2605，归一化后）：
+     | 分区 | 判定 | tint（线性） | 身份 |
+     |---|---|---|---|
+     | 中央 core | \|nx\|<0.30 且 \|nz\|<0.55 | 不染 | 保持原版观感 |
+     | 金融 finance | nx ≥ 0.30 | (0.88, 0.94, 1.06) | 冷蓝白玻璃感 |
+     | 工业 industrial | nx ≤ −0.30 | (0.82, 0.82, 0.80) | 灰暗去饱和 |
+     | 老城 old_town | 中带 nz > 0 | (1.09, 0.97, 0.86) | 暖砖 |
+     | 海滨 waterfront | 中带 nz ≤ 0 | (1.02, 1.04, 0.97) | 暖白偏绿 |
+   - 只染普通楼体/立面（landmark 有独有配色不染）；诊断加 `districts` 计数。
+   - ⚠️ headless 检查不编译 shader：`instance uniform` 若在运行时报错，
+     症状是立面材质失效——回退方案是把 instance uniform 降级为普通 uniform
+     + 全城统一 tint（或撤掉 shader 改动即可，GDScript 侧无害）。
+2. **地标剪影**（待做）：3 个手工地标进 `distant_city.gd` 远景层——需要模型/程序化
+   几何设计，单独一轮做。
+3. **路面贴花**（部分已有）：`roads.glb` 自带 roadline 车道线几何且已按原版校准；
+   斑马线/井盖/油渍需要新贴图 atlas，待美术资产。
+4. **烘焙光照**（待做）：detail 区块 LightmapGI——流式区块与烘焙光照的兼容性
+   需要先小范围验证，单独一轮做。
+5. **室内与天台**（待做）：5–10 个功能室内 + 天台可达。
 
 ## 四、三级：世界可信度
 
@@ -176,4 +193,5 @@
 - [x] 抢车交互（§2.2）：F 键抢 AI 车 + 惊散波 + 通缉 +1★
 - [x] 武器战斗（§2.3）：三把枪 + 2D 弹道 + 行人击倒 + 警察开火 + 血量/死亡重生
 - [x] 任务链（§2.4）：JSON 模板 + deliver/race/eliminate + 光标上图 + 赏金入账
-- [ ] 二级（地图精致：分区色板/路面贴花/烘焙光照/室内天台）
+- [x] 分区色板（§3.1）：instance uniform 分区染色，材质数零增长
+- [ ] 地标剪影（§3.2）/ 路面贴花补全（§3.3）/ 烘焙光照（§3.4）/ 室内天台（§3.5）

@@ -46,6 +46,11 @@ uniform float emission_energy = 0.0;
 /// 逐材质环境光强度（原版 `profile.environment ?? .96`）
 uniform float env_scale = 0.96;
 
+/// 分区染色（GTA化 §3.1）：按城市象限逐 MeshInstance 设置（instance uniform），
+/// 材质仍按 profile 键共享 —— 材质数零增长，染色纯 GPU。
+/// 只乘反照率（墙/玻璃），不动自发光（窗光不该被分区色染）。
+instance uniform vec3 district_tint = vec3(1.0);
+
 // ---------------------------------------------------------------------------
 // 立面多样性 —— 原版 city-facade-diversity.ts（MaterialPluginBase → gdshader）
 //
@@ -364,7 +369,7 @@ void fragment() {
 		glazing = mix(glazing, mean_glass, unresolved);
 		// 双瓣近似：玻璃覆盖决定粗糙度/镜面，天空倒影不糊
 		float glass_lobe = smoothstep(0.03, 0.20, glazing);
-		ALBEDO = clamp(surface, vec3(0.009), vec3(0.82));
+		ALBEDO = clamp(surface * district_tint, vec3(0.009), vec3(0.82));
 		ROUGHNESS = mix(0.78, glass_roughness, glass_lobe);
 		METALLIC = 0.0;
 		SPECULAR = 0.5 * mix(1.0, glazing, glass_lobe);
@@ -426,6 +431,7 @@ void fragment() {
 		// 顶点色是乘性的（原版：有顶点色就 useVertexColors=true）；
 		// 网格没有顶点色时 Godot 会把它设成白色，等于不生效。
 		base *= COLOR.rgb;
+		base *= district_tint;
 		ALBEDO = base;
 
 		if (use_normal_tex) {

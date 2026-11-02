@@ -100,6 +100,44 @@ const FACADE_WINDOWS_PATH := ARCH + "facade-windows.png"
 ## 只对 buildings.glb 的 block_* 网格启用（原版 /^block_-?\d+_-?\d+_/）
 const BLOCK_MESH_RE := "^block_-?\\d+_-?\\d+_"
 
+# ---------------------------------------------------------------------------
+# 分区染色（GTA化 §3.1）：按城市象限给楼体一个 tint（instance uniform，
+# 材质数零增长）。中央不染色保持原版观感，四个分区各有身份：
+#   东 = 金融（冷蓝白）／西 = 工业（灰暗去饱和）／北中带 = 老城暖砖／南中带 = 海滨
+# ---------------------------------------------------------------------------
+const CITY_EXTENT_X := 6788.1
+const CITY_EXTENT_Z := 2604.89
+const DISTRICT_TINTS := {
+	"finance": Color(0.88, 0.94, 1.06),
+	"old_town": Color(1.09, 0.97, 0.86),
+	"waterfront": Color(1.02, 1.04, 0.97),
+	"industrial": Color(0.82, 0.82, 0.80),
+}
+## 中央保护区（归一化半径内不染色）
+const DISTRICT_CORE_X := 0.30
+const DISTRICT_CORE_Z := 0.55
+## 诊断计数：各分区已染色的 MeshInstance 数
+var _district_counts := {"finance": 0, "old_town": 0, "waterfront": 0, "industrial": 0, "core": 0}
+
+## 世界坐标 → 数据坐标（世界 z = -数据北，同 TrafficSystem 约定）→ 分区 tint。
+## 返回线性 RGB（shader 里直接乘反照率），中央返回白色 = 不染。
+static func district_tint_for(world_pos: Vector3) -> Color:
+	return DISTRICT_TINTS[district_name_for(world_pos)]
+
+
+static func district_name_for(world_pos: Vector3) -> String:
+	var nx := world_pos.x / CITY_EXTENT_X
+	var nz := -world_pos.z / CITY_EXTENT_Z
+	if absf(nx) < DISTRICT_CORE_X and absf(nz) < DISTRICT_CORE_Z:
+		return "core"
+	if nx >= DISTRICT_CORE_X:
+		return "finance"
+	if nx <= -DISTRICT_CORE_X:
+		return "industrial"
+	return "old_town" if nz > 0.0 else "waterfront"
+
+
+
 var world: CityWorld
 var enabled := true
 
@@ -425,6 +463,18 @@ func apply_meshes(root: Node, asset_name: String) -> int:
 		if kind == "landmark" and mi.name.begins_with("detail_"):
 			mesh_kind = "detail"
 		var fv_mesh := fv_asset and _block_re.search(mi.name) != null
+		# 分区染色（§3.1）：只染普通楼体/立面（landmark 有自己的独有配色）。
+		# 必须在树里才能取 global_position；不在树就先不标 meta，下轮扫描再染。
+		if kind == "ordinary" and not mi.has_meta("district_tinted") \
+				and mi.is_inside_tree():
+			var dn := district_name_for(mi.global_transform.origin)
+			mi.set_meta("district_tinted", dn)
+			if dn != "core":
+				_district_counts[dn] = int(_district_counts[dn]) + 1
+			else:
+				_district_counts["core"] = int(_district_counts["core"]) + 1
+			mi.set_instance_shader_parameter("district_tint",
+				district_tint_for(mi.global_transform.origin))
 		for s in mesh.get_surface_count():
 			# 已经挂了 override 的 surface 一律不碰：既避免重复套用，也避免把
 			# ground_field.gd 的屋顶 surface override 顶掉（它在更早的步骤里挂上）。
@@ -486,6 +536,7 @@ func diagnostics() -> Dictionary:
 		"profiles": PROFILES.size(),
 		"materials": _materials.size(),
 		"materialBudget": 31,
+		"districts": _district_counts.duplicate(),
 		"facadeVariety": {
 			"ready": _facade_atlas != null and _facade_windows != null,
 			"materials": _fv_materials.size(),
