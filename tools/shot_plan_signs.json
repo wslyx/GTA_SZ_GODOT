@@ -1,0 +1,33 @@
+{
+  "warmup": 7.0,
+  "gap": 4.0,
+  "settle": 3.0,
+  "shots": [
+    {
+      "name": "sign_front_zoom",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium",
+        "goto": [-2666.3, -867.1, -1.7149],
+        "zoom": 30
+      }
+    },
+    {
+      "name": "sign_night",
+      "env": {
+        "light_mode": 2,
+        "tier": "medium",
+        "goto": [-2666.3, -867.1, -1.7149]
+      }
+    },
+    {
+      "name": "sign_rear",
+      "env": {
+        "light_mode": 0,
+        "tier": "medium",
+        "goto": [-2725.7, -875.7, 1.4267],
+        "zoom": 30
+      }
+    }
+  ]
+}

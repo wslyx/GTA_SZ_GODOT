@@ -1,0 +1,256 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 1.2,
+ "shots": [
+  {
+   "name": "d00_pos",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     -2664,
+     -862,
+     90
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "d01_start",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -264,
+     -862
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "d02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d06",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d07",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d08",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d09",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d10",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d11",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d12",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d13",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d14",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d15",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d16",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d17",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d18",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d19",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d20",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d21",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d22",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d23",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d24",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d25",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d26",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d27",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d28",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "d29",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

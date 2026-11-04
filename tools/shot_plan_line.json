@@ -1,0 +1,84 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 1.2,
+ "shots": [
+  {
+   "name": "pk_goto",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     1600,
+     300,
+     90
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_06",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "pk_07",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

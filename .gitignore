@@ -85,3 +85,8 @@ desktop.ini
 *.swo
 *~
 *.stackdump
+
+# 调试转储文件：体积巨大（GB 级），禁止入库
+# 如需历史留存，请放对象存储或 Git LFS 独立仓库
+tools/dumps/
+*.dmp

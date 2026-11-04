@@ -89,6 +89,10 @@ uniform sampler2D litter_color : source_color, hint_default_white;
 uniform sampler2D litter_normal : hint_normal;
 uniform float grass_park = 1.0;
 uniform float grass_detail_range = 110.0;
+// 原版 cityGrassPark.y（森林档）：山体层用 —— 树冠 tint + 双尺度冠簇噪声，
+// 逐顶点色（树冠簇/高地/岩石）由 mesh COLOR 承担（仅山地网格有色，故加门控）
+uniform float grass_forest : hint_range(0.0, 1.0) = 0.0;
+uniform float use_vertex_color : hint_range(0.0, 1.0) = 0.0;
 
 // ---------------------------------------------------------------------------
 // A6b 植被夜间地面补光（原版 city-landscape-lighting.ts）
@@ -260,6 +264,17 @@ void fragment() {
 		vec3 lawn = mix(lawn_a, lawn_b, 0.25 + 0.45 * grass_patch);
 		base = mix(mix(lawn, soil, worn), litter, leafy);
 		base *= mix(vec3(0.95, 0.98, 0.93), vec3(1.02, 1.01, 0.95), grass_patch);
+		// 原版 VERTEXCOLOR：山地网格带逐顶点烘焙色（树冠簇/高地压暗/岩石暖灰），
+		// 普通草地网格无 COLOR（Godot 缺省=白，等价 vColor=1）
+		if (use_vertex_color > 0.5) {
+			base *= COLOR.rgb;
+		}
+		// 原版森林档（cityGrassPark.y>.5）：亚热带树冠 tint + 冠簇噪声
+		if (grass_forest > 0.5) {
+			float crown = city_grass_noise(gp * 0.11 + 3.0);
+			float crown_fine = city_grass_noise(gp * 0.31 + 71.0);
+			base *= vec3(0.66, 0.74, 0.58) * mix(0.62, 1.08, crown) * mix(0.86, 1.06, crown_fine);
+		}
 
 		city_grass_roughness = 0.96;
 		// 近处叠加细节法线（远距离省掉三次细法线采样）

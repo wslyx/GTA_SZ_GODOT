@@ -288,23 +288,68 @@ func _tile_loaded(tile: Dictionary) -> Dictionary:
 		return e
 	if _failed.has(id) or _pending >= MAX_PENDING:
 		return {}
+	# ---- 后台预取管线（2026-11-04，修复记录 五十八）----
+	# 瓦片首次命中原来是主线程同步 读文件+解码（实测 30-34ms），车开进新
+	# 128m 瓦片就顶一次针。改为：入队 → WorkerThreadPool 后台解码 → 完成
+	# 后并回缓存并标 _dirty，下一轮重建自然接上。排队中的瓦片本轮返回空。
+	if _prefetch_queued.has(id):
+		return {}
+	if _prefetch_busy:
+		return {}
 	var url := str(tile.get("url", ""))
 	var path := BASE + url
 	if not FileAccess.file_exists(path):
 		_failed[id] = true
 		return {}
-	_pending += 1
 	var data := FileAccess.get_file_as_bytes(path)
-	_pending -= 1
-	var patches := _decode_tile(tile, data)
-	var entry := {"tile": tile, "patches": patches, "samples": {}, "used": _revision}
-	_cache[id] = entry
-	_trim_cache()
-	return entry
+	if data.is_empty():
+		_failed[id] = true
+		return {}
+	_prefetch_queued[id] = true
+	_prefetch_slot = {"id": id, "tile": tile, "data": data}
+	_prefetch_busy = true
+	_prefetch_task = WorkerThreadPool.add_task(
+		Callable(self, "_prefetch_decode").bind(_prefetch_slot))
+	return {}
+
+
+## 工作线程：只碰自己 slot 里的数据（_manifest 为只读），完成后主线程并库。
+func _prefetch_decode(slot: Dictionary) -> void:
+	slot["patches"] = _decode_tile(slot["tile"], slot["data"])
+
+
+## 每帧轮询预取任务：完成则并回缓存
+func _prefetch_poll() -> void:
+	if _prefetch_busy:
+		if WorkerThreadPool.is_task_completed(_prefetch_task):
+			WorkerThreadPool.wait_for_task_completion(_prefetch_task)
+			_prefetch_busy = false
+			var sid := str(_prefetch_slot.get("id", ""))
+			if sid != "" and _prefetch_slot.has("patches"):
+				_pending += 1
+				var entry := {"tile": _prefetch_slot.get("tile", {}),
+					"patches": _prefetch_slot.get("patches", []),
+					"samples": {}, "used": _revision}
+				_cache[sid] = entry
+				_trim_cache()
+				_pending -= 1
+				_dirty = true   # 下一轮重建把新瓦片的草叶接上
+			_prefetch_queued.erase(sid)
+		return
+	if _prefetch_queue.is_empty():
+		return
+	var item: Dictionary = _prefetch_queue.pop_front()
+	_tile_loaded(item["tile"])
 
 
 var _pending := 0
 var _failed: Dictionary = {}
+## 后台预取管线：待解码瓦片 / 防重复排队 / WorkerThreadPool 任务
+var _prefetch_queue: Array = []
+var _prefetch_queued: Dictionary = {}
+var _prefetch_task := -1
+var _prefetch_slot := {}
+var _prefetch_busy := false
 
 
 func _trim_cache() -> void:
@@ -327,6 +372,7 @@ func _trim_cache() -> void:
 func update_system(delta: float, focus: Vector3) -> void:
 	if not enabled or not _built:
 		return
+	_prefetch_poll()
 	_update(delta, focus)
 
 
@@ -392,6 +438,13 @@ func _rebuild(x: float, z: float) -> void:
 			var entry := _tile_loaded(tile)
 			if not entry.is_empty():
 				tiles.append(entry)
+
+	# 预取相邻瓦片：把 128m 瓦片的解码摊到后台，进新区域时不再 30ms 顶针
+	for pix in range(lo_ix - 1, hi_ix + 2):
+		for piz in range(lo_iz - 1, hi_iz + 2):
+			var nkey := "%d,%d" % [pix, piz]
+			if _tile_index.has(nkey) and not _cache.has(nkey):
+				_tile_loaded(_tile_index[nkey])
 
 	# 候选丛：按优先级（d / range）分桶，避免 GDScript 里的 sort_custom
 	var buckets: Array = []

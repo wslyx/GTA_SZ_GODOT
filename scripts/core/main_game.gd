@@ -83,6 +83,10 @@ var _walk_first_person := false
 ## K 键：强制显示光标（截图 / 点 UI 用）。置 true 时 _update_mouse_capture 不再抢光标，
 ## 鼠标也不会转视角（转视角只在 MOUSE_MODE_CAPTURED 下生效）。
 var _cursor_free := false
+## 点击捕获（2026-11-03，用户需求）：游戏启动后**不**捕获鼠标，光标保持可见；
+## 只有点击了 gameplay 画面才置位捕获；按 Alt（或 K）随时放开。
+## UI（暂停页/大地图/设置页）打开时无论此标志如何一律显示光标。
+var _mouse_demand_capture := false
 var _car_model: Node3D
 ## 座舱（原版 createCityCockpit）：挂在车模下，只在座舱视角显示
 var _cockpit = null
@@ -231,6 +235,7 @@ func _build_world() -> void:
 	walk = CityWalk.new(
 		func(x: float, z: float) -> bool: return world.collision.blocked(x, z),
 		func(x: float, z: float) -> float: return world.height_field.height_at(x, z))
+	print("[BOOT-T] CityWalk 已建 t=%.1fs" % (float(Time.get_ticks_msec()) / 1000.0))
 
 	# ALS 步行角色：物理地面代理（角色周围的动态 StaticBody）+ C# 角色宿主。
 	# 宿主 _Ready 里预热动画资源 —— 此刻还在加载画面后面，玩家无感。
@@ -619,6 +624,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				walk.zoom(-120.0)
 			camera.distance_scale = clampf(camera.distance_scale / 1.08, 0.5, 6.0)
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			# 点击游戏画面才捕获鼠标（2026-11-03，用户需求）：启动后光标可见，
+			# 点一下 gameplay 画面即捕获；Alt 随时放开。只翻标志位，真正的
+			# mouse_mode 交给下一帧 _update_mouse_capture 统一裁决 —— 本帧内
+			# 下面的手势落点仍按可见语义取真实位置，避免锚点跳变。
+			# UI 控件点不到这里（被消费，进不了 _unhandled_input）。
+			if mb.pressed and not _mouse_demand_capture:
+				_mouse_demand_capture = true
+				if _cursor_free:
+					_cursor_free = false
+				hud.toast("光标：已锁定（Alt 放开）", 1.6)
 			# 观察模式：左键按下开始计长按（光标 id 用 0，鼠标没有 pointerId）
 			if mode == Mode.OBSERVER and world != null and world.beacons != null:
 				var g = world.beacons.gesture
@@ -804,7 +819,19 @@ func _on_key(k: InputEventKey) -> void:
 			# 只翻标志位，真正的 mouse_mode 交给 _update_mouse_capture 统一裁决，
 			# 否则会和"暂停/大地图/设置页要光标"的既有逻辑打架。
 			_cursor_free = not _cursor_free
-			hud.toast("光标：自由（再按 K 收回）" if _cursor_free else "光标：已锁定", 1.6)
+			if not _cursor_free:
+				# K 收回光标 = 恢复"点击画面捕获"的常态；若尚未点击过画面，
+				# 光标保持可见直到下一次点击。
+				_mouse_demand_capture = false
+			hud.toast("光标：自由（点击画面或按 K 收回）" if _cursor_free else "光标：已交还画面（点击锁定）", 1.6)
+		KEY_ALT:
+			# Alt 放开鼠标捕获（2026-11-03，用户需求）：光标回到可见，
+			# 点一下游戏画面重新锁定。只翻标志位，mouse_mode 由
+			# _update_mouse_capture 下一帧统一裁决。
+			# （Godot 4 的 Key 枚举只有通用 KEY_ALT，事件里左右 Alt 都报它。）
+			if _mouse_demand_capture:
+				_mouse_demand_capture = false
+				hud.toast("光标：自由（点击画面重新锁定）", 1.6)
 		KEY_H:
 			if audio != null:
 				audio.cue("horn")
@@ -1166,10 +1193,14 @@ func _warm_als_ground(data_x: float, data_z: float) -> void:
 		_als_ground.update_around(CoordinateUtil.to_world(data_x, data_z, 0.0))
 
 
-## —— 光标策略：默认"捕获 + 隐藏"（FPS 式），只有"需要鼠标的 UI"打开时可见 ——
-## gameplay 画面（驾驶 / 坦克 / 步行 / 无人机 / 飞机 / 观景）一律
+## —— 光标策略（2026-11-03 改版）：启动后光标**可见不捕获**，点击 gameplay
+## 画面才捕获（FPS 式），Alt / K 随时放开 ——
+## gameplay 画面在已捕获状态（_mouse_demand_capture 且无 UI）下：
 ## MOUSE_MODE_CAPTURED：光标隐藏、鼠标锁在窗口内（移动到屏幕边缘不会丢，
-## 也不会误点窗口外）。以下界面打开时切回 MOUSE_MODE_VISIBLE：
+## 也不会误点窗口外）。以下任一成立时切回 MOUSE_MODE_VISIBLE：
+##   - 尚未点击过游戏画面（_mouse_demand_capture == false）；
+##   - K 强制自由光标（_cursor_free）；
+##   - Alt 放开（同上，翻回 _mouse_demand_capture == false）；
 ##   - Esc 暂停页（继续驾驶 / 声音按钮要靠鼠标点）；
 ##   - F10 图像设置页；
 ##   - 大地图（M / Esc 开关，点选目的地、拖拽全靠鼠标）；
@@ -1192,11 +1223,14 @@ func _update_mouse_capture() -> void:
 		return
 	_als_orbit.InputEnabled = false
 	# 需要光标的界面（任一成立即显示）：
+	#   还没点击过游戏画面（启动默认）；
+	#   K 强制自由 / Alt 放开（_cursor_free / !_mouse_demand_capture）；
 	#   session 未就绪 → 加载页 / 失败重试页；
 	#   settings_visible → F10 图像设置页（打开即 paused）；
 	#   pause_overlay.visible → Esc 暂停页；
 	#   big_map_visible → 大地图。
-	var want_cursor: bool = _cursor_free or not session_ready \
+	var want_cursor: bool = not _mouse_demand_capture or _cursor_free \
+		or not session_ready \
 		or (panels != null and (panels.settings_visible \
 			or (panels.pause_overlay != null and panels.pause_overlay.visible))) \
 		or (maps != null and maps.big_map_visible)
@@ -1226,6 +1260,8 @@ func _als_enter_world() -> void:
 	_als_host.EnterWorld(feet, walk.yaw)
 	_trace_mark("ALS EnterWorld(C# 全部)", _t)
 	_als_walk_active = true
+	print("[ALS] 下车 EnterWorld 落点数据=(%.1f, %.1f) walk_active=true"
+		% [walk.x, walk.z])
 
 
 func _als_exit_world() -> void:
@@ -1241,6 +1277,8 @@ func _als_exit_world() -> void:
 	_trace_mark("ALS ExitWorld(C# 全部)", _t)
 	_als_walk_active = false
 	camera.current = true
+	print("[ALS] 上车 ExitWorld 马达写回数据=(%.1f, %.1f) yaw=%.1f"
+		% [walk.x, walk.z, walk.yaw])
 
 func _enter_observer() -> void:
 	_pre_observer_mode = mode
@@ -1364,6 +1402,11 @@ func _toggle_aircraft() -> void:
 
 ## 起飞探测线的采样点：yaw 平飞姿态下的 (right·side + forward·forward + up·up)。
 ## 数据坐标（与 FlightSim.point_at 同一套基）。
+func _physics_process(_delta: float) -> void:
+	# 物理步窗口标记（行车卡死定位：57.5 清单 / 五十六看门狗）
+	MemProbe.phase = "physics_step"
+
+
 func _flight_spawn_point(px: float, py: float, pz: float, yaw: float,
 		side: float, forward: float, up: float) -> Vector3:
 	var b := FlightSim.basis_from(yaw, 0.0, 0.0)
@@ -1377,8 +1420,10 @@ func _flight_spawn_point(px: float, py: float, pz: float, yaw: float,
 # ---------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	MemProbe.phase = "frame_start"
 	if not session_ready:
 		# _ready() 里有两帧的 await，这两帧 _process 会先于 world 创建跑进来
+		MemProbe.phase = "loading"
 		if world != null:
 			panels.set_loading_progress(world.progress_ratio())
 			panels.set_loading_detail(world.progress_detail())
@@ -1387,6 +1432,8 @@ func _process(delta: float) -> void:
 	var dt := clampf(delta, 0.0, 0.05)
 	# 原版 update() 第一行：this.time += dt（暂停也不停表）
 	_game_time += dt
+	var __pt0 := Time.get_ticks_msec()
+	MemProbe.phase = "mouse"
 
 	# ALS 宿主有自己的 _PhysicsProcess，不吃 _update_modes 的 `if paused` 守卫
 	# —— 暂停期间禁用其处理（含子节点轨道相机），恢复时再放开。
@@ -1394,7 +1441,9 @@ func _process(delta: float) -> void:
 		_als_host.process_mode = Node.PROCESS_MODE_DISABLED if paused else Node.PROCESS_MODE_INHERIT
 
 	_update_mouse_capture()
+	MemProbe.phase = "modes"
 	_update_modes(dt)
+	MemProbe.phase = "arrival"
 	_check_manual_arrival()
 
 	# 焦点与分块剔除
@@ -1403,6 +1452,7 @@ func _process(delta: float) -> void:
 	world.set_focus(CoordinateUtil.to_world(p.x, p.y, 0.0))
 
 	# 光照跟随、路灯、招牌、立面流式
+	MemProbe.phase = "lighting"
 	if world.lighting != null:
 		world.lighting.update_system(dt, focus)
 	# 天空推进（Sky 着色器的光照档过渡）—— 主路径下 Sky 本身就在无限远，
@@ -1413,7 +1463,9 @@ func _process(delta: float) -> void:
 	# h = smoothstep(-0.05, 0.85, p.y) 恒在 0.0~0.2，整屏都是 horizon_color，
 	# 表现为"从路面一直顶到天空的一整片纯色幕布"，把远处城市切成一刀。
 	if world.sky != null:
+		MemProbe.phase = "sky"
 		world.sky.update_system(dt, focus)
+	MemProbe.phase = "facades"
 	world.facades.update_system(dt, focus)
 
 	# 玩法
@@ -1421,6 +1473,7 @@ func _process(delta: float) -> void:
 	# 在它之后、不受那个守卫管。于是打开暂停菜单后 rides.step() / career.step()
 	# 仍每帧执行，合约的 elapsed 照常累加、评分照常随时间衰减 —— 暂停没真暂停，
 	# 挂机在暂停界面里也能把合约"拖"到超时。
+	MemProbe.phase = "gameplay"
 	var speed := float(_vehicle_state()["speed"]) if mode in [Mode.CAR, Mode.TANK] else walk.speed
 	var res: Dictionary = {}
 	# 通缉系统喂玩家状态（数据坐标）：追捕/被捕判定用
@@ -1475,10 +1528,12 @@ func _process(delta: float) -> void:
 			panels.show_dialogue(str(res["dialogue"]["line"]), opts, "career")
 
 	# UI
+	MemProbe.phase = "hud"
 	hud.update_hud(dt)
 	maps.update_ui(dt)
 
 	# 音频：把驾驶状态喂给程序化合成器
+	MemProbe.phase = "audio"
 	if audio != null:
 		audio.enabled = GameState.audio_enabled
 		var slipping := false
@@ -1492,11 +1547,18 @@ func _process(delta: float) -> void:
 		if world.wanted != null:
 			audio.set_siren(world.wanted.siren_level())
 	# 行为生态（§4.1）：通缉中警笛范围内的车流靠边让行
+	MemProbe.phase = "traffic_yield"
 	if world.traffic != null:
 		if world.wanted != null and world.wanted.wanted_level > 0:
 			world.traffic.yield_positions = world.wanted.cop_poses()
 		elif not world.traffic.yield_positions.is_empty():
 			world.traffic.yield_positions = []
+	# 整帧慢查：超 100ms 打一行，phase= 看门狗阶段（grep [HITCH]）
+	var __frame_ms := Time.get_ticks_msec() - __pt0
+	if __frame_ms > 100:
+		print("[HITCH] _process 本帧 %d ms phase=\"%s\"" % [__frame_ms, MemProbe.phase])
+	MemProbe.phase = "idle"
+	MemProbe.phase = "idle"
 
 func _update_modes(dt: float) -> void:
 	var __hitch_t0 := Time.get_ticks_msec()

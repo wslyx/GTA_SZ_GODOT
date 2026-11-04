@@ -31,6 +31,40 @@ var failed_count := 0
 ## 累计入队数（含已完成），用于加载界面的「N / M」
 var enqueued_count := 0
 
+## ---- 全局加载门（2026-11-04，修复记录 五十九）----
+## 行车 2km 卡死（主线程 0% CPU 无限等待，phase="cw.done"）两次复现的共同点：
+## 卡死前 **chunk 与 facade 两个 GlbLoader 实例的线程化加载同时在飞**。
+## load_threaded 的加载线程持有资源缓存锁，主线程帧末 flush（queue_free 节点
+## → 释放资源）也要拿同一把锁 —— 并发加载 + 主线程释放之间存在引擎级竞态，
+## 一旦加载线程被（如杀软文件扫描）拖住，主线程就无限等锁。
+## 修复：全工程同一时刻只允许一个线程化加载在飞（各实例本就各自串行，
+## 这里只是把串行范围扩大到全局）。静态变量只被主线程读写，无竞争。
+static var _global_inflight := false
+
+## ---- 帧末删除与线程化加载互斥 ----
+## queue_free 的实际删除发生在帧末 flush —— 若此刻有线程化加载在飞，
+## 删除资源会与加载线程在资源缓存锁上互等（0% CPU 死锁，行车实测复现，
+## 全局加载门只挡了"加载 vs 加载"，没挡"加载 vs 释放"）。
+## 所以：加载在飞时把节点挂到 _pending_free，门开了再删。
+static var _pending_free: Array = []
+
+static func safe_free(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if _global_inflight:
+		_pending_free.append(node)
+		return
+	node.queue_free()
+
+
+static func flush_pending_free() -> void:
+	if _global_inflight or _pending_free.is_empty():
+		return
+	for n in _pending_free:
+		if n != null and is_instance_valid(n):
+			n.queue_free()
+	_pending_free.clear()
+
 
 ## cache_mode 透传给 ResourceLoader.load_threaded_request：
 ##   CACHE_MODE_REUSE（默认）—— 资源按路径入全局缓存，适合一次性常驻资源（地形/道路/立面）。
@@ -83,8 +117,13 @@ func counters() -> Vector2i:
 
 ## 推进一个加载项。返回"这一帧是否有进展"。
 func poll() -> bool:
+	# 门开着就先把挂起的节点删掉（避免与加载在飞重叠）
+	GlbLoader.flush_pending_free()
 	if _current.is_empty():
 		if _queue.is_empty():
+			return false
+		# 全局加载门：别的实例有线程化加载在飞时等一帧（见 _global_inflight 注释）
+		if GlbLoader._global_inflight:
 			return false
 		_current = _queue.pop_front()
 		var p: String = _current["path"]
@@ -102,6 +141,7 @@ func poll() -> bool:
 			_fail(p, "load_threaded_request 失败 code=%d" % err)
 			_current = {}
 			return true
+		GlbLoader._global_inflight = true
 		_current["state"] = "loading"
 		return true
 
@@ -113,10 +153,12 @@ func poll() -> bool:
 			return false
 		ResourceLoader.THREAD_LOAD_LOADED:
 			var scene := ResourceLoader.load_threaded_get(p)
+			GlbLoader._global_inflight = false
 			_finish(scene)
 			return true
 		_:
 			_fail(p, "线程加载失败 status=%d" % status)
+			GlbLoader._global_inflight = false
 			_current = {}
 			return true
 

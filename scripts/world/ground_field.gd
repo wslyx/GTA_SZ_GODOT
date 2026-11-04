@@ -26,7 +26,10 @@ const SHADER_PATH := "res://shaders/ground_field.gdshader"
 ## 移植版由 distant_system.gd 程序化生成、节点名是 `ground-relief`（连字符）。
 # A5：terrain_concrete / coastal_shore_* 纳入接管（中湾铺装要在它们身上生效，
 # 且接管会保留原贴图/顶点色 —— 之前用独立 override 丢顶点色，整片地面变白板）
-const GROUND_MESH_RE := "^(?:roads_|terrain_(?:land|park|pavement|concrete)|coastal_shore_(?:concrete|seawall|coastal-rock)|landmark_baypark_(?:concrete|stone)|ground_relief_|ground-relief|detail_lianhua_|rain-|rain_|coastal_bridge_|city_meadow_)"
+const GROUND_MESH_RE := "^(?:roads_|terrain_(?:land|park|pavement|concrete)|coastal_shore_(?:concrete|seawall|coastal-rock)|landmark_baypark_(?:concrete|stone)|ground_relief_|ground-relief|detail_lianhua_|rain-|rain_|coastal_bridge_|city_meadow_|mountain-)"
+## 山地层（distant_system 程序化 mountain-near/-far）：原版 'mountain-landscape'
+## 材质 = applyGrassMaterial(park=false, forest=true) —— 草地着色器森林档。
+const MOUNTAIN_PREFIX := "mountain-"
 ## 原版 applyLandscapeSurfaces 的草地判据（材质名）
 const GRASS_MAT_NAMES := ["land", "park"]
 ## C 屋顶表面：只对 `block_<i>_<j>_roof` 生效（原版 city-roof-surface.ts 的同名判据）
@@ -264,6 +267,29 @@ func _build_materials() -> void:
 		for mi in GlbLoader.meshes_of(root):
 			if re.search(mi.name) == null:
 				continue
+			# 山地层特殊路径：它的材质挂的是 **material_override**（distant_system
+			# 程序化网格），渲染优先级高于 surface_override —— 必须直接替换
+			# material_override，否则接管写了也不生效（首跑实测：山坡仍是平色壳）。
+			if str(mi.name).begins_with(MOUNTAIN_PREFIX):
+				if mi.material_override is ShaderMaterial:
+					continue
+				var src_m := mi.material_override as BaseMaterial3D
+				if src_m == null or not _lawn_tex.size() == 6:
+					continue
+				var mmat := ShaderMaterial.new()
+				mmat.shader = shader
+				_init_material(mmat, src_m, true)
+				# 原版 'mountain-landscape'：albedo 白、粗糙 .98、
+				# environmentIntensity .85、cityGrassPark=(0,1)（森林档）
+				mmat.set_shader_parameter("albedo_tint", Color(1.0, 1.0, 1.0))
+				mmat.set_shader_parameter("roughness_value", 0.98)
+				mmat.set_shader_parameter("grass_park", 0.0)
+				mmat.set_shader_parameter("grass_forest", 1.0)
+				mmat.set_shader_parameter("use_vertex_color", 1.0)
+				mmat.set_shader_parameter("env_scale", 0.85)
+				_entries.append({"mat": mmat, "src": src_m, "lawn": true, "forest": true})
+				mi.material_override = mmat
+				continue
 			var mesh: Mesh = mi.mesh
 			if mesh == null:
 				continue
@@ -284,7 +310,19 @@ func _build_materials() -> void:
 				# 草地分支要求六张贴图都在；缺任意一张时宁可退回普通材质，
 				# 否则 `is_lawn` 会去采样未赋值的 sampler（法线会是垃圾值）。
 				var lawn := GRASS_MAT_NAMES.has(str(src.resource_name)) and _lawn_tex.size() == 6
+				# 山地层：原版 'mountain-landscape' = applyGrassMaterial(park=false, forest=true)
+				# —— 草地着色器森林档 + 逐顶点色（网格已带 COLOR）
+				var forest := str(mi.name).begins_with(MOUNTAIN_PREFIX) and _lawn_tex.size() == 6
+				if forest:
+					lawn = true
 				_init_material(mat, src, lawn)
+				if forest:
+					mat.set_shader_parameter("albedo_tint", Color(1.0, 1.0, 1.0))
+					mat.set_shader_parameter("roughness_value", 0.98)
+					mat.set_shader_parameter("grass_park", 0.0)
+					mat.set_shader_parameter("grass_forest", 1.0)
+					mat.set_shader_parameter("use_vertex_color", 1.0)
+					mat.set_shader_parameter("env_scale", 0.85)
 				var bp_kind: float = BAYPARK_KIND_BY_NAME.get(str(mi.name).to_lower(), 0.0)
 				if bp_kind > 0.0:
 					mat.set_shader_parameter("baypark_kind", bp_kind)
@@ -292,7 +330,7 @@ func _build_materials() -> void:
 						Vector2(-2283.27, 794.82))
 					print("[GroundField] 中湾铺装 kind=%.0f → %s" % [bp_kind, mi.name])
 				by_src[src.get_instance_id()] = mat
-				_entries.append({"mat": mat, "src": src, "lawn": lawn})
+				_entries.append({"mat": mat, "src": src, "lawn": lawn, "forest": forest})
 				mi.set_surface_override_material(s, mat)
 	_sync()
 	if _scan_count == 0:
@@ -515,7 +553,12 @@ func _sync() -> void:
 			continue
 		var role := str(src.resource_name)
 		var env_scale := 1.0
-		if bool(e["lawn"]):
+		if bool(e.get("forest", false)):
+			# 原版 'mountain-landscape'.environmentIntensity = .85
+			env_scale = 0.85
+			mat.set_shader_parameter("albedo_tint", Color(1.0, 1.0, 1.0))
+			mat.set_shader_parameter("roughness_value", 0.98)
+		elif bool(e["lawn"]):
 			env_scale = GRASS_ENV
 		elif role.begins_with("asphalt"):
 			env_scale = asphalt_env

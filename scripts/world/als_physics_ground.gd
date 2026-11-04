@@ -116,6 +116,7 @@ func _cell_key(cx: int, cz: int) -> int:
 ## 口径与原实现一致：外环 AABB 挤出成盒（跳过 landmark-detail 与
 ## height<=1.1），跨格建筑整块放进每个覆盖它的格（重复块无副作用）。
 func _index_buildings() -> void:
+	var __t0 := Time.get_ticks_msec()
 	var buildings: Array = CityData.buildings
 	for b in buildings:
 		var height := float(b.get("height", 0.0))
@@ -152,6 +153,9 @@ func _index_buildings() -> void:
 				if not _building_cells.has(key):
 					_building_cells[key] = []
 				_building_cells[key].append([box, pos])
+	# 启动归因：全城建筑索引是加载期主线程大块耗时之一（grep [BOOT-T]）
+	print("[BOOT-T] [AlsGround] 全城建筑索引 %d 格 用时 %d ms"
+		% [_building_cells.size(), Time.get_ticks_msec() - __t0])
 
 
 ## 增量式跨格：离开范围的格 freed，新进入范围的格按缓存查表实例化。

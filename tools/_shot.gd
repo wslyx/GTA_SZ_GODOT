@@ -204,6 +204,61 @@ func dump_materials() -> void:
 func _late_env(overrides: Dictionary) -> void:
 	if bool(overrides.get("fire", false)) and main.has_method("fire_missile"):
 		main.call("fire_missile")
+	# 诊断（截图时刻打印，此时物理/相机已落位）
+	if overrides.has("diag"):
+		var car_d = main.get("car")
+		var model_d = main.get("_car_model")
+		var cam_d = get_viewport().get_camera_3d()
+		var hf = main.get("world")
+		var walk_o = main.get("walk")
+		var walk_x := -1.0
+		var walk_z := -1.0
+		var walk_spd := 0.0
+		if walk_o != null:
+			walk_x = float(walk_o.get("x"))
+			walk_z = float(walk_o.get("z"))
+			walk_spd = float(walk_o.get("speed"))
+		if car_d != null and cam_d != null and hf != null:
+			var cx: float = float(car_d.get("x"))
+			var cz: float = float(car_d.get("z"))
+			var spd: float = float(car_d.get("speed")) if car_d.get("speed") != null else 0.0
+			var apph: int = int(main.get("autopilot").get("phase")) if main.get("autopilot") != null else -1
+			var my: float = model_d.global_position.y if model_d != null else -999.0
+			var cp: Vector3 = cam_d.global_position
+			var hf_h: float = float(hf.call("ground_height_data", cx, cz))
+			var hf_hc: float = float(hf.call("ground_height_data", cp.x, -cp.z))
+			print("[diag] car data=(%.1f,%.1f) 速度=%.1f ap相位=%d | walk=(%.1f,%.1f) w速度=%.1f | cam world=(%.1f, %.2f, %.1f) hf=%.2f 相机-hf=%.2f | mouse_mode=%d | obj=%d nodes=%d stat=%.0fMB vram=%.0fMB" % [
+				cx, cz, spd, apph,
+				walk_x, walk_z, walk_spd,
+				cp.x, cp.y, cp.z, hf_hc, cp.y - hf_hc,
+				Input.mouse_mode,
+				Performance.get_monitor(Performance.OBJECT_COUNT),
+				get_tree().get_node_count(),
+				Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0,
+				float(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)) / 1048576.0])
+			# ---- 碰撞/物理自动验收（grep [ANOMALY]）----
+			# 1) 车辆悬浮/陷地：模型 y 与高度场差 >0.5m（悬挂行程 ~0.1-0.3m）
+			if my > -900.0 and absf(my - hf_h) > 0.5:
+				print("[ANOMALY] 车辆悬浮/陷地 Δy=%.2f (模型y=%.2f hf=%.2f) @ (%.0f,%.0f)"
+					% [my - hf_h, my, hf_h, cx, cz])
+			# 2) 车辆位置在碰撞格内（穿墙/穿建筑）
+			var col = hf.get("collision")
+			if col != null and col.call("blocked", cx, cz):
+				print("[ANOMALY] 车辆位于碰撞格内 @ (%.0f,%.0f)" % [cx, cz])
+			# 3) 速度突变（碰撞弹飞/穿透回弹）
+			if _prev_speed >= 0.0 and absf(spd - _prev_speed) > 15.0:
+				print("[ANOMALY] 速度突变 %.1f→%.1f @ (%.0f,%.0f)" % [_prev_speed, spd, cx, cz])
+			_prev_speed = spd
+			# 4) ALS 角色悬浮/陷地（步行中才查；walk_spd>0.5 视为在动）
+			if walk_spd > 0.5:
+				var host4 = main.get("_als_host")
+				if host4 != null:
+					var mp = host4.get("MotorPosition")
+					if mp != null:
+						var gy := float(hf.call("ground_height_data", mp.x, -mp.z))
+						if absf(mp.y - 0.9 - gy) > 0.6:
+							print("[ANOMALY] ALS 角色悬浮/陷地 Δy=%.2f (马达y=%.2f 地面=%.2f)"
+								% [mp.y - 0.9 - gy, mp.y, gy])
 	# 长焦：截图前一刻暂停物理（相机不再被追尾逻辑每帧改写）再改 fov，
 	# 用来把远处地标的细节拉近看。
 	if overrides.has("zoom") and main.has_method("get"):
@@ -311,6 +366,214 @@ func _apply_env(overrides: Dictionary) -> void:
 				# 想和原版截图（画质·中）对齐就得显式指定。
 				GraphicsQuality.set_tier(str(value))
 				GraphicsQuality.apply_to_world(world)
+			"quality":
+				# 逐项画质覆盖（键同 GraphicsQuality.overrides），设置后按当前
+				# 档位整套重套 —— 对照实验用：{"shadows":0} 关阴影、{"ao":false} 关 SSAO。
+				if value is Dictionary:
+					var qd: Dictionary = value
+					for qk in qd.keys():
+						GraphicsQuality.set_override(str(qk), qd[qk])
+					GraphicsQuality.apply_to_world(world)
+					print("[shot] quality 覆盖 %s 已重套" % JSON.stringify(value))
+			"debug_draw":
+				# 视口调试渲染模式（0 正常 / 1 unshaded / 2 lighting / 3 overdraw）。
+				# unshaded 一刀切分"着色差异 vs 几何/贴图差异"。
+				get_viewport().debug_draw = int(value)
+				print("[shot] debug_draw -> %d" % int(value))
+			"vehicle_probe":
+				# 车漆反射探针开关（同一次运行内 A/B，排除运行间天空差异）。
+				# true=启用（默认），false=set_enabled(false) 关掉探针影响。
+				var vr = main.get("_vehicle_reflections")
+				if vr != null and vr.has_method("set_enabled"):
+					vr.set_enabled(bool(value))
+					print("[shot] vehicle_probe -> %s" % str(bool(value)))
+				else:
+					print("[shot] vehicle_probe: 未找到 VehicleReflections 节点")
+			"tree_stat":
+				# 全树节点名直方图（查节点泄露：前后两次对比 diff）
+				var w7 = main.get("world")
+				if w7 != null:
+					var hist := {}
+					var total7 := 0
+					var stk7: Array = [w7]
+					while not stk7.is_empty():
+						var nd7: Node = stk7.pop_back()
+						for ch7 in nd7.get_children():
+							stk7.append(ch7)
+						total7 += 1
+						var nm := String(nd7.name)
+						var nkey := nm
+						var p7 := nm.find("-")
+						if p7 > 0:
+							nkey = nm.substr(0, p7 + 1)
+						hist[nkey] = int(hist.get(nkey, 0)) + 1
+					var keys := hist.keys()
+					keys.sort()
+					for hk in keys:
+						if int(hist[hk]) >= 3:
+							print("[tree] %-28s × %d" % [str(hk), int(hist[hk])])
+					print("[tree] (总节点 %d)" % total7)
+			"tree_dump":
+				# chunks_root 全路径清单（精确 diff 区块重载泄露：hop1 vs hopN）
+				var w8 = main.get("world")
+				var cr = w8.get("chunks_root") if w8 != null else null
+				if cr != null:
+					var cnt8 := 0
+					var stk8: Array = [[cr, ""]]
+					while not stk8.is_empty():
+						var e8: Array = stk8.pop_back()
+						var nd8: Node = e8[0]
+						var path8: String = e8[1] + "/" + String(nd8.name)
+						print("[tree-dump] " + path8)
+						cnt8 += 1
+						for ch8 in nd8.get_children():
+							stk8.append([ch8, path8])
+					print("[tree-dump] (chunks_root 节点 %d)" % cnt8)
+			"autopilot_drive":
+				# 自动跑图：交给游戏自带的自动驾驶（路径规划+避障+红绿灯），
+				# 物理/车流/行人全真实运行 —— 复现"行车 2km 卡死"用。
+				# value = [dest_east, dest_north]（数据坐标）。走正式入口
+				# start_autopilot（内含 _prepare_autopilot 的依赖接线）。
+				var car_d2 = main.get("car")
+				if car_d2 != null and value is Array and (value as Array).size() >= 2:
+					var dest := Vector2(float(value[0]), float(value[1]))
+					var ok2: bool = main.call("start_autopilot", dest)
+					print("[shot] autopilot_drive ok=%s dest=%s" % [str(ok2), str(dest)])
+				else:
+					print("[shot] autopilot_drive: car 不可用或参数缺失")
+			"walk_toggle":
+				# F 键等价：下车进步行（ALS 角色）/ 上车。需车已停稳。
+				# （_toggle_vehicle_entry 返回 void → call 得 null，不能赋给 typed bool）
+				main.call("_toggle_vehicle_entry")
+				var wmode = main.get("mode")
+				print("[shot] walk_toggle 完成，mode=%s" % str(wmode))
+			"keys_hold":
+				# 按键注入：value = ["W","SHIFT",...]（模拟 ALS 行走输入）。
+				# 先释放上一批，再按下这一批 —— 长按跨多个机位持续生效。
+				_keys_release_all()
+				var codes := _parse_keynames(value)
+				for kc in codes:
+					var ev := InputEventKey.new()
+					ev.keycode = kc
+					ev.physical_keycode = kc
+					ev.pressed = true
+					Input.parse_input_event(ev)
+					_held_keys.append(kc)
+				print("[shot] keys_hold %s（已按 %d 键）" % [str(value), _held_keys.size()])
+			"keys_release":
+				_keys_release_all()
+				print("[shot] keys_release（全部松开）")
+			"diag":
+				# 诊断：打印车/相机世界坐标 vs 高度场（排查"钻进山体"类问题）
+				var car_d = main.get("car")
+				var model_d = main.get("_car_model")
+				var cam_d = get_viewport().get_camera_3d()
+				var hf = main.get("world")
+				if car_d != null and cam_d != null and hf != null:
+					var cx: float = float(car_d.get("x"))
+					var cz: float = float(car_d.get("z"))
+					var my: float = model_d.global_position.y if model_d != null else -999.0
+					var cp: Vector3 = cam_d.global_position
+					var hf_h: float = float(hf.call("ground_height_data", cx, cz))
+					var hf_hc: float = float(hf.call("ground_height_data", cp.x, -cp.z))
+					print("[diag] car data=(%.1f,%.1f) 模型y=%.2f hf=%.2f | cam world=(%.1f, %.2f, %.1f) hf=%.2f 相机-hf=%.2f" % [
+						cx, cz, my, hf_h, cp.x, cp.y, cp.z, hf_hc, cp.y - hf_hc])
+			"hide_mesh":
+				# 全局按名字子串隐藏 MeshInstance3D（跨根，定位"这块面是谁"）。
+				# 值可为 String 或 String[]（一次隐藏多组）。
+				var hide_list: Array = []
+				if value is String and not (value as String).is_empty():
+					hide_list = [value]
+				elif value is Array:
+					hide_list = value
+				for hv in hide_list:
+					var w5 = main.get("world")
+					var n5 := 0
+					var stk5: Array = [w5]
+					while not stk5.is_empty():
+						var nd5: Node = stk5.pop_back()
+						for ch5 in nd5.get_children():
+							stk5.append(ch5)
+						if nd5 is MeshInstance3D and String(nd5.name).to_lower().contains(str(hv)):
+							(nd5 as MeshInstance3D).visible = false
+							n5 += 1
+					print("[shot] 已隐藏 *%s* × %d" % [str(hv), n5])
+			"probe_mesh":
+				# 三角面级探测：列出该 XZ 上每一层表面的网格名与高度。
+				# 用于定位共面 z-fighting —— AABB 命中不一定是真覆盖。
+				# 值为数据坐标 [east, north]。
+				if value is Array and (value as Array).size() >= 2:
+					var pm: Array = value
+					var wx: float = float(pm[0])
+					var wz: float = float(pm[1])
+					var wpos := CoordinateUtil.to_world(wx, wz, 0.0)
+					var w = main.get("world")
+					if w != null:
+						var stk6: Array = [w]
+						while not stk6.is_empty():
+							var nd6: Node = stk6.pop_back()
+							for ch6 in nd6.get_children():
+								stk6.append(ch6)
+							if not (nd6 is MeshInstance3D) or (nd6 as MeshInstance3D).mesh == null:
+								continue
+							var mi3 := nd6 as MeshInstance3D
+							var xf := mi3.global_transform
+							var aabb3 := xf * mi3.mesh.get_aabb()
+							if wpos.x < aabb3.position.x or wpos.x > aabb3.end.x \
+									or wpos.z < aabb3.position.z or wpos.z > aabb3.end.z:
+								continue
+							for s3 in mi3.mesh.get_surface_count():
+								var arrays3 := mi3.mesh.surface_get_arrays(s3)
+								if arrays3[Mesh.ARRAY_VERTEX] == null:
+									continue
+								var verts3: PackedVector3Array = arrays3[Mesh.ARRAY_VERTEX]
+								var idx3 = arrays3[Mesh.ARRAY_INDEX]
+								var count3: int = verts3.size() / 3 if idx3 == null else idx3.size() / 3
+								for t3 in count3:
+									var ia: int = t3 * 3 if idx3 == null else int(idx3[t3 * 3])
+									var ib: int = t3 * 3 + 1 if idx3 == null else int(idx3[t3 * 3 + 1])
+									var ic: int = t3 * 3 + 2 if idx3 == null else int(idx3[t3 * 3 + 2])
+									var a3 := xf * verts3[ia]
+									var b3 := xf * verts3[ib]
+									var c3 := xf * verts3[ic]
+									# XZ 点在三角形内？标准叉积同号测试
+									var w1 := (b3.x - a3.x) * (wpos.z - a3.z) - (b3.z - a3.z) * (wpos.x - a3.x)
+									var w2 := (c3.x - b3.x) * (wpos.z - b3.z) - (c3.z - b3.z) * (wpos.x - b3.x)
+									var w3 := (a3.x - c3.x) * (wpos.z - c3.z) - (a3.z - c3.z) * (wpos.x - c3.x)
+									var has_neg := w1 < 0.0 or w2 < 0.0 or w3 < 0.0
+									var has_pos := w1 > 0.0 or w2 > 0.0 or w3 > 0.0
+									if has_neg and has_pos:
+										continue
+									var y3 := (a3.y + b3.y + c3.y) / 3.0
+									print("[probe-mesh] (%.0f,%.0f) %s surf%d y≈%.3f" % [wx, wz, mi3.name, s3, y3])
+				print("[probe-mesh] done")
+			"probe_point":
+				# 枚举 AABB 包含该世界坐标的所有 MeshInstance3D —— 定位
+				# "这个屏幕位置到底画的是谁"。值为数据坐标 [east, north, y]。
+				if value is Array and (value as Array).size() >= 3:
+					var pv: Array = value
+					var wp: Vector3 = CoordinateUtil.to_world(float(pv[0]), float(pv[1]), float(pv[2]))
+					var w = main.get("world")
+					var hits: Array = []
+					if w != null:
+						var stk: Array = [w]
+						while not stk.is_empty():
+							var nd: Node = stk.pop_back()
+							for ch in nd.get_children():
+								stk.append(ch)
+							if nd is MeshInstance3D and (nd as MeshInstance3D).mesh != null:
+								var mi2 := nd as MeshInstance3D
+								var aabb := mi2.global_transform * mi2.mesh.get_aabb()
+								if aabb.has_point(wp):
+									var mat_name := "?"
+									if mi2.mesh.get_surface_count() > 0:
+										var m0 := mi2.mesh.surface_get_material(0)
+										if m0 != null:
+											mat_name = m0.resource_name
+									hits.append("%s (mat=%s)" % [mi2.name, mat_name])
+					print("[probe] %s 命中 %d:" % [str(wp), hits.size()])
+					for h2 in hits:
+						print("   - " + str(h2))
 			"mode":
 				# 玩家模式切换（car / tank / observer / aircraft），用来截坦克炮塔
 				# 与飞行 HUD —— 这两个都是"只在特定模式下才画"的东西。
@@ -471,9 +734,45 @@ func _reset_env() -> void:
 func _capture(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
+	# ---- 画面自动验收（渲染失效 / 帧冻结检测，grep [VIEW]/[ANOMALY]）----
+	var w := img.get_width()
+	var h := img.get_height()
+	var n := 0
+	var sr := 0.0
+	var sg := 0.0
+	var sb := 0.0
+	var hash_acc := 0
+	var samples: Array = []
+	for yy in range(0, h, 16):
+		for xx in range(0, w, 16):
+			var c := img.get_pixel(xx, yy)
+			var lum := c.r * 0.3 + c.g * 0.6 + c.b * 0.1
+			sr += c.r
+			sg += c.g
+			sb += c.b
+			samples.append(lum)
+			hash_acc = (hash_acc * 31 + int(lum * 63.0)) % 2147483647
+			n += 1
+	if n > 0:
+		var mr := sr / n
+		var mg := sg / n
+		var mb := sb / n
+		var var_acc := 0.0
+		for lum in samples:
+			var d := float(lum) - (mr * 0.3 + mg * 0.6 + mb * 0.1)
+			var_acc += d * d
+		var sigma := sqrt(var_acc / n)
+		print("[VIEW] %s 均色=(%.2f,%.2f,%.2f) 亮度σ=%.1f 采样=%d" % [name, mr, mg, mb, sigma, n])
+		if sigma < 0.02:   # 亮度为 0-1 量纲：正常画面 σ≈0.1-0.25,纯色 <0.02
+			print("[ANOMALY] 画面纯色（渲染失效?）均色=(%.2f,%.2f,%.2f) σ=%.3f" % [mr, mg, mb, sigma])
+		if _prev_view_hash == hash_acc:
+			print("[ANOMALY] 画面与上一张逐点一致（帧冻结?）")
+		_prev_view_hash = hash_acc
 	var path := "%s/%s.png" % [_out_dir, name]
 	var err := img.save_png(path)
-	print("[shot] %s  %dx%d  err=%d" % [path, img.get_width(), img.get_height(), err])
+	print("[shot] %s  %dx%d  err=%d" % [path, w, h, err])
+
+var _prev_view_hash := -1
 
 
 ## 把关键 UI 节点的可见性 / 位置 / 尺寸 / 文本打到日志。
@@ -567,3 +866,34 @@ func dump_state() -> void:
 		var hf = world.get("height_field")
 		if hf != null:
 			print("[state] 车所在处地面高度 = %.3f" % hf.call("height_at", car.x, car.z))
+
+# ---------------------------------------------------------------------------
+# 按键注入（ALS 步行自动化）：_keys_hold/_keys_release env 用
+# ---------------------------------------------------------------------------
+
+var _held_keys: Array = []
+var _prev_speed := -1.0
+
+
+func _parse_keynames(value: Variant) -> Array:
+	var out: Array = []
+	if not (value is Array):
+		return out
+	var table := {
+		"W": KEY_W, "A": KEY_A, "S": KEY_S, "D": KEY_D,
+		"SHIFT": KEY_SHIFT, "SPACE": KEY_SPACE, "E": KEY_E, "F": KEY_F,
+	}
+	for nm in value:
+		if table.has(String(nm).to_upper()):
+			out.append(table[String(nm).to_upper()])
+	return out
+
+
+func _keys_release_all() -> void:
+	for kc in _held_keys:
+		var ev := InputEventKey.new()
+		ev.keycode = kc
+		ev.physical_keycode = kc
+		ev.pressed = false
+		Input.parse_input_event(ev)
+	_held_keys.clear()

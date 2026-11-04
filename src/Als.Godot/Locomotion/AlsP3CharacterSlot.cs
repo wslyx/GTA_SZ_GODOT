@@ -23,6 +23,8 @@ public partial class AlsP3CharacterSlot : Node
 	private bool _generationMismatchObserved;
 	private long _committedFrameAtClassification;
 	private bool _recoveryCommitted;
+	/// <summary>调试日志用：上次打印过的替换相位（变化时打一行 [ALS]）。</summary>
+	private AlsP3ReplacementPhase _lastLoggedPhase = AlsP3ReplacementPhase.None;
 	private bool _failureRecoveryRequested;
 	private long _classificationSequenceBaseline;
 	private AlsFrameIdentity _expectedClassificationIdentity;
@@ -92,12 +94,14 @@ public partial class AlsP3CharacterSlot : Node
 		var spareHandle = new AlsSlotHandle(
 			activeHandle.CharacterId,
 			NextGeneration(activeHandle.Generation));
+		GD.Print("[ALS] slot Configure 开始 pos=" + characterPosition);
 		try
 		{
 			_active = CreateCharacter(activeHandle, characterPosition, active: true);
 			_spare = CreateCharacter(spareHandle, characterPosition, active: false);
 			_configured = true;
 			ValidateVisibilityInvariants();
+			GD.Print("[ALS] slot Configure 完成（active/spare 角色就绪）");
 		}
 		catch
 		{
@@ -129,6 +133,7 @@ public partial class AlsP3CharacterSlot : Node
 		_active.BeginReplacementRequest(completedFrameId);
 		_replacementCompletedFrameId = completedFrameId;
 		_replacementPhase = AlsP3ReplacementPhase.AwaitingRetiredResult;
+		GD.Print($"[ALS] slot RequestReplacement frame={completedFrameId}");
 		ValidateVisibilityInvariants();
 	}
 
@@ -153,6 +158,7 @@ public partial class AlsP3CharacterSlot : Node
 		_replacementCompletedFrameId = _active.RuntimeCommittedFrameId;
 		_recoveryCommitted = false;
 		_failureRecoveryRequested = true;
+		GD.Print("[ALS] slot RequestFailureRecovery（失败恢复替换开始）");
 		ReplaceActiveCharacter();
 		_replacementPhase = AlsP3ReplacementPhase.AwaitingGenerationMismatch;
 		ValidateVisibilityInvariants();
@@ -166,6 +172,13 @@ public partial class AlsP3CharacterSlot : Node
 		}
 
 		ValidateVisibilityInvariants();
+		// 调试日志：替换相位变化时打一行（生命周期事件，非逐帧刷屏）
+		if (_replacementPhase != _lastLoggedPhase)
+		{
+			GD.Print($"[ALS] slot 相位 {_lastLoggedPhase} → {_replacementPhase}" +
+				$" frame={_active.RuntimeCommittedFrameId}");
+			_lastLoggedPhase = _replacementPhase;
+		}
 		switch (_replacementPhase)
 		{
 			case AlsP3ReplacementPhase.AwaitingRetiredResult:
@@ -188,6 +201,7 @@ public partial class AlsP3CharacterSlot : Node
 		{
 			return;
 		}
+		GD.Print("[ALS] slot DisposeRuntime（释放动画运行时）");
 		DeactivateCharactersForDisposal();
 		if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
 		{

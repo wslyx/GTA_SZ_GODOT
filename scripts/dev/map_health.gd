@@ -123,6 +123,18 @@ func _collect(root: Node, all_materials := false, skip_bridge := false) -> void:
 		if nd is MeshInstance3D:
 			var mi := nd as MeshInstance3D
 			if mi.mesh != null:
+				# ---- 植被排除（2026-11-03，修复记录 五十二）----
+				# 树冠/灌木不是可行驶地面。此前 detail_lianhua_leaf（莲花山树冠
+				# 簇）被收进"视觉地面"，height-fix 网格在灌木区取到树冠高度
+				# （实测 (1665,1730) 地面 22.9 / 树冠 31.8 / fix=27.73 的双线性
+				# 混合值）—— 车在山上灌木区浮到半空"开在隐形树顶上"。
+				# 材质名过滤拦不住（GlbLoader 重挂材质后 resource_name 可能变），
+				# 这里按网格节点名拉黑，覆盖所有植被来源。
+				var lname := String(mi.name).to_lower()
+				if lname.contains("leaf") or lname.contains("canopy") \
+						or lname.contains("tree") or lname.contains("bush") \
+						or lname.contains("meadow") or lname.contains("grass_instance"):
+					continue
 				if skip_bridge and (mi.name.begins_with("coastal_bridge_")
 						or mi.name.begins_with("rain")):
 					continue

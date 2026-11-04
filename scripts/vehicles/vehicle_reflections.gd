@@ -10,13 +10,23 @@ extends Node3D
 ##
 ## Godot 对应物：`ReflectionProbe` + `UPDATE_ONCE`（拍一张然后闲置，需要时再触发）。
 ## 差异与代价：
-##   - Godot 不能只渲染"附近 200 个网格"，盒子里的东西全会进 —— 所以盒子
-##     尺寸给 90m（罩住近处楼），靠 2Hz 节流把成本摊平；
-##   - 分辨率由引擎定，配不了 128px；重挂一次 `UPDATE_ONCE` 即触发一次捕获。
+##   - Godot 不能只渲染"附近 200 个网格"，盒子里的东西全会进 —— 所以靠
+##     2Hz 节流把成本摊平；分辨率由引擎定，配不了 128px；重挂一次
+##     `UPDATE_ONCE` 即触发一次捕获。
+##   - ⚠️ 影响域（2026-11-03，修复记录 五十一）：原版 Babylon 的探针贴图**只赋给
+##     车漆材质**；Godot 的 ReflectionProbe 是逐像素硬边界影响 —— 盒内所有像素
+##     （包括路面）都改用探针反射，盒外用天空 IBL。曾经照抄原版给 90m 盒子，
+##     结果盒子前表面在车前方 ~45m 的路面上投出一条**随车移动的明暗分界线**
+##     （探针内容 ≠ 天空 radiance，粗糙沥青两侧反射不同亮度）。unshaded 调试
+##     视图下消失（跳过反射）、隐藏网格/关 SSR/SSAO/阴影都无效 —— 这条线曾长期
+##     误诊为 IBL/几何问题。
+##   - 修法：盒子压扁 + 抬高下沿到 0.9m，把路面（车局部 y≈0~0.3）整个排除在
+##     影响域外；横向收到 12m，容忍坡度（0.6m 余量 / 12m = 5% 坡）与车身俯仰。
+##     立方图内容仍是全场景捕获，车漆（0.9~2.9m 高的车身）反射不受影响。
 ##
 ## 挂接：作为车模的子节点随车移动；画质档 medium+ 才启用。
 
-const PROBE_SIZE := Vector3(90.0, 60.0, 90.0)
+const PROBE_SIZE := Vector3(12.0, 2.0, 12.0)
 const CAPTURE_INTERVAL := 0.5      ## 原版 targetCapturesPerSecond = 2
 const CAPTURE_MOVE := 2.0          ## 原版：位移 < 2m 不重拍
 const ENABLE_DISTANCE := 65.0      ## 原版：相机距车 65m 外不启用
@@ -39,7 +49,9 @@ func setup(camera: Camera3D) -> void:
 	_probe.update_mode = ReflectionProbe.UPDATE_ONCE
 	_probe.intensity = 0.8
 	_probe.box_projection = true
-	_probe.position = Vector3(0.0, 1.1, 0.0)   ## 原版：车顶上 1.1m
+	# 下沿 = 1.9 - 2.0/2 = 0.9m：路面在车局部 y≈0~0.3，整条排除在影响域外；
+	# 车身（顶 ~1.3m）仍在盒内。此前 90m 盒 + 下沿 -28.9m 会把 45m 内路面全罩进。
+	_probe.position = Vector3(0.0, 1.9, 0.0)
 	add_child(_probe)
 	set_enabled(true)
 

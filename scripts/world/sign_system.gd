@@ -64,17 +64,42 @@ func setup(p_world: CityWorld) -> void:
 	update_signs(world.focus)
 
 
-## ── 指路牌（2026-10-24 补齐）────────────────────────────────────────
+## ── 指路牌（2026-10-24 补齐；2026-11-03 加杆 + 背板 + 路肩偏移）─────
 ## 原版 city-world.ts setupSigns()：spawn ±650/700m 内的 primary/trunk 主干道
-## （路名含「辅」跳过、points ≥4、最多 9 块），8×2m 单面片挂在 a 点 6.8m 高，
+## （路名含「辅」跳过、points ≥4、count++>8 → 最多 8 块），8×2m 单面片
 ## 自发光不受光照（夜里也清晰可读），按行进方向选 sign-east/west.jpg。
 ## 贴面只朝 a→b 行进方向 —— 背面不渲染（原版注释：背面会镜像文字）。
-const DIRECTION_SIGN_MAX := 9
+## 原版牌子无杆、悬在 6.8m —— 本端口补齐三件事：
+##   1. 挂点原是道路中线首点（road.points[0]），直接立杆会插进车道，
+##      故沿迎面来车的右手侧偏移 half_width+0.8m 到路肩；
+##   2. 补 5.9m 立柱（顶入牌底 0.1m），受光照、投影；
+##   3. 补灰色铝背板（不贴图、unshaded）—— 不用 CULL_DISABLED 开双面，
+##      因为同一张贴图背面会看到镜像文字，背板则背面干净。
+const DIRECTION_SIGN_MAX := 8
+## 杆顶 5.9m，牌面中心 6.8m、高 2m（底缘 5.8m）→ 杆顶嵌入牌底 0.1m
+const SIGN_POLE_HEIGHT := 5.9
+## 背板相对牌面沿 −法线的后移量，避免共面深度闪烁
+const SIGN_BACK_GAP := 0.02
 
 func _build_direction_signs() -> void:
 	var spawn: Vector2 = CityData.spawn_pos
 	var placed := 0
 	var tex_cache := {}
+	# 牌面 / 背板 / 立柱的网格与材质只建一份，每块牌子 3 个 MeshInstance3D 共享
+	var quad := QuadMesh.new()
+	quad.size = Vector2(8.0, 2.0)
+	var pole_mesh := CylinderMesh.new()
+	pole_mesh.top_radius = 0.12
+	pole_mesh.bottom_radius = 0.16
+	pole_mesh.height = SIGN_POLE_HEIGHT
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color(0.42, 0.44, 0.47)
+	pole_mat.metallic = 0.6
+	pole_mat.roughness = 0.45
+	# 背板 unshaded 与牌面亮度语义一致（牌面 albedo 0.82，背板压暗一档）
+	var back_mat := StandardMaterial3D.new()
+	back_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	back_mat.albedo_color = Color(0.5, 0.52, 0.55)
 	for road in CityData.roads:
 		if placed >= DIRECTION_SIGN_MAX:
 			break
@@ -103,8 +128,10 @@ func _build_direction_signs() -> void:
 		if tex == null:
 			push_warning("[SignSystem] 缺少指路牌贴图 %s" % tex_path)
 			continue
-		var quad := QuadMesh.new()
-		quad.size = Vector2(8.0, 2.0)
+		# 迎面来车沿 -dir 行驶，其右手侧在数据坐标里 = (-dn, dx)（右手通行）
+		var half_w := float(road.get("width", 16.0)) * 0.5
+		var shoulder := Vector2(-dir_data.y, dir_data.x).normalized() * (half_w + 0.8)
+		var anchor := a + shoulder
 		var mat := StandardMaterial3D.new()
 		mat.albedo_texture = tex
 		# 原版：disableLighting + emissiveColor .82 → 等价 unshaded × 0.82
@@ -115,13 +142,31 @@ func _build_direction_signs() -> void:
 		mi.name = "direction-sign"
 		mi.mesh = quad
 		mi.material_override = mat
-		mi.position = CoordinateUtil.to_world(a.x, a.y, 6.8)
+		mi.position = CoordinateUtil.to_world(anchor.x, anchor.y, 6.8)
 		# 原版 rotation.y = atan2(dx, dz) + π（Babylon z=北、平面朝 −Z，
 		# 法线 = a→b 行进方向）；Godot QuadMesh 面朝 +Z：
 		# 法线 = (sin φ, cos φ)，令其等于 (dx, −dz)̂ → φ = atan2(dx, −dz)
-		mi.rotation.y = atan2(dir_data.x, -dir_data.y)
+		var phi := atan2(dir_data.x, -dir_data.y)
+		mi.rotation.y = phi
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
+		# 背板：同尺寸灰板，法线反向、沿 −法线后退 2cm —— 背面看到的是干净金属板
+		var back := MeshInstance3D.new()
+		back.name = "direction-sign-back"
+		back.mesh = quad
+		back.material_override = back_mat
+		var n := Vector3(sin(phi), 0.0, cos(phi))
+		back.position = mi.position - n * SIGN_BACK_GAP
+		back.rotation.y = phi + PI
+		back.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(back)
+		# 立柱：立在路肩点上，顶入牌底 0.1m；受光照、投影（牌面与背板不投影）
+		var pole := MeshInstance3D.new()
+		pole.name = "direction-sign-pole"
+		pole.mesh = pole_mesh
+		pole.material_override = pole_mat
+		pole.position = CoordinateUtil.to_world(anchor.x, anchor.y, SIGN_POLE_HEIGHT * 0.5)
+		add_child(pole)
 	print("[SignSystem] 指路牌 %d 块" % placed)
 
 

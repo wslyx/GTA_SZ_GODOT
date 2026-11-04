@@ -132,6 +132,7 @@ var _focus_data := Vector2.ZERO
 var _steps: Array = []
 var _step := 0
 var _cull_timer := 0.0
+var _nodestat_timer := 0.0
 ## 地标步骤内部有 3 段装载，用它算步骤内进度
 var _landmark_stage := 0
 ## 地面材质注入是否已跑过（_plan_ground_field 只做一次）
@@ -255,17 +256,49 @@ func _process(delta: float) -> void:
 	if _cull_timer <= 0.0:
 		_cull_timer = 0.25
 		# 流式激活时由 chunk_streamer 负责加载/卸载与阴影；否则走原 visibility 剔除。
+		# （看门狗阶段标记：行车卡死时 MemProbe 会报"停在哪个阶段"）
+		MemProbe.phase = "city_world.chunk_streamer"
 		if chunk_streamer != null and chunk_streamer.active:
 			chunk_streamer.update_system(delta, focus)
 		else:
 			_cull_chunks()
+		MemProbe.phase = "city_world.subsystems"
 	_update_subsystems(delta)
+	MemProbe.phase = "cw.done"
 
 
 func _update_subsystems(delta: float) -> void:
 	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials, wanted]:
 		if sys != null and sys.has_method("update_system"):
+			MemProbe.phase = "cw." + str(sys.name)
+			var __t0 := Time.get_ticks_msec()
 			sys.update_system(delta, focus)
+			# 慢查日志：哪个子系统单帧超 8ms 一目了然（grep [SLOW]）
+			var __ms := Time.get_ticks_msec() - __t0
+			if __ms > 8:
+				print("[SLOW] cw.%s 本帧 %d ms" % [str(sys.name), __ms])
+	# 30s 一次节点前缀直方图：节点泄露直接看增量（grep [NODESTAT]）
+	_nodestat_timer -= delta
+	if _nodestat_timer <= 0.0:
+		_nodestat_timer = 30.0
+		var hist := {}
+		var stk: Array = [self]
+		while not stk.is_empty():
+			var nd: Node = stk.pop_back()
+			for ch in nd.get_children():
+				stk.append(ch)
+			var nm := String(nd.name)
+			var pcut := nm.find("-")
+			var key := nm.substr(0, pcut + 1) if pcut > 0 else nm
+			hist[key] = int(hist.get(key, 0)) + 1
+		var parts: Array = []
+		var keys := hist.keys()
+		keys.sort()
+		for k in keys:
+			if int(hist[k]) >= 5:
+				parts.append("%s×%d" % [str(k), int(hist[k])])
+		parts.append("(总 %d)" % get_tree().get_node_count())
+		print("[NODESTAT] " + " ".join(PackedStringArray(parts)))
 
 
 

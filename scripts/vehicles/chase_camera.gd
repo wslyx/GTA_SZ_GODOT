@@ -144,6 +144,21 @@ func follow_vehicle(target_data: Vector3, speed: float, dt: float, tank := false
 		else:
 			global_position += carry
 			global_position = global_position.lerp(desired, factor)
+	# ---- 相机贴地钳制（2026-11-03，修复记录 五十二）----
+	# 症状：山上行车（尤其朝下坡开 / 停在坡上），画面被绿色糊满、近坡着色
+	# 反常，观感"山是透明的，能看到对面山体的内侧面"。
+	# 归因：相机 = 车轮处地面高度 + 固定挂高，水平后退 f 米 —— 朝下坡开时
+	# 车后是上坡方向，地形比车轮处高数米，相机整个钻进山体网格。ground_field
+	# 是双面渲染（背面法线翻转），从网格内部看到的就是"对面内侧面 + 交切线"。
+	# diag 实测：车 (1750,1690) hf=24.77，相机 y=27.02 而相机所在 XZ 的地面
+	# 高达 30.00 —— 深入地下 3m。
+	# 修法：用相机自身 XZ 的高度场做地板，绝不低于地面 0.6m。只抬不降，
+	# 不影响原版追尾手感。
+	if ground_height_fn.is_valid():
+		var cam_min_y: float = float(ground_height_fn.call(
+			global_position.x, -global_position.z)) + 0.6
+		if global_position.y < cam_min_y:
+			global_position.y = cam_min_y
 	look_at_target(look_at)
 	fov = rad_to_deg(FOV_BASE + absf(speed) * FOV_SPEED_GAIN)
 

@@ -487,6 +487,19 @@ func height_at(east: float, north: float) -> float:
 		base += lianhua_height(east, north)
 		base += mountain_delta(east, north)
 		base += relief_height(east, north)
+	# ---- 莲花山"视觉表面地板"（2026-11-03，修复记录 五十二）----
+	# 症状：山上行车（尤其陡坡/坡脚），相机贴地甚至钻进山体网格 —— 满屏背面
+	# （ground_field 双面渲染、法线翻转），观感是"山是透明的，能看到对面山体
+	# 的内侧面"；相机略高于表面时那条交切线看起来像凭空多出的"山脊"。
+	# 归因：修正网格是 8m 栅格双线性（陡变格纯取最近角点），而视觉网格是 9m
+	# 格 SW->NE 三角剖分 —— 陡坡上两套采样天生差 1.5~3m，物理永远可能落在
+	# 视觉表面之下。lianhua_height() 的剖分与网格逐字同源，取 max 即是
+	# "绝不低于可见地面"的地板；网格顶点还带 +0.045 抬升，这里再加 0.05 余量。
+	# 只在山体格内生效（lh≈0 的平地/道路不受影响）。
+	if _has_lianhua:
+		var lh_surface := lianhua_height(east, north)
+		if lh_surface > 0.01:
+			base = maxf(base, lh_surface + 0.05)
 	base = maxf(base, bridge_lift(east, north))
 	if cafe_floor.is_valid():
 		base = cafe_floor.call(east, north, base)

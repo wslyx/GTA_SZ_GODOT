@@ -190,7 +190,7 @@ func _load_canopy_asset() -> void:
 				# 原版模型的容器变换历来被忽略（GLB 本身是单位变换），保持 identity
 				_canopy_nodes["%s|%s|%s" % [sp["id"], key, mi.name]] = {
 					"node": node2, "local": Transform3D()}
-			inst.queue_free()
+			GlbLoader.safe_free(inst)
 
 	var trees: Array = CityData.canopy_trees().get("trees", [])
 	_canopy_instances.clear()
@@ -369,7 +369,7 @@ func _load_furniture() -> void:
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			add_child(node)
 			_furniture_nodes.append({"mm": mm, "mesh": mi.mesh})
-		inst.queue_free()
+		GlbLoader.safe_free(inst)
 
 	# —— 每次调用：按焦点重摆 ——
 	var focus := world.focus

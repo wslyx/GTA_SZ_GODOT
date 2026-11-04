@@ -77,6 +77,7 @@ var _has_prev := false
 var stats_loaded := 0
 var stats_unloaded := 0
 var stats_failed := 0
+var _snap_timer := 0.0
 
 # --- 区块 Impostor（§加载优化③）：补 3–6km 的细节真空 ----------------------
 ## 原理（PUBG 式）：块**加载后**用 SubViewport 顶视烘一张 256² thumbnail，
@@ -274,12 +275,24 @@ func update_system(delta: float, focus: Vector3) -> void:
 				for mi in GlbLoader.meshes_of(node):
 					if mi.cast_shadow != cast:
 						mi.cast_shadow = cast
-		# 1.5) Impostor 烘焙节流：一次一张、间隔 2s、加载器空闲才做
-		_bake_timer -= delta
-		if _bake_timer <= 0.0 and not _bake_busy \
-				and not _bake_queue.is_empty() and _loader.is_idle():
-			_bake_timer = BAKE_INTERVAL
-			_process_bake_queue()
+	# 1.5) Impostor 烘焙节流：一次一张、间隔 2s、加载器空闲才做
+	_bake_timer -= delta
+	if _bake_timer <= 0.0 and not _bake_busy \
+			and not _bake_queue.is_empty() and _loader.is_idle():
+		_bake_timer = BAKE_INTERVAL
+		_process_bake_queue()
+
+	# 30s 状态快照（grep [ChunkStreamer]）：常驻块数 / 待载 / 失败 / 队列 / 照片
+	_snap_timer -= delta
+	if _snap_timer <= 0.0:
+		_snap_timer = 30.0
+		var pending := 0
+		for e in chunks:
+			if e["state"] == "pending":
+				pending += 1
+		print("[ChunkStreamer] 快照 常驻=%d 待载=%d 失败=%d 照片=%d 队列=%d"
+			% [stats_loaded - stats_unloaded, pending, stats_failed,
+				_impostors.size(), _loader.pending()])
 
 	# 2) 串行排队加载：LOAD_RADIUS 内评分最高的未加载区块
 	#    评分 = 距离² × (1 − 0.6 × 前进对齐度)，前进方向由焦点位移平滑估计
@@ -339,7 +352,7 @@ func update_system(delta: float, focus: Vector3) -> void:
 func _unload_chunk(e: Dictionary) -> void:
 	var node: Node3D = e["node"]
 	if node != null and is_instance_valid(node):
-		node.queue_free()
+		GlbLoader.safe_free(node)
 	var key := "%d_%d" % [e["i"], e["j"]]
 	if world != null:
 		world.blocks = world.blocks.filter(
@@ -351,6 +364,8 @@ func _unload_chunk(e: Dictionary) -> void:
 	# Impostor：块走了，照片留下（已烘焙时）
 	_imp_show(e, true)
 	stats_unloaded += 1
+	print("[ChunkStreamer] 卸载 %s（累计 载入 %d / 卸载 %d / 失败 %d）"
+		% [key, stats_loaded, stats_unloaded, stats_failed])
 
 
 func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) -> void:
@@ -362,7 +377,7 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 	if e.is_empty():
 		# 找不到对应区块（极端情况）：直接释放，避免悬挂。
 		if node != null and is_instance_valid(node):
-			node.queue_free()
+			GlbLoader.safe_free(node)
 		return
 	GlbLoader.configure_meshes(GlbLoader.meshes_of(node), true, false)
 	# 跨块共享内嵌贴图（office/residential 4 张）：所有材质重挂共享实例，
@@ -383,6 +398,11 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 	e["scene"] = null
 	e["state"] = "loaded"
 	stats_loaded += 1
+	var __ms := Time.get_ticks_msec() - __t0
+	# 载入事件（compact，grep [ChunkStreamer]）：挂载耗时直接打，
+	# 挂载瞬间的卡顿归因靠这条行的时间戳对帧阻塞日志
+	print("[ChunkStreamer] 载入 %s 用时 %d ms（累计 载入 %d / 卸载 %d / 失败 %d）"
+		% [key, __ms, stats_loaded, stats_unloaded, stats_failed])
 	# 维护 world.blocks，供 traffic / pedestrian / scenery 的 place() 就绪判断。
 	# ⚠️ 必须在 impostor 逻辑**之前**：impostor 任何异常都不许打断挂载主链路
 	#（历史 bug：_imp_show 在贴图未烘焙时误建节点 → 读缺失键崩溃 → world.blocks
@@ -396,7 +416,6 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource) ->
 	_imp_show(e, false)
 	if e["node"] != null:
 		_bake_queue.append(e)
-	var __ms := Time.get_ticks_msec() - __t0
 	if __ms > 12:
 		print("[HITCH] 区块挂载 %s 用时 %d ms（configure/dedup/阴影）" % [key, __ms])
 

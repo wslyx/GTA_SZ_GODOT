@@ -1,0 +1,17 @@
+[tree] beacon-                      × 3
+[tree] block_-                      × 96
+[tree] detail_fortune-              × 5
+[tree] detail_mixc-                 × 4
+[tree] detail_qijie-                × 5
+[tree] roads_-                      × 419
+[tree] roads_0_-                    × 10
+[tree] roads_10_-                   × 5
+[tree] roads_1_-                    × 10
+[tree] roads_2_-                    × 10
+[tree] roads_3_-                    × 10
+[tree] roads_4_-                    × 10
+[tree] roads_5_-                    × 7
+[tree] roads_8_-                    × 7
+[tree] roads_9_-                    × 5
+[tree] roof-                        × 27
+[tree] (总节点 1297)

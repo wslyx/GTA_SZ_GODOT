@@ -1,0 +1,215 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 1.2,
+ "shots": [
+  {
+   "name": "w00_pos",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     -2664,
+     -862,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w01_exit",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true,
+    "walk_toggle": true
+   }
+  },
+  {
+   "name": "w02_keys",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true,
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ]
+   }
+  },
+  {
+   "name": "w03_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w04_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w05_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w06_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w07_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w08_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w09_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w10_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w11_north",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w12_back",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true,
+    "keys_hold": [
+     "S",
+     "SHIFT"
+    ]
+   }
+  },
+  {
+   "name": "w13_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w14_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w15_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w16_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w17_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w18_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w19_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w20_south",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w21_enter",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true,
+    "keys_release": true,
+    "walk_toggle": true
+   }
+  },
+  {
+   "name": "w22_end",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "w23_end",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

@@ -162,16 +162,22 @@ public partial class GtaSzAlsPlayerHost : Node3D
     {
         if (_failed || !_runtimeConfigured)
         {
+            GD.Print($"[ALS] EnterWorld 跳过（failed={_failed} runtimeConfigured={_runtimeConfigured}）");
             return;
         }
+        GD.Print($"[ALS] EnterWorld feet={feetWorldPosition} yaw={dataYaw} 首次配置={!_slotConfigured}");
+        var enterSw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var capsuleCenter = feetWorldPosition + Vector3.Up * (_context.MotorSettings.StandingHeight * 0.5f);
             if (!_slotConfigured)
             {
                 // 首次下车：此刻才构造角色（图与角色资源已随 _Ready 预热）。
+                var cfgSw = System.Diagnostics.Stopwatch.StartNew();
                 _slot.Configure(_context, () => _playerInput, capsuleCenter);
                 _slotConfigured = true;
+                enterSw.Restart();
+                GD.Print($"[ALS-T] slot.Configure {cfgSw.ElapsedMilliseconds} ms");
             }
             else
             {
@@ -189,6 +195,7 @@ public partial class GtaSzAlsPlayerHost : Node3D
             _orbitCamera.SetView(-dataYaw, -0.2f);
             _orbitCamera.GetNode<Camera3D>("SpringArm3D/Camera3D").Current = true;
             Active = true;
+            GD.Print($"[ALS] EnterWorld 完成（角色已激活，轨道相机接管）{enterSw.ElapsedMilliseconds} ms");
         }
         catch (Exception exception)
         {
@@ -203,6 +210,7 @@ public partial class GtaSzAlsPlayerHost : Node3D
         {
             return;
         }
+        GD.Print("[ALS] ExitWorld（角色停用，相机交还追尾）");
         Active = false;
         _slot.ActiveCharacter.SetActive(false);
         _slot.ActiveCharacter.Visible = false;
@@ -289,6 +297,9 @@ public partial class GtaSzAlsPlayerHost : Node3D
         _failed = true;
         var message = exception.Message.Replace('\r', ' ').Replace('\n', ' ');
         _failure = $"{exception.GetType().Name}: {message}";
-        GD.PushError($"GTA ALS player host failed: {_failure}");
+        // [ALS] 前缀便于 grep；堆栈首行一起打（定位抛出点）
+        var stackTop = (exception.StackTrace ?? "").Split('\n');
+        var firstFrame = stackTop.Length > 0 ? stackTop[0].Trim() : "";
+        GD.PushError($"[ALS] player host failed: {_failure} @ {firstFrame}");
     }
 }

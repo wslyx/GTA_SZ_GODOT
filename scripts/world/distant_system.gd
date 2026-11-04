@@ -114,6 +114,44 @@ func _read_preserved_bounds() -> void:
 		terrain_preserved = Rect2(b[0], b[1], b[2] - b[0], b[3] - b[1])
 
 
+## 山地角点的坡度法线 + 逐顶点色（原版 city-mountains.ts attachVisuals 逐字）：
+##   法线 = 高程网格中心差分坡度（数据 z=北，世界 z 取反）；
+##   颜色 = 双尺度树冠簇噪声 × 细噪声 × 高地压暗 + 陡坡暖灰岩石。
+## 以前整层只给 UP 法线 + 平色橄榄 —— 山坡像一层"反着看的壳"，即用户报告的
+## "山坡可见面反了"（修复记录 五十五）。
+static func _mountain_corner(heights: PackedFloat32Array, cols: int, rows: int,
+		x0: float, z0: float, step: float, gc: int, gr: int) -> Array:
+	var sx := float(heights[gr * cols + mini(gc + 1, cols - 1)]
+		- heights[gr * cols + maxi(gc - 1, 0)]) / (2.0 * step)
+	var sz := float(heights[mini(gr + 1, rows - 1) * cols + gc]
+		- heights[maxi(gr - 1, 0) * cols + gc]) / (2.0 * step)
+	var ln := sqrt(sx * sx + 1.0 + sz * sz)
+	# 噪声用数据坐标（原版 wx/wz），与 world z 无关
+	var wx := x0 + gc * step
+	var wz := z0 + gr * step
+	var clumps := (sin(wx / 91.0 + wz / 137.0) * cos(wz / 83.0 - wx / 211.0)) * 0.5 + 0.5
+	var fine := 0.93 + 0.07 * sin(wx / 37.0 + 1.3) * cos(wz / 41.0)
+	var hh := float(heights[gr * cols + gc])
+	var highland := clampf((hh - 30.0) / 200.0, 0.0, 1.0)
+	var stone := minf(0.45, maxf(0.0, sqrt(sx * sx + sz * sz) - 0.40) * 0.75)
+	var shade := (0.78 + 0.22 * clumps) * fine * (1.0 - 0.20 * highland)
+	# 世界 z=-北：法线 z 分量跟着翻
+	var n := Vector3(-sx / ln, 1.0 / ln, sz / ln)
+	var c := Color(shade * (1.0 + stone * 0.60), shade * (1.0 - stone * 0.22),
+		shade * (1.0 + stone * 0.48), 1.0)
+	return [n, c]
+
+
+static func _add_vc_tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
+		na: Array, nb: Array, nc: Array) -> void:
+	var pts: Array = [a, b, c]
+	var nrm: Array = [na, nb, nc]
+	for k in 3:
+		st.set_normal(nrm[k][0])
+		st.set_color(nrm[k][1])
+		st.add_vertex(pts[k])
+
+
 ## 生成一层山体网格。stride 用于近层抽稀（1 = 全精度）。
 func _build_mountain_layer(manifest_path: String, bin_name: String, far_layer: bool,
 		stride: int, col: Color, node_name: String) -> Array:
@@ -160,8 +198,17 @@ func _build_mountain_layer(manifest_path: String, bin_name: String, far_layer: b
 				var h01 := heights[ri * cols + c] + offset
 				var h11 := heights[ri * cols + ci] + offset
 				# 数据 (east, north) → 世界 (x=east, z=-north)
-				_add_up_tri(st, Vector3(ex0, h00, -nz0), Vector3(ex1, h10, -nz0), Vector3(ex1, h11, -nz1))
-				_add_up_tri(st, Vector3(ex0, h00, -nz0), Vector3(ex1, h11, -nz1), Vector3(ex0, h01, -nz1))
+				var v00 := Vector3(ex0, h00, -nz0)
+				var v10 := Vector3(ex1, h10, -nz0)
+				var v11 := Vector3(ex1, h11, -nz1)
+				var v01 := Vector3(ex0, h01, -nz1)
+				# 角点法线 + 逐顶点色（原版 city-mountains.ts：树冠簇/高地/岩石）
+				var k00 := _mountain_corner(heights, cols, rows, x0, z0, step, c, r)
+				var k10 := _mountain_corner(heights, cols, rows, x0, z0, step, ci, r)
+				var k11 := _mountain_corner(heights, cols, rows, x0, z0, step, ci, ri)
+				var k01 := _mountain_corner(heights, cols, rows, x0, z0, step, c, ri)
+				_add_vc_tri(st, v00, v10, v11, k00, k10, k11)
+				_add_vc_tri(st, v00, v11, v01, k00, k11, k01)
 				tris += 2
 				c += stride_step
 			r += stride_step
@@ -205,16 +252,26 @@ func _build_relief_mesh() -> Mesh:
 		verts.resize(vc)
 		var norms := PackedVector3Array()
 		norms.resize(vc)
+		# ---- 坐标换轴（2026-11-03，修复记录 五十四）----
+		# 二进制 positions 是**数据坐标**（z=北）：原版 TS 把它直接喂 Babylon
+		# 场景（原版数据系=世界系），baseHeightAt(x,z) 也按 (east,north) 采样。
+		# Godot 世界 z=-北，必须在这里翻 z，否则土坡南北镜像。
+		# 而镜像本身会翻转绕序手性 —— Godot 正面=CCW，镜像后原绕序的"正面"
+		# 变成背面，双面着色下就是用户看到的"小土坡单面可见、可见的面反了"
+		# （背面法线被 ground_field 翻转，坡面明暗/受光全部颠倒）。
+		# 所以三件套一起改：位置 z 取反 + 法线 z 取反 + 索引倒序。
+		# 物理侧 height_field.load_relief() 把 z 当北用（数据系采样），本来就
+		# 是对的，不要跟着改。
 		for i in vc:
-			verts[i] = Vector3(pos_f[i * 3], pos_f[i * 3 + 1], pos_f[i * 3 + 2])
-			norms[i] = Vector3(nrm_f[i * 3], nrm_f[i * 3 + 1], nrm_f[i * 3 + 2])
+			verts[i] = Vector3(pos_f[i * 3], pos_f[i * 3 + 1], -pos_f[i * 3 + 2])
+			norms[i] = Vector3(nrm_f[i * 3], nrm_f[i * 3 + 1], -nrm_f[i * 3 + 2])
 		var t := 0
 		while t + 2 < icount:
 			var i0 := raw.decode_u32(io + t * 4)
 			var i1 := raw.decode_u32(io + (t + 1) * 4)
 			var i2 := raw.decode_u32(io + (t + 2) * 4)
 			if i0 < vc and i1 < vc and i2 < vc:
-				for k in [i0, i1, i2]:
+				for k in [i2, i1, i0]:
 					st.set_normal(norms[k])
 					st.add_vertex(verts[k])
 				tri_total += 1

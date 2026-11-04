@@ -181,10 +181,12 @@ func update_system(delta: float, focus: Vector3) -> void:
 			if dx * dx + dz * dz > UNLOAD_RADIUS * UNLOAD_RADIUS:
 				var node: Node3D = t["node"]
 				if node != null and is_instance_valid(node):
-					node.queue_free()
+					GlbLoader.safe_free(node)
 				t["node"] = null
 				t["state"] = "pending"
 				stats_unloaded += 1
+				print("[FacadeStreamer] 卸载 %s（累计 载入 %d / 卸载 %d / 失败 %d）"
+					% [str(t["id"]), stats_loaded, stats_unloaded, stats_failed])
 		for t in tiles:
 			var node: Node3D = t["node"]
 			if node == null or not is_instance_valid(node):
@@ -245,12 +247,14 @@ func _on_loaded(_path: String, node: Node3D, meta: Variant, _scene: Resource = n
 	_current_id = ""
 	var e: Dictionary = _by_id.get(id, {})
 	if e.is_empty():
-		node.queue_free()
+		GlbLoader.safe_free(node)
 		return
 	GlbLoader.configure_meshes(GlbLoader.meshes_of(node), true, false)
 	e["node"] = node
 	e["state"] = "loaded"
 	stats_loaded += 1
+	print("[FacadeStreamer] 载入 %s（累计 载入 %d / 卸载 %d / 失败 %d）"
+		% [id, stats_loaded, stats_unloaded, stats_failed])
 
 
 func _on_failed(path: String, _reason: String) -> void:
