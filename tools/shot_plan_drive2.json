@@ -1,0 +1,31 @@
+{
+ "warmup": 8.0,
+ "gap": 3.5,
+ "settle": 2.0,
+ "shots": [
+  { "name": "dr00_start", "env": { "light_mode": 0, "tier": "medium", "goto": [-2664, -862, 90], "diag": true } },
+  { "name": "dr01_go",    "env": { "light_mode": 0, "tier": "medium", "autopilot_drive": [500, 500], "diag": true } },
+  { "name": "dr02", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr03", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr04", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr05", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr06", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr07", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr08", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr09", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr10", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr11", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr12", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr13", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr14", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr15", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr16", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr17", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr18", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr19", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr20", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr21", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr22", "env": { "light_mode": 0, "tier": "medium", "diag": true } },
+  { "name": "dr23", "env": { "light_mode": 0, "tier": "medium", "diag": true } }
+ ]
+}

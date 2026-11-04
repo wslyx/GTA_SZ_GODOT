@@ -1,0 +1,982 @@
+{
+ "warmup": 8.0,
+ "gap": 5.0,
+ "settle": 1.8,
+ "shots": [
+  {
+   "name": "g00_x-6400_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -6400,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g01_x-5333_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -5333,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g02_x-4266_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -4266,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g03_x-3199_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -3199,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g04_x-2132_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -2132,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g05_x-1065_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -1065,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g06_x+0002_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g07_x+1069_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     1069,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g08_x+2136_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2136,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g09_x+3203_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     3203,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g10_x+4270_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     4270,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g11_x+5337_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     5337,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g12_x+6404_z-2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     6404,
+     -2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g13_x-6400_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -6400,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g14_x-5333_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -5333,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g15_x-4266_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -4266,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g16_x-3199_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -3199,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g17_x-2132_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -2132,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g18_x-1065_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -1065,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g19_x+0002_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g20_x+1069_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     1069,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g21_x+2136_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2136,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g22_x+3203_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     3203,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g23_x+4270_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     4270,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g24_x+5337_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     5337,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g25_x+6404_z-1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     6404,
+     -1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g26_x-6400_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -6400,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g27_x-5333_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -5333,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g28_x-4266_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -4266,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g29_x-3199_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -3199,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g30_x-2132_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -2132,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g31_x-1065_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -1065,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g32_x+0002_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g33_x+1069_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     1069,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g34_x+2136_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2136,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g35_x+3203_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     3203,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g36_x+4270_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     4270,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g37_x+5337_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     5337,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g38_x+6404_z+0000",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     6404,
+     0,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g39_x-6400_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -6400,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g40_x-5333_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -5333,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g41_x-4266_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -4266,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g42_x-3199_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -3199,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g43_x-2132_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -2132,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g44_x-1065_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -1065,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g45_x+0002_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g46_x+1069_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     1069,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g47_x+2136_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2136,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g48_x+3203_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     3203,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g49_x+4270_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     4270,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g50_x+5337_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     5337,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g51_x+6404_z+1050",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     6404,
+     1050,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g52_x-6400_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -6400,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g53_x-5333_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -5333,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g54_x-4266_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -4266,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g55_x-3199_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -3199,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g56_x-2132_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -2132,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g57_x-1065_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     -1065,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g58_x+0002_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g59_x+1069_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     1069,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g60_x+2136_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     2136,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g61_x+3203_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     3203,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g62_x+4270_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     4270,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g63_x+5337_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     5337,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  },
+  {
+   "name": "g64_x+6404_z+2100",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "observer_at": [
+     6404,
+     2100,
+     450,
+     0,
+     -55
+    ],
+    "diag": false
+   }
+  }
+ ]
+}

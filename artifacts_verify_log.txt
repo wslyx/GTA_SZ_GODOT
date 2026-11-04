@@ -1,0 +1,231 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+Vulkan 1.4.357 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3060
+
+[shot] 主场景已加入，窗口 1920x1080，方案 4 张，warmup 8.0s gap 3.0s
+[MemProbe] t=0s static=198MB video=0MB tex=0MB nodes=72
+[BOOT-T] CityWorld 已建 t=3.0s
+[BOOT-T] CityWalk 已建 t=3.0s
+[ALS-T] 运行时选项 8 ms
+[ALS-T] 加载编译资源 tres 101 ms
+[ALS-T] LoadDefinition（含摘要链） 189 ms
+[ALS-T] 运动轮廓编译 13 ms
+[MemProbe] ⚠ 主线程停滞 8s phase="physics_step" nodes=72
+[ALS-T] 运行时上下文构造 9012 ms
+[ALS] 已跳过 3 项导出取证校验（ALS_SKIP_PROVENANCE=1，结构与范围校验仍在跑）
+    - Raw source export belongs to another manifest or player/sample binding.
+    - Raw source export belongs to another manifest or player/sample binding.
+    - Raw source export belongs to another manifest or player/sample binding.
+[MemProbe] ⚠ 主线程停滞 16s phase="physics_step" nodes=72
+[MemProbe] ⚠ 主线程停滞 24s phase="physics_step" nodes=72
+[MemProbe] ⚠ 主线程停滞 32s phase="physics_step" nodes=72
+[MemProbe] ⚠ 主线程停滞 40s phase="physics_step" nodes=72
+ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
+ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
+[BOOT-T] ALS 预热完成 t=45.0s
+[BOOT-T] 12 个子系统已建 t=45.0s
+[Audio] 海湾晚风 BGM 已预渲染：1176000 样本（53.3s 循环）
+[BOOT-T] UI/玩法系统已建 t=45.8s
+[VehicleMaterials] 已标定 ["wheel_rubber", "wheel_alloy", "carpaint", "car_glass", "car_chrome"]
+[SportDetails] 运动套件 22 个节点（rearSign=1，车身三角面 62133，后舱盖 y=0.891）
+[Cockpit] 裁掉挡视线的内饰三角形 618 个：car_trim:36, car_leather:582
+[BOOT-T] 车辆模型已载 t=46.3s
+[BOOT-T] world.build() 前 t=46.3s
+[NetSession] 心跳 in_session=false remotes=0 nodes=516
+[CityData] 命中二进制快照（2.1 MB），跳过 city.json 解析
+[MemProbe] 主线程停滞 44.6s 后恢复 phase="loading"
+[CityData] 路名生成 675 ms：未命名 7354 条获得显示名 / 共 12202 条（上下文点 293）
+[CityData] 地标替换：剔除基础楼体 12 个
+[CityData] 核心数据加载完成 839 ms：道路 12202 / 建筑 16089 / 绿地 1703 / 水域 312 / 地标 13
+[BOOT-T] [AlsGround] 全城建筑索引 1695 格 用时 93 ms
+[HeightField] 修正高度网格 1701x656（8m 步长，覆盖 80%）
+[CityCollision] 构建完成 254 ms：路段格 6516 / 建筑格 4361 / 陆地环 1 / 水域 312
+[CityData] 导航图：42829 节点 / 47218 边
+[RoadGraph] 使用 navigation.json：42829 节点 / 47218 边 / 主分量 35558 节点（83%）
+[BOOT-T] 装载开始 ["res://data/city/terrain.glb"] t=47.9s
+[BOOT-T] 装载完成 ["res://data/city/terrain.glb"] t=48.0s
+[BOOT-T] 装载开始 ["res://data/city/roads.glb"] t=48.0s
+[BOOT-T] 装载完成 ["res://data/city/roads.glb"] t=48.3s
+[BOOT-T] 装载开始 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=48.3s
+[BOOT-T] 装载完成 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=48.4s
+[CityWorld] 桥面投影已关闭 ×2（超大 casting 体，阴影贴图解析不动）
+[CityWorld] detail：按前缀移除旧地标网格 17 个
+[TencentWindows] 窗格 6058 块 / 12138 三角形 / 67 ms
+[CityWorld] 腾讯幕墙窗格数据：{ "panes": 6058, "glassTriangles": 12138, "buildMs": 67.0, "hdr": 0.55 }
+[CityWorld] candidates：按前缀移除旧地标网格 16 个
+[CityWorld] 候选地标：丢弃地面平板 16 个
+[ChunkStreamer] 区块清单 150 块，加载半径 3000m / 卸载 3600m
+[ChunkStreamer] 预加载出生点 1200m 内建筑区块 8 块（3000m 外由运行时流式补齐）
+[ChunkStreamer] 载入 -6_-2 用时 0 ms（累计 载入 1 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -6_-1 用时 1 ms（累计 载入 2 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -5_-2 用时 0 ms（累计 载入 3 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -5_-1 用时 0 ms（累计 载入 4 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -4_-2 用时 0 ms（累计 载入 5 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -4_-1 用时 0 ms（累计 载入 6 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -3_-2 用时 0 ms（累计 载入 7 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -3_-1 用时 0 ms（累计 载入 8 / 卸载 0 / 失败 0）
+[FacadeStreamer] 瓦片清单 150 块，初始加载 700m 内
+[FacadeStreamer] 预加载出生点 700m 内立面瓦片 4 块
+[FacadeStreamer] 载入 -4_-1（累计 载入 1 / 卸载 0 / 失败 0）
+[FacadeStreamer] 载入 -4_-2（累计 载入 2 / 卸载 0 / 失败 0）
+[FacadeStreamer] 载入 -5_-1（累计 载入 3 / 卸载 0 / 失败 0）
+[FacadeStreamer] 载入 -5_-2（累计 载入 4 / 卸载 0 / 失败 0）
+[SkySystem] 使用 Sky 着色器（全分辨率逐像素 + 立方图缓存 + 三档连续混合）
+[LightingDirector] 灯位 20409 个（道路灯 + 公园灯），网格单元 96m
+[LightingDirector] 公园高杆灯：灯位 220 个 / 灯杆 mesh 3 个 / 自发光材质 1 个
+[WeatherSystem] 积水片 62661 个（来自 62661 条布局记录）
+[DistantSystem] mountain-far：140140 三角形（stride=1）
+[WeatherSystem] 积水网格后台构建完成并挂载
+[ScenerySystem] 林冠 40927 棵 / 树种 6 个 / 节点 36 / 索引单元 256m
+[LandscapeLayer] 种植树 7933 棵 / 细节 64010 / 路面细节 16971 / 原型 15 / open 对账 命中（6261 棵）
+[MeadowLayer] 草地瓦片 3162 个 / safeRadius 2.9 m / 每瓦片 32×32×3 字节
+[HITCH] Scenery 本帧 18 ms
+[RoadSurface] asphalt 3 / roadline 1 / canopy 1 / shore 1
+[GroundField] 烘焙 AO occlusion.png 3399×1307 cell=4.0 m
+[GroundField] 屋顶查表 3399×1307 cell=4.0 m + 细节瓦片（8 种 finish）
+[GroundField] 公共照明场灯位 20409 个（道路灯 + 公园灯）
+[GroundField] 中湾铺装 kind=1 → terrain_pavement
+[GroundField] 中湾铺装 kind=2 → terrain_concrete
+[GroundField] 中湾铺装 kind=1 → landmark_baypark_stone
+[GroundField] 中湾铺装 kind=3 → coastal_shore_seawall
+[GroundField] 中湾铺装 kind=2 → coastal_shore_concrete
+[GroundField] 中湾铺装 kind=4 → coastal_shore_coastal-rock
+[GroundField] 接管地面材质 20 个（草地 3）env_scale：沥青 0.55 / 草地 0.75 / 其余 1.00
+[DistantSystem] mountain-near：188894 三角形（stride=2）
+[RooftopLayer] 屋顶实例 76864 个 / 14 类 / 1078 个 200m 格，索引 79 ms
+[RooftopLayer] 屋顶原型 14 类 / 网格 39 个 / 材质 14 个（染色开启）
+[ArchMaterials] 立面 profile 28 个 / 贴图组 3（齐）
+[DistantSystem] 公园缓坡 54973 面
+[ArchMaterials] 接管网格 surface 86 个 / 共享材质 25 个（预算 31 + 立面多样性 :fv 变体）/ 无 UV 0 / 立面多样性 16
+[ArchMaterials] 逐材质环境光强度 env_scale 取值：[0.85, 0.96, 1.04, 1.05, 1.08]
+[ObserverDestination] 陆地块 1 / 水域 312
+[ObserverBeacons] 光柱 3 件 / 收藏 0 个（上限 24）
+[ObserverBeacons] 落点自检：海湾生活驿站 / 有落点=true
+[DistantSystem] 远景网格后台构建完成并挂载：3 项
+[SignSystem] 指路牌 7 块
+[SignSystem] 招牌数据 3077 条，显示池 64
+[MemProbe] t=48s static=679MB video=1401MB tex=928MB nodes=1952
+[TrafficSignals] 信号灯模型 mesh role 9 个
+[TrafficSignals] 395 个路口，周期 31.4s
+[TrafficSystem] 路网节点索引 42829 个，24 ms
+[PedestrianSystem] 人行道段 36969 条
+[EbikeSystem] 停车排 mesh 21 个 / 骑手 mesh 4 个（染色开启）
+[EbikeSystem] 停车排 21110 辆，配色 11 种，索引单元 128m
+[MainGame] 城市构建完成，启动累计 51433 ms
+[MemProbe] on_built入口 static=723MB t=51.4s
+[MemProbe] career/rides/story 后 static=724MB t=51.5s
+[MemProbe] hud.setup 后 static=775MB t=51.5s
+[MemProbe] mapui 字体预热后 static=794MB t=51.5s
+[MemProbe] mapui 小地图控件后 static=794MB t=51.5s
+[MemProbe] mapui atlas 壳后 static=828MB t=51.6s
+[MemProbe] mapui _build 后 static=828MB t=51.6s
+[MapUI] 小地图静态图层已烘焙：5287x2108（外扩 64px）
+[MemProbe] mapui bake 调度后 static=829MB t=51.6s
+[MemProbe] maps.setup 后 static=829MB t=51.6s
+[MemProbe] panels 入口 static=829MB t=51.6s
+[MemProbe] panels _build 后 static=852MB t=51.6s
+[MemProbe] panels _build_pause 后 static=854MB t=51.6s
+[MemProbe] panels.setup 后 static=854MB t=51.6s
+[DistantCity] 几何后台构建 2256 ms：150 块 / 462367 三角形
+ERROR: System.InvalidOperationException: P3 slot exposed a character visual without committed readiness.
+   at GodotAls.Locomotion.AlsP3CharacterSlot.ValidateCharacterVisibility(AlsP3Character character) in E:\CodePro\godot_fps_demo\GTA_SZ_GODOT\src\Als.Godot\Locomotion\AlsP3CharacterSlot.cs:line 572
+   at GodotAls.Locomotion.AlsP3CharacterSlot.ValidateVisibilityInvariants() in E:\CodePro\godot_fps_demo\GTA_SZ_GODOT\src\Als.Godot\Locomotion\AlsP3CharacterSlot.cs:line 540
+   at GodotAls.Locomotion.AlsP3CharacterSlot._PhysicsProcess(Double delta) in E:\CodePro\godot_fps_demo\GTA_SZ_GODOT\src\Als.Godot\Locomotion\AlsP3CharacterSlot.cs:line 168
+   at Godot.Node.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret) in /root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:line 2648
+   at GodotAls.Locomotion.AlsP3CharacterSlot.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret) in E:\CodePro\godot_fps_demo\GTA_SZ_GODOT\.godot\mono\temp\obj\Debug\Godot.SourceGenerators\Godot.SourceGenerators.ScriptMethodsGenerator\GodotAls.Locomotion.AlsP3CharacterSlot_ScriptMethods.generated.cs:line 250
+   at Godot.Bridge.CSharpInstanceBridge.Call(IntPtr godotObjectGCHandle, godot_string_name* method, godot_variant** args, Int32 argCount, godot_variant_call_error* refCallError, godot_variant* ret) in /root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:line 24
+   at: void Godot.NativeInterop.ExceptionUtils.LogException(System.Exception) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/NativeInterop/ExceptionUtils.cs:113)
+   C# backtrace (most recent call first):
+       [0] void Godot.GD.PushError(string) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/GD.cs:366)
+       [1] void Godot.NativeInterop.ExceptionUtils.LogException(System.Exception) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/NativeInterop/ExceptionUtils.cs:113)
+       [2] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)
+[ChunkStreamer] 卸载 -6_-2（累计 载入 8 / 卸载 1 / 失败 0）
+[ChunkStreamer] 快照 常驻=7 待载=143 失败=0 照片=0 队列=0
+[SLOW] cw.ScenerySystem 本帧 12 ms
+[GroundField] 屋顶 finish 已接管 8 个 block_*_roof 网格
+[NODESTAT] block_-×48 detail_fortune-×5 detail_qijie-×5 roads_-×419 roads_0_-×10 roads_10_-×5 roads_1_-×10 roads_2_-×10 roads_3_-×10 roads_4_-×10 roads_5_-×7 roads_8_-×7 roads_9_-×5 roof-×27 (总 2558)
+[DistantCity] 远景城市壳 150 块 / 建筑 16064（跳过 0，屋顶失败 0），三角形 462367，挂载 1 ms
+[MemProbe] mapui bake 清理后 static=964MB t=54.8s
+[GroundField] 公共照明场 clipmap 首帧上传完成（1024×1024，中心 0,0）
+[SLOW] cw.ScenerySystem 本帧 10 ms
+[BOOT-T] 管线预热完成 tours=7（首见上传挪进加载期）
+[MemProbe] finish_loading 前 static=961MB t=55.2s
+[MemProbe] finish_loading 后 static=961MB t=55.2s
+[shot] session_ready 达成
+[ChunkStreamer] 载入 -1_0 用时 0 ms（累计 载入 9 / 卸载 1 / 失败 0）
+[HITCH] Scenery 本帧 18 ms
+[SLOW] cw.ScenerySystem 本帧 19 ms
+[FacadeStreamer] 载入 -6_-2（累计 载入 5 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -5_0 用时 0 ms（累计 载入 10 / 卸载 1 / 失败 0）
+[NetSession] 心跳 in_session=false remotes=0 nodes=2718
+[MemProbe] t=54s static=965MB video=1507MB tex=992MB nodes=2718
+[FacadeStreamer] 载入 -6_-1（累计 载入 6 / 卸载 0 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 10 ms
+[ChunkStreamer] 载入 -6_-2 用时 0 ms（累计 载入 11 / 卸载 1 / 失败 0）
+[MemProbe] t=56s static=965MB video=1509MB tex=992MB nodes=2729
+[SLOW] cw.ScenerySystem 本帧 11 ms
+[ChunkStreamer] 载入 -4_0 用时 0 ms（累计 载入 12 / 卸载 1 / 失败 0）
+[MemProbe] t=58s static=965MB video=1510MB tex=992MB nodes=2736
+[SLOW] cw.ScenerySystem 本帧 11 ms
+[ChunkStreamer] 载入 -6_0 用时 0 ms（累计 载入 13 / 卸载 1 / 失败 0）
+[MemProbe] t=60s static=966MB video=1512MB tex=992MB nodes=2743
+[shot] 无人机定点 (0, 0, 160) pitch=-40°
+[diag] car data=(-2664.2,-862.2) 模型y=0.14 hf=0.12 | cam world=(0.0, 160.00, 0.0) hf=0.04 相机-hf=159.96
+[shot] #1 v01_center_air <- {"diag":true,"light_mode":0.0,"observer_at":[0.0,0.0,160.0,0.0,-40.0],"tier":"medium"}
+[FacadeStreamer] 卸载 -4_-1（累计 载入 6 / 卸载 1 / 失败 0）
+[FacadeStreamer] 卸载 -4_-2（累计 载入 6 / 卸载 2 / 失败 0）
+[FacadeStreamer] 卸载 -5_-1（累计 载入 6 / 卸载 3 / 失败 0）
+[FacadeStreamer] 卸载 -5_-2（累计 载入 6 / 卸载 4 / 失败 0）
+[FacadeStreamer] 卸载 -6_-1（累计 载入 6 / 卸载 5 / 失败 0）
+[FacadeStreamer] 卸载 -6_-2（累计 载入 6 / 卸载 6 / 失败 0）
+[ChunkStreamer] 载入 -5_1 用时 0 ms（累计 载入 14 / 卸载 1 / 失败 0）
+[FacadeStreamer] 载入 0_0（累计 载入 7 / 卸载 6 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 11 ms
+[MemProbe] t=62s static=967MB video=1517MB tex=1000MB nodes=2730
+[FacadeStreamer] 载入 0_-1（累计 载入 8 / 卸载 6 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 10 ms
+[diag] car data=(-2664.2,-862.2) 速度=0.0 ap相位=0 | walk=(0.0,0.0) w速度=0.0 | cam world=(0.0, 160.00, 0.0) hf=0.04 相机-hf=159.96 | mouse_mode=0 | obj=25816 nodes=2734 stat=967MB vram=1518MB
+[VIEW] v01_center_air 均色=(0.41,0.46,0.39) 亮度σ=0.2 采样=8160
+[shot] E:/CodePro/godot_fps_demo/GTA_SZ_GODOT/tools/shots/v01_center_air.png  1920x1080  err=0
+[NetSession] 心跳 in_session=false remotes=0 nodes=2734
+[shot] 无人机定点 (80, 60, 60) pitch=-25°
+[diag] car data=(-2664.2,-862.2) 模型y=0.14 hf=0.12 | cam world=(80.0, 60.00, -60.0) hf=0.04 相机-hf=59.96
+[shot] #2 v02_center_close <- {"diag":true,"light_mode":0.0,"observer_at":[80.0,60.0,60.0,0.0,-25.0],"tier":"medium"}
+[MemProbe] t=64s static=967MB video=1518MB tex=1000MB nodes=2734
+[FacadeStreamer] 载入 -1_0（累计 载入 9 / 卸载 6 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 10 ms
+[MemProbe] t=66s static=967MB video=1520MB tex=1000MB nodes=2738
+[diag] car data=(-2664.2,-862.2) 速度=0.0 ap相位=0 | walk=(0.0,0.0) w速度=0.0 | cam world=(80.0, 60.00, -60.0) hf=0.04 相机-hf=59.96 | mouse_mode=0 | obj=25829 nodes=2738 stat=967MB vram=1520MB
+[VIEW] v02_center_close 均色=(0.36,0.43,0.34) 亮度σ=0.2 采样=8160
+[shot] E:/CodePro/godot_fps_demo/GTA_SZ_GODOT/tools/shots/v02_center_close.png  1920x1080  err=0
+[shot] 无人机定点 (1665, 1730, 150) pitch=-45°
+[diag] car data=(-2664.2,-862.2) 模型y=0.14 hf=0.12 | cam world=(1665.0, 150.00, -1730.0) hf=27.73 相机-hf=122.27
+[shot] #3 v03_park_air <- {"diag":true,"light_mode":0.0,"observer_at":[1665.0,1730.0,150.0,0.0,-45.0],"tier":"medium"}
+[FacadeStreamer] 卸载 0_0（累计 载入 9 / 卸载 7 / 失败 0）
+[FacadeStreamer] 卸载 0_-1（累计 载入 9 / 卸载 8 / 失败 0）
+[FacadeStreamer] 卸载 -1_0（累计 载入 9 / 卸载 9 / 失败 0）
+[ChunkStreamer] 载入 -7_-1 用时 0 ms（累计 载入 15 / 卸载 1 / 失败 0）
+[FacadeStreamer] 载入 2_2（累计 载入 10 / 卸载 9 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 11 ms
+[MemProbe] t=68s static=967MB video=1519MB tex=1000MB nodes=2737
+[SLOW] cw.ScenerySystem 本帧 10 ms
+[diag] car data=(-2664.2,-862.2) 速度=0.0 ap相位=0 | walk=(0.0,0.0) w速度=0.0 | cam world=(1665.0, 150.00, -1730.0) hf=27.73 相机-hf=122.27 | mouse_mode=0 | obj=25840 nodes=2737 stat=967MB vram=1522MB
+[FacadeStreamer] 载入 2_3（累计 载入 11 / 卸载 9 / 失败 0）
+[VIEW] v03_park_air 均色=(0.34,0.40,0.30) 亮度σ=0.2 采样=8160
+[shot] E:/CodePro/godot_fps_demo/GTA_SZ_GODOT/tools/shots/v03_park_air.png  1920x1080  err=0
+[shot] 无人机定点 (1754, -243, 80) pitch=-35°
+[diag] car data=(-2664.2,-862.2) 模型y=0.14 hf=0.12 | cam world=(1754.0, 80.00, 243.0) hf=13.20 相机-hf=66.80
+[shot] #4 v04_float_pt <- {"diag":true,"light_mode":0.0,"observer_at":[1754.0,-243.0,80.0,0.0,-35.0],"tier":"medium"}
+[FacadeStreamer] 卸载 2_2（累计 载入 11 / 卸载 10 / 失败 0）
+[FacadeStreamer] 卸载 2_3（累计 载入 11 / 卸载 11 / 失败 0）
+[MemProbe] t=71s static=967MB video=1518MB tex=1000MB nodes=2733
+[FacadeStreamer] 载入 2_-1（累计 载入 12 / 卸载 11 / 失败 0）
+[SLOW] cw.ScenerySystem 本帧 11 ms
+[MemProbe] t=73s static=967MB video=1520MB tex=1000MB nodes=2737
+[diag] car data=(-2664.2,-862.2) 速度=0.0 ap相位=0 | walk=(0.0,0.0) w速度=0.0 | cam world=(1754.0, 80.00, 243.0) hf=13.20 相机-hf=66.80 | mouse_mode=0 | obj=25853 nodes=2737 stat=968MB vram=1525MB
+[VIEW] v04_float_pt 均色=(0.88,0.90,0.91) 亮度σ=0.2 采样=8160
+[shot] E:/CodePro/godot_fps_demo/GTA_SZ_GODOT/tools/shots/v04_float_pt.png  1920x1080  err=0
+[shot] 全部完成
+WARNING: 7 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 1 ObjectDB instance was leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

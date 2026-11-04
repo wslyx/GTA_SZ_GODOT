@@ -1,0 +1,752 @@
+{
+ "warmup": 8.0,
+ "gap": 10.0,
+ "settle": 1.5,
+ "shots": [
+  {
+   "name": "ns_mid_start",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     407,
+     -1192,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_go",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     95,
+     2092
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_06",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_07",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_08",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_09",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_10",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_11",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_12",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_13",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_14",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_15",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_16",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_17",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_18",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_19",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_20",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_21",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_22",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_23",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_24",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_25",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_26",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_27",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_28",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_29",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_30",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_31",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_32",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_33",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_34",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_35",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_36",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_37",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_38",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_39",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_40",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_41",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_42",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_43",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_44",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_45",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_46",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_47",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_48",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_49",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_50",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_51",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_52",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_53",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_54",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_55",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_56",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_57",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_58",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_59",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_60",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_61",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_62",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_63",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_64",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_65",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_66",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_67",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_68",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_69",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_70",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_71",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_72",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_73",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_74",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_75",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_76",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_77",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_78",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_79",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_80",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_81",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_82",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_83",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_84",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_85",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_86",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_87",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_88",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ns_mid_89",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

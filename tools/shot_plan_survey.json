@@ -1,0 +1,26 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 2.5,
+ "shots": [
+  { "name": "s01_spawn",      "env": { "light_mode": 0, "tier": "medium", "goto": [-2664, -862, 90], "diag": true } },
+  { "name": "s02_center",     "env": { "light_mode": 0, "tier": "medium", "goto": [0, 0, 0], "diag": true } },
+  { "name": "s03_park",       "env": { "light_mode": 0, "tier": "medium", "goto": [1665, 1730, 45], "diag": true } },
+  { "name": "s04_east",       "env": { "light_mode": 0, "tier": "medium", "goto": [4000, 500, 0], "diag": true } },
+  { "name": "s05_west",       "env": { "light_mode": 0, "tier": "medium", "goto": [-4500, 300, 0], "diag": true } },
+  { "name": "s06_north",      "env": { "light_mode": 0, "tier": "medium", "goto": [500, 2200, 180], "diag": true } },
+  { "name": "s07_south",      "env": { "light_mode": 0, "tier": "medium", "goto": [-300, -2000, 0], "diag": true } },
+  { "name": "s08_se",         "env": { "light_mode": 0, "tier": "medium", "goto": [3500, -1500, 135], "diag": true } },
+  { "name": "s09_night_street","env": { "light_mode": 2, "tier": "medium", "goto": [-2664, -862, 90], "diag": true } },
+  { "name": "a10_west",       "env": { "light_mode": 0, "tier": "medium", "observer_at": [-5000, 0, 300, 0, -50], "diag": true } },
+  { "name": "a11_center",     "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, 0, 300, 0, -50], "diag": true } },
+  { "name": "a12_east",       "env": { "light_mode": 0, "tier": "medium", "observer_at": [5000, 0, 300, 0, -50], "diag": true } },
+  { "name": "a13_north",      "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, 2000, 300, 0, -50], "diag": true } },
+  { "name": "a14_south",      "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, -2000, 300, 0, -50], "diag": true } },
+  { "name": "a15_nw",         "env": { "light_mode": 0, "tier": "medium", "observer_at": [-3500, 1500, 300, 0, -50], "diag": true } },
+  { "name": "a16_ne",         "env": { "light_mode": 0, "tier": "medium", "observer_at": [3500, 1500, 300, 0, -50], "diag": true } },
+  { "name": "a17_sw",         "env": { "light_mode": 0, "tier": "medium", "observer_at": [-3500, -1500, 300, 0, -50], "diag": true } },
+  { "name": "a18_night_aerial","env": { "light_mode": 2, "tier": "medium", "observer_at": [0, 500, 350, 0, -45], "diag": true } },
+  { "name": "a19_sunset_aerial","env": { "light_mode": 1, "tier": "medium", "observer_at": [-1000, -800, 280, 0, -35], "diag": true } }
+ ]
+}

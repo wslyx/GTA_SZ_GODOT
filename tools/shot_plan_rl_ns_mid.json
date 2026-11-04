@@ -1,0 +1,64 @@
+{
+ "warmup": 8.0,
+ "gap": 8.0,
+ "settle": 1.5,
+ "shots": [
+  {
+   "name": "rl_ns_mid_t0",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     680,
+     -1160,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ns_mid_r00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     680,
+     -1160
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ns_mid_r01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     419,
+     248
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ns_mid_r02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     380,
+     1648
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ns_mid_end",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

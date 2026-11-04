@@ -1,0 +1,752 @@
+{
+ "warmup": 8.0,
+ "gap": 10.0,
+ "settle": 1.5,
+ "shots": [
+  {
+   "name": "ew_north_start",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     -6310,
+     1703,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_go",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     6306,
+     1692
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_06",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_07",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_08",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_09",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_10",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_11",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_12",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_13",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_14",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_15",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_16",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_17",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_18",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_19",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_20",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_21",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_22",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_23",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_24",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_25",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_26",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_27",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_28",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_29",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_30",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_31",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_32",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_33",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_34",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_35",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_36",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_37",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_38",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_39",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_40",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_41",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_42",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_43",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_44",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_45",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_46",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_47",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_48",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_49",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_50",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_51",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_52",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_53",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_54",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_55",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_56",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_57",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_58",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_59",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_60",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_61",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_62",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_63",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_64",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_65",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_66",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_67",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_68",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_69",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_70",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_71",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_72",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_73",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_74",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_75",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_76",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_77",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_78",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_79",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_80",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_81",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_82",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_83",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_84",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_85",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_86",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_87",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_88",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  },
+  {
+   "name": "ew_north_89",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}

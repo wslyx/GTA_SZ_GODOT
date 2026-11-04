@@ -1,0 +1,22 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 4.0,
+ "shots": [
+  { "name": "wk00_onfoot",  "env": { "light_mode": 0, "tier": "medium", "onfoot": true, "diag": true } },
+  { "name": "wk01_walk",    "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W"], "diag": true } },
+  { "name": "wk02_walk",    "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W"], "diag": true } },
+  { "name": "wk03_walk",    "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W"], "diag": true } },
+  { "name": "wk04_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk05_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk06_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk07_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk08_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk09_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk10_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk11_sprint",  "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk12_stop",    "env": { "light_mode": 0, "tier": "medium", "keys_release": true, "diag": true } },
+  { "name": "wk13_night",   "env": { "light_mode": 2, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "wk14_night",   "env": { "light_mode": 2, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "warmup": 8.0,
+ "gap": 3.0,
+ "settle": 2.5,
+ "shots": [
+  { "name": "v01_center_air",  "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, 0, 160, 0, -40], "diag": true } },
+  { "name": "v02_center_close","env": { "light_mode": 0, "tier": "medium", "observer_at": [80, 60, 60, 0, -25], "diag": true } },
+  { "name": "v03_park_air",    "env": { "light_mode": 0, "tier": "medium", "observer_at": [1665, 1730, 150, 0, -45], "diag": true } },
+  { "name": "v04_float_pt",    "env": { "light_mode": 0, "tier": "medium", "observer_at": [1754, -243, 80, 0, -35], "diag": true } }
+ ]
+}

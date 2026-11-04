@@ -1,0 +1,101 @@
+{
+ "warmup": 8.0,
+ "gap": 3.5,
+ "settle": 4.0,
+ "shots": [
+  {
+   "name": "w_south_t",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     489,
+     -1088,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_walk",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "onfoot": true,
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "w_south_w05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "keys_hold": [
+     "W",
+     "SHIFT"
+    ],
+    "diag": true
+   }
+  }
+ ]
+}

@@ -1,0 +1,148 @@
+{
+ "warmup": 8.0,
+ "gap": 8.0,
+ "settle": 1.5,
+ "shots": [
+  {
+   "name": "rl_ew_north_t0",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "goto": [
+     -6310,
+     1703,
+     0
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r00",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -6310,
+     1703
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r01",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -4910,
+     1691
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r02",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -3507,
+     1682
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r03",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -1917,
+     1551
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r04",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     -512,
+     1728
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r05",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     892,
+     1761
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r06",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     2296,
+     1618
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r07",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     3697,
+     1847
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r08",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     5097,
+     1792
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_r09",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "autopilot_drive": [
+     6306,
+     1754
+    ],
+    "diag": true
+   }
+  },
+  {
+   "name": "rl_ew_north_end",
+   "env": {
+    "light_mode": 0,
+    "tier": "medium",
+    "diag": true
+   }
+  }
+ ]
+}
