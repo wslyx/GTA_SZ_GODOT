@@ -76,7 +76,15 @@ func update_around(world_pos: Vector3) -> void:
 	if _ground_center.distance_squared_to(center) > REBUILD_STEP * REBUILD_STEP:
 		_rebuild_ground(center)
 		_ground_center = center
-	var cell := Vector2i(int(floor(world_pos.x / CELL)), int(floor(world_pos.z / CELL)))
+	var cell := Vector2i(int(floor(world_pos.x / CELL)), int(floor(-world_pos.z / CELL)))
+	# 地标 GLB 异步装配，首次进入步行时补索引一次。
+	if not _landmarks_indexed:
+		_index_landmarks()
+	# ⚠️ 建筑格索引用的是**数据 north**（_index_buildings 里 floor(minz / CELL)），
+	# 而这里是世界坐标 z = −north。旧代码直接写 floor(world_pos.z / CELL)，
+	# 少了取负 —— 于是碰撞体建在**南北镜像**的格子上：玩家身边确实有 3~4 个
+	# 建筑碰撞体，但全是城市另一侧的建筑，脚下这栋楼没有任何碰撞体，
+	# 角色可以直接跑进大楼（跑图体检 2026-11-05 用户反馈）。
 	if cell != _building_cell:
 		_rebuild_buildings(cell)
 		_building_cell = cell
@@ -156,6 +164,60 @@ func _index_buildings() -> void:
 	# 启动归因：全城建筑索引是加载期主线程大块耗时之一（grep [BOOT-T]）
 	print("[BOOT-T] [AlsGround] 全城建筑索引 %d 格 用时 %d ms"
 		% [_building_cells.size(), Time.get_ticks_msec() - __t0])
+	_index_landmarks()
+
+
+## 地标体量索引（2026-11-05）：`CityData.buildings` 只含 blocks 的 16076 栋
+## 普通楼体，10 个地标（会展中心/春笋/平安…）是独立 GLB、没有 collision 数据
+## —— 角色能直接走进会展中心。这里按**世界空间 AABB** 补：地标网格逐个取
+## global_transform * mesh.get_aabb()，只收**竖向体量 ≥ LANDMARK_MIN_H** 的
+## （广场/步道/草皮都是扁平网格，自动被滤掉），footprint 过大的（连片底座）
+## 跳过以免在整片广场上造隐形墙。结果并入同一套 _building_cells 格索引，
+## 跨格增删逻辑不需要改。
+const LANDMARK_MIN_H := 8.0
+const LANDMARK_MAX_FOOT := 40000.0   ## m²（200×200），超过视为连片底座
+
+var _landmarks_indexed := false
+
+func _index_landmarks() -> void:
+	if _landmarks_indexed:
+		return
+	if _world == null or _world.landmarks_root == null:
+		return
+	# 地标 GLB 是异步装配的：还没有任何网格就下次再试（不能置位）。
+	if _world.landmarks_root.get_child_count() == 0:
+		return
+	_landmarks_indexed = true
+	var added := 0
+	var stack: Array = [_world.landmarks_root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is MeshInstance3D:
+			var mi := n as MeshInstance3D
+			if mi.mesh != null and not mi.mesh.get_aabb().size.is_zero_approx():
+				var ab: AABB = GlbLoader._xf_aabb(mi.global_transform, mi.mesh.get_aabb())
+				var ey := ab.size.y
+				if ey >= LANDMARK_MIN_H and ab.size.x * ab.size.z <= LANDMARK_MAX_FOOT:
+					# 世界 (x, y, z=-north) → 数据 (east, north)
+					var mnx := ab.position.x
+					var mxx := ab.position.x + ab.size.x
+					var mnz := -(ab.position.z + ab.size.z)
+					var mxz := -ab.position.z
+					var box := BoxShape3D.new()
+					box.size = Vector3(ab.size.x, ey, ab.size.z)
+					var pos := Vector3((mnx + mxx) * 0.5, ab.position.y + ey * 0.5,
+						(ab.position.z + ab.position.z + ab.size.z) * 0.5)
+					for cx in range(int(floor(mnx / CELL)), int(floor(mxx / CELL)) + 1):
+						for cz in range(int(floor(mnz / CELL)), int(floor(mxz / CELL)) + 1):
+							var key := _cell_key(cx, cz)
+							if not _building_cells.has(key):
+								_building_cells[key] = []
+							_building_cells[key].append([box, pos])
+							added += 1
+		for c in n.get_children():
+			stack.append(c)
+	if added > 0:
+		print("[AlsGround] 地标碰撞体索引 %d 个格条目（竖向体量 ≥%.0fm）" % [added, LANDMARK_MIN_H])
 
 
 ## 增量式跨格：离开范围的格 freed，新进入范围的格按缓存查表实例化。

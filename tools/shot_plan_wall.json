@@ -1,0 +1,13 @@
+{
+ "warmup": 10.0,
+ "gap": 3.0,
+ "settle": 2.0,
+ "shots": [
+  { "name": "c0_place", "env": { "light_mode": 0, "tier": "medium", "goto": [-83.4, -649.4, 0], "onfoot": true, "diag": true } },
+  { "name": "c1", "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "c2", "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "c3", "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "c4", "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } },
+  { "name": "c5", "env": { "light_mode": 0, "tier": "medium", "keys_hold": ["W", "SHIFT"], "diag": true } }
+ ]
+}

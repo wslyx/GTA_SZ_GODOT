@@ -478,6 +478,20 @@ func _apply_env(overrides: Dictionary) -> void:
 					var hf_hc: float = float(hf.call("ground_height_data", cp.x, -cp.z))
 					print("[diag] car data=(%.1f,%.1f) 模型y=%.2f hf=%.2f | cam world=(%.1f, %.2f, %.1f) hf=%.2f 相机-hf=%.2f" % [
 						cx, cz, my, hf_h, cp.x, cp.y, cp.z, hf_hc, cp.y - hf_hc])
+				# 步行穿楼诊断：角色位置是否落在建筑足迹内（CityCollision 2D），
+				# 以及 ALS 物理代理当前持有多少建筑碰撞体。
+				var walk_d = main.get("walk")
+				var wld2 = main.get("world")
+				if walk_d != null and wld2 != null:
+					var wx: float = float(walk_d.get("x"))
+					var wz: float = float(walk_d.get("z"))
+					var blk: bool = bool(wld2.collision.blocked(wx, wz))
+					var gnd = main.get("_als_ground")
+					var nbody := 0
+					if gnd != null:
+						nbody = int(gnd.get("_building_bodies").size())
+					print("[walk-diag] pos=(%.1f,%.1f) 建筑足迹内=%s 物理建筑格=%d" % [
+						wx, wz, str(blk), nbody])
 			"hide_mesh":
 				# 全局按名字子串隐藏 MeshInstance3D（跨根，定位"这块面是谁"）。
 				# 值可为 String 或 String[]（一次隐藏多组）。
