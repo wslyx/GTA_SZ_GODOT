@@ -120,6 +120,10 @@ var _propeller_angle := 0.0
 const CAR_WHEELS_SCRIPT := preload("res://scripts/vehicles/car_wheels.gd")
 var _car_wheels = null               ## CAR_WHEELS_SCRIPT 实例（untyped：全局类名未注册）
 var _wheel_spin := 0.0
+## 车辆连续在水面上的秒数（落水判定，_step_car 用）
+var _in_water_t := 0.0
+## 步行角色连续在水面上的秒数（落水判定，_step_walk 用）
+var _walk_in_water_t := 0.0
 ## 世界时钟（原版 world.time，永不停表：悬挂起伏用它驱动）
 var _game_time := 0.0
 ## 步行时的角色本体（原版 city-rider.ts）。
@@ -1703,6 +1707,25 @@ func _step_car(dt: float) -> void:
 				world.wanted.report_crime("hit_cop", px2, 1.0)
 				break
 
+	# ---- 落水判定（GTA 式，2026-11-05 体检 s07/s08）----
+	# 水面纯视觉无碰撞，车开进深圳湾会悬浮在水上继续开。is_water 与水面
+	# 网格同源；入水即强阻力减速，2 秒后拖回最近主路口。
+	if world.water != null and world.water.is_water(car.x, car.z):
+		_in_water_t += dt
+		# 水阻：每秒速度衰减到 8%（比手刹狠），原地熄火漂在水面
+		car.speed *= pow(0.08, dt)
+		if _in_water_t > 2.0:
+			var nid2 := world.graph.nearest_main_node(Vector2(car.x, car.z))
+			if nid2 >= 0:
+				var np2: Vector2 = world.graph.nodes[nid2]
+				car.x = np2.x
+				car.z = np2.y
+				car.speed = 0.0
+				hud.toast("车辆落水 · 已拖回岸边", 3.5)
+			_in_water_t = 0.0
+	else:
+		_in_water_t = 0.0
+
 	_place_car_model()
 	# 车轮滚动：原版 wheelSpin += s.speed*dt/wheelRadius（用碰撞回滚后的 speed，
 	# 撞墙时轮子同步停转/倒转）；转向用物理转角 car.steer（前轮 + 刹车盘）。
@@ -1818,6 +1841,21 @@ func _step_walk(dt: float) -> void:
 		walk.speed = _als_host.HorizontalSpeed
 		walk.moving = walk.speed > 0.1
 		walk_eye_world = motor
+		# ---- 落水（步行）：水面纯视觉，ALS 会走在水面上 —— 1 秒后送回最近路口 ----
+		if world.water != null and world.water.is_water(walk.x, walk.z):
+			_walk_in_water_t += dt
+			if _walk_in_water_t > 1.0:
+				var nid_w := world.graph.nearest_main_node(Vector2(walk.x, walk.z))
+				if nid_w >= 0:
+					_als_exit_world()
+					var np_w: Vector2 = world.graph.nodes[nid_w]
+					walk.x = np_w.x
+					walk.z = np_w.y
+					_als_enter_world()
+					hud.toast("你游回了岸边", 3.0)
+				_walk_in_water_t = 0.0
+		else:
+			_walk_in_water_t = 0.0
 		# 武器开火（GTA化 §2.3）：仅步行持枪；方向 = 相机朝向的 2D 投影
 		_step_weapons(dt)
 		return

@@ -416,18 +416,27 @@ static func bridge_ramp(distance: float, height: float, ramp: float) -> float:
 	return height * (1.0 - t * t * (3.0 - 2.0 * t))
 
 
-## 原版 `bridgeHeight(x, z)`。
+## 原版 `bridgeHeight(x, z)` + 2026-11-05 横向渗漏修复（体检 190 处 2.76m 浮空）。
 ##
-## ⚠️⚠️ 这里的 `d` 必须是**到桥段线段的最短距离**（原版 `closest(x,z,s.a,s.b).d`），
-## 不是"到折线首点的距离"。桥面在 d≈0 处取满高 height(2.8m)，然后沿**横向**
-## 在 ramp(70m) 内三次平滑衰减到 0。这条衰减带同时就是**引桥**：
-## 车辆沿路驶近桥头时，到桥段的距离从 70m 连续递减到 0，路面高度随之从地面
-## 平滑抬到桥面 —— 桥头不会出现 2.8m 的台阶。
+## ⚠️ 物理与视觉同源（跑图体检 2026-11-04/05 三轮归因迭代后的最终口径）：
 ##
-## 旧实现把 `d` 传成了 `p.distance_to(a)`（到**首点 a** 的距离），又把门限写成
-## `lateral <= width/2 + 6`，于是"桥面"变成以 a 为圆心、半径 70m、宽仅 9m 的
-## 一个窄条：桥中段和整条引桥的标高都是 0。车开上桥 → 车身掉回地面 →
-## 直接钻到桥面底下（用户反馈的"过桥穿模到桥下"）。
+## 旧实现把 `d`（到桥段线段的最短距离，不分方向）直接喂给 70m 的 ramp ——
+## 桥**侧面** 70m 内的所有点都吃到衰减抬升：与桥平行的地面道路视觉是
+## 0.04m 平路，物理却抬到 2.6~2.8m（体检 191 处 2~3m 浮空，122 处在桥段
+## 30m 内）。中途试过"端点引桥 + 方向闸"，但实际路口以各种角度接桥头
+## （T 形/曲线），方向闸把真正的桥面节点也踢出窗口（66 处桥面下陷）——
+## 而且**视觉数据本来就没有引桥坡**：roads.glb 的引道是平的，coastal-
+## bridges.glb 的桥面从端点处 2.8m 起跳。物理唯一能和视觉对上的口径就是
+## **桥面窗口**：
+##   · 投影参数落在 [−0.01, 1.01]（含端点 ε 容差，桥头节点视觉上就是站
+##     在桥面边缘）→ 距桥轴线 ≤ 半宽+0.5m 取满标高，出窗 1.5m 内快速
+##     衰减（路缘硬边）；
+##   · 其余一律 0 —— 桥头是台阶，视觉上同样是台阶，车"蹦"上桥与视觉
+##     跳变一致，不再有大面积隐形引桥坡。
+##
+## 历史教训仍成立：`d` 必须按投影计算，不能用"到首点的距离"（那样桥中段
+## 会整个没标高，车钻桥底）；也不能用"不分方向 70m 衰减"（桥侧平行路
+## 全部浮空）。
 func bridge_lift(east: float, north: float) -> float:
 	if _bridge_segs.is_empty():
 		return 0.0
@@ -435,11 +444,24 @@ func bridge_lift(east: float, north: float) -> float:
 	var cands = _bridge_cells.get(k)
 	if cands == null:
 		return 0.0
+	var p := Vector2(east, north)
 	var h := 0.0
 	for i in cands:
 		var s: Dictionary = _bridge_segs[i]
-		var d := CityCollision.seg_distance(east, north, s["a"], s["b"])
-		h = maxf(h, bridge_ramp(d, float(s["height"]), float(s["ramp"])))
+		var a: Vector2 = s["a"]
+		var b: Vector2 = s["b"]
+		var seg_h := float(s["height"])
+		var seg_w := float(s["width"])
+		var ab := b - a
+		var l2 := ab.length_squared()
+		var t := 0.0 if l2 < 1e-9 else clampf((p - a).dot(ab) / l2, 0.0, 1.0)
+		# ---- 桥面窗口（含端点 ε 容差）----
+		var foot := a + ab * t
+		var dlat := p.distance_to(foot) - (seg_w * 0.5 + 0.5)
+		if dlat <= 0.0:
+			h = maxf(h, seg_h)
+		elif dlat <= 1.5 and t > -0.01 and t < 1.01:
+			h = maxf(h, bridge_ramp(dlat, seg_h, 1.5))
 	if h <= 0.0:
 		return 0.0
 	# 原版 onRoad 闸门：只有落在路面（距路中心线 ≤ width/2+8）上的点才抬。

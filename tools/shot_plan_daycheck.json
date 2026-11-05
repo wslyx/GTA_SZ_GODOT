@@ -1,0 +1,10 @@
+{
+ "warmup": 10.0,
+ "gap": 2.5,
+ "settle": 3.0,
+ "shots": [
+  { "name": "n1_day_street", "env": { "light_mode": 0, "tier": "medium", "observer_at": [-2664, -862, 20, 0, -12] } },
+  { "name": "n2_day_park",   "env": { "light_mode": 0, "tier": "medium", "observer_at": [-2450, -700, 30, 30, -20] } },
+  { "name": "n3_day_convention", "env": { "light_mode": 0, "tier": "medium", "observer_at": [1700, -200, 60, 0, -25] } }
+ ]
+}

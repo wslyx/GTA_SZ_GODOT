@@ -517,6 +517,68 @@ func _apply_all() -> void:
 	apply_meshes(world.buildings_root, "buildings")
 	apply_meshes(world.facades_root, "facades")
 	apply_meshes(world.landmarks_root, "landmarks")
+	_calibrate_landmark_fallback()
+
+
+## 未命中 profile 的地标：金属/玻璃源材质标定（2026-11-05，跑图体检「巨型白色
+## 无贴图面片」）。
+##
+## 原版 GLASS 只登记九个地标 id；**会展中心（convention-futian）不在名单里**，
+## 它的外壳保留 landmarks.glb 的源材质 silver / landmarkglass —— 两者都是
+## 近镜面（metallic .68~.78 / rough .17~.22）。在本移植的 IBL + ACES + 泛光
+## 链下，一整面朝向天空的曲面外壳被曝成**纯白巨面**（体检 v04 的"白板吞掉
+## 相机视野"、n3 截图里占据半屏的白色曲面）。原版没有这套泛光链，同参数
+## 不会白到失细节。
+##
+## 处理：只对**仍在使用源材质**（未被 profile 接管成 architecture:*）的地标
+## 表面降温 —— 压 metallic、抬 roughness、轻微压暗反照率。已接管的地标不受
+## 影响（surface override 优先）。
+const LANDMARK_METAL_CALIB := {
+	"silver": {"metallic": 0.40, "roughness": 0.52, "albedo": 0.88},
+	"landmarkglass": {"metallic": 0.35, "roughness": 0.34, "albedo": 0.92},
+	"steel": {"metallic": 0.40, "roughness": 0.55, "albedo": 0.90},
+}
+
+func _calibrate_landmark_fallback() -> void:
+	if world == null or world.landmarks_root == null:
+		return
+	var changed := 0
+	var stack: Array = [world.landmarks_root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is MeshInstance3D:
+			var mi := n as MeshInstance3D
+			if mi.mesh != null:
+				for s in mi.mesh.get_surface_count():
+					var ov := mi.get_surface_override_material(s)
+					if ov != null:
+						continue   # 已被 profile 接管
+					var mat := mi.mesh.surface_get_material(s)
+					if not (mat is BaseMaterial3D):
+						continue
+					var b := mat as BaseMaterial3D
+					# ⚠️ _apply_all 每 1.5s 重扫一次：源材质是共享的，必须
+					# 按实例只标定一次，否则反照率会被反复乘 0.9 直到变黑。
+					var mid := b.get_instance_id()
+					if _calib_done.has(mid):
+						continue
+					var role := _source_role(str(b.resource_name))
+					var spec: Dictionary = LANDMARK_METAL_CALIB.get(role, {})
+					if spec.is_empty():
+						continue
+					_calib_done[mid] = true
+					b.metallic = float(spec["metallic"])
+					b.roughness = float(spec["roughness"])
+					b.albedo_color = b.albedo_color * float(spec["albedo"])
+					changed += 1
+		for c in n.get_children():
+			stack.append(c)
+	if changed > 0:
+		print("[ArchMaterials] 未映射地标金属/玻璃标定 %d 个材质（silver/landmarkglass/steel）"
+			% changed)
+
+var _calib_done := {}
+var _calib_logged := false
 
 
 func update_system(delta: float, focus: Vector3) -> void:

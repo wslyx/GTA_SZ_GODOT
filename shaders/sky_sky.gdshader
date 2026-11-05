@@ -295,7 +295,12 @@ vec3 night_sky(vec3 p) {
 	vec2 delta = fract(grid) - center;
 	delta.x *= max(0.25, sqrt(max(0.0, 1.0 - d.y * d.y)));
 	float radius = mix(0.045, 0.080, pow(magnitude, 5.0));
-	float aa = max(length(fwidth(grid)) * 0.45, 0.018);
+	// fwidth 上限钳制（2026-11-05，体检 s09「夜空规则矩形亮块」防御）：
+	// 星空 uv 是球面参数化，atan 经线（u 回卷处）与天顶附近 u 的屏幕导数会
+	// 爆到几个数量级 —— 星点抗锯齿半径 / 星尘足迹跟着放大，在立方图面边界
+	// 形成成片的矩形亮块。给导数一个物理上限（≈ 0.25 格），越界处按"星点
+	// 消失"处理，不再铺成块。
+	float aa = clamp(length(fwidth(grid)) * 0.45, 0.018, 0.25);
 	float core = 1.0 - smoothstep(max(0.0, radius - aa), radius + aa, length(delta));
 	float stars = step(0.963 - band * 0.035, chance) * core
 		* smoothstep(0.025, 0.20, elevation) * min(1.0, radius / aa);
@@ -307,7 +312,7 @@ vec3 night_sky(vec3 p) {
 	vec2 fc = floor(fine);
 	vec2 fp = fract(fine) - vec2(hash(fc + 25.1), hash(fc + 82.7));
 	fp.x *= max(0.25, sqrt(max(0.0, 1.0 - d.y * d.y)));
-	float footprint = 0.0064 + dot(fwidth(fine), fwidth(fine)) * 0.16;
+	float footprint = clamp(0.0064 + dot(fwidth(fine), fwidth(fine)) * 0.16, 0.0064, 0.02);
 	float sparks = step(0.965 - band * 0.11, hash(fc + 147.0))
 		* exp(-dot(fp, fp) / footprint) * 0.0064 / footprint;
 	color += vec3(0.30, 0.34, 0.44) * sparks * band * aboveHorizon;
@@ -324,7 +329,7 @@ vec3 night_sky(vec3 p) {
 	vec3 my = cross(mx, mb);
 	vec2 lunar = vec2(dot(d, mx), dot(d, my)) / 0.0082;
 	float mr = length(lunar);
-	float maa = max(fwidth(mr), 0.025);
+	float maa = clamp(fwidth(mr), 0.025, 0.5);   // 上限同上：月盘边缘不许铺成方角
 	float disc = (1.0 - smoothstep(1.0 - maa, 1.0 + maa, mr)) * step(0.0, dot(d, mb));
 	float maria = sz_noise(lunar * 4.2 + 7.0) * 0.7 + sz_noise(lunar * 10.0 + 1.7) * 0.3;
 	float relief = mix(0.56, 1.0, smoothstep(0.25, 0.70, maria))

@@ -1,0 +1,14 @@
+{
+ "warmup": 8.0,
+ "gap": 2.0,
+ "settle": 2.5,
+ "shots": [
+  { "name": "f01_night_street",  "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, 0, 25, 0, -8] } },
+  { "name": "f02_night_skyup",   "env": { "light_mode": 0, "tier": "medium", "observer_at": [0, 0, 25, 0, 70] } },
+  { "name": "f03_day_aerial",    "env": { "light_mode": 2, "tier": "medium", "observer_at": [300, 300, 150, 0, -40] } },
+  { "name": "f04_convention",    "env": { "light_mode": 2, "tier": "medium", "observer_at": [1700, -200, 90, 0, -30] } },
+  { "name": "f05_park_boards",   "env": { "light_mode": 2, "tier": "medium", "observer_at": [1665, 1730, 60, 0, -25] } },
+  { "name": "f06_road_boards",   "env": { "light_mode": 2, "tier": "medium", "observer_at": [-2664, -862, 40, 0, -20] } },
+  { "name": "f07_water_edge",    "env": { "light_mode": 2, "tier": "medium", "observer_at": [900, -2200, 60, 0, -25] } }
+ ]
+}

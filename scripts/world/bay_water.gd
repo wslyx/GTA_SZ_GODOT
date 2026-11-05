@@ -29,6 +29,15 @@ var raised_vertices := 0
 var _built := false
 var planar_mirror = null
 
+## ---- 水面查询表（2026-11-05 落水判定用）----
+## 体检 s07/s08：车开进深圳湾直接悬浮在水面上行驶 —— 水面纯视觉、无碰撞。
+## 高度场在水面上返回 0.0（原生层全 0），与岸边陆地 0.04m 只差 4cm，没法用
+## 高度判水。这里把 terrain_water/terrain_sea 网格的三角形收进 64m 格桶，
+## is_water() 做 XZ 点包含测试 —— 与水面网格严格同源，不会误判陆地。
+const WCELL := 64.0
+var _water_tris := PackedFloat32Array()   ## 6 floats/tri（数据坐标 e1,n1,e2,n2,e3,n3）
+var _water_bins: Dictionary = {}          ## Vector2i → PackedInt32Array
+
 
 func setup(p_world: CityWorld) -> void:
 	world = p_world
@@ -40,6 +49,7 @@ func setup(p_world: CityWorld) -> void:
 	_raise_terrain_water()
 	_create_horizon()
 	_setup_mirror()
+	_build_water_lookup()
 	_built = true
 
 
@@ -140,6 +150,83 @@ func _apply_mirror_to_material() -> void:
 		return
 	shader_material.set_shader_parameter("mirror_tex", planar_mirror.get_texture())
 	shader_material.set_shader_parameter("mirror_enabled", planar_mirror.enabled)
+
+
+## 收集水面三角形 → 数据坐标（east=x, north=-z）64m 格桶
+func _build_water_lookup() -> void:
+	if world == null or world.terrain_root == null:
+		return
+	for mi in GlbLoader.meshes_of(world.terrain_root):
+		var lname := mi.name.to_lower()
+		if not ("water" in lname or "sea" in lname):
+			continue
+		if mi.mesh == null:
+			continue
+		var faces := mi.mesh.get_faces()
+		var xf := mi.global_transform
+		var i := 0
+		while i + 2 < faces.size():
+			var a := xf * faces[i]
+			var b := xf * faces[i + 1]
+			var c := xf * faces[i + 2]
+			_water_tri(a.x, -a.z, b.x, -b.z, c.x, -c.z)
+			i += 3
+	if _water_tris.size() > 0:
+		print("[BayWater] 水面查询表 %d 三角形 / %d 格桶" % [
+			_water_tris.size() / 6, _water_bins.size()])
+
+
+func _water_tri(e1: float, n1: float, e2: float, n2: float, e3: float, n3: float) -> void:
+	var idx := _water_tris.size() / 6
+	for v in [e1, n1, e2, n2, e3, n3]:
+		_water_tris.append(v)
+	var minx := minf(e1, minf(e2, e3))
+	var maxx := maxf(e1, maxf(e2, e3))
+	var minz := minf(n1, minf(n2, n3))
+	var maxz := maxf(n1, maxf(n2, n3))
+	var x0 := int(floor(minx / WCELL))
+	var x1 := int(floor(maxx / WCELL))
+	var z0 := int(floor(minz / WCELL))
+	var z1 := int(floor(maxz / WCELL))
+	for gx in range(x0, x1 + 1):
+		for gz in range(z0, z1 + 1):
+			var k := Vector2i(gx, gz)
+			var arr: PackedInt32Array = _water_bins.get(k, PackedInt32Array())
+			arr.append(idx)
+			_water_bins[k] = arr
+
+
+## 该数据坐标点是否在水面上（XZ 点包含测试；只测水平投影 —— 水面是平的）。
+## 没建表（世界未就绪）时返回 false，宁可不判定也不要误传送。
+func is_water(east: float, north: float) -> bool:
+	if _water_tris.is_empty():
+		return false
+	var gx := int(floor(east / WCELL))
+	var gz := int(floor(north / WCELL))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			var arr = _water_bins.get(Vector2i(gx + dx, gz + dz))
+			if arr == null:
+				continue
+			for ti in arr:
+				var base: int = int(ti) * 6
+				var r := _bary2(east, north,
+					_water_tris[base], _water_tris[base + 1],
+					_water_tris[base + 2], _water_tris[base + 3],
+					_water_tris[base + 4], _water_tris[base + 5])
+				if r.x >= -0.001 and r.y >= -0.001 and r.z >= -0.001:
+					return true
+	return false
+
+
+static func _bary2(px: float, pz: float, ax: float, az: float, bx: float, bz: float,
+		cx: float, cz: float) -> Vector3:
+	var d := (bz - cz) * (ax - cx) + (cx - bx) * (az - cz)
+	if absf(d) < 1e-9:
+		return Vector3(-1, -1, -1)
+	var l1 := ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / d
+	var l2 := ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / d
+	return Vector3(l1, l2, 1.0 - l1 - l2)
 
 
 func set_quality(p: Dictionary) -> void:

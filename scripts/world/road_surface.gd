@@ -146,9 +146,37 @@ func apply_now() -> int:
 	_apply_normal_map()
 	_apply_canopy()
 	_apply_look()
+	_apply_road_props()
 	print("[RoadSurface] asphalt %d / roadline %d / canopy %d / shore %d" % [
 		_materials.size(), _roadline.size(), _canopy.size(), _shore.size()])
 	return _materials.size() + _roadline.size() + _canopy.size() + _shore.size()
+
+
+## 杆件金属标定（2026-11-05，跑图体检 §二.1「白色竖直薄板/线条」）。
+##
+## roads.glb 的 steel 是深灰金属（baseColor .28/.35/.38、metallic .8、
+## roughness .27）—— 物理上没错，但在本移植的 IBL + ACES + 泛光组合下变成
+## **全镜面反天空**：白天一整片灯杆/护栏/信号杆被曝成白条，密集处像"无贴图
+## 白模薄板插满绿地与道路"（体检报告最严重的视觉缺陷之一）。原版 Babylon
+## 没有这套泛光链，同参数不会白成这样。
+## 处理：压成哑光深灰金属（保金属感，去镜面白）。只动 roads_root 的 steel，
+## lamp（自发光灯头）保持原样。
+const STEEL_METALLIC := 0.35
+const STEEL_ROUGHNESS := 0.62
+
+func _apply_road_props() -> void:
+	if world == null or world.roads_root == null:
+		return
+	var n := 0
+	for mat in _collect_from(world.roads_root):
+		if str(mat.resource_name) != "steel":
+			continue
+		mat.metallic = STEEL_METALLIC
+		mat.roughness = maxf(STEEL_ROUGHNESS, mat.roughness)
+		n += 1
+	if n > 0:
+		print("[RoadSurface] 杆件钢材质标定 %d 个（metallic %.2f / rough %.2f）"
+			% [n, STEEL_METALLIC, STEEL_ROUGHNESS])
 
 
 ## 收集一棵子树里所有 BaseMaterial3D。

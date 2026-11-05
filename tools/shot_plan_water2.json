@@ -1,0 +1,9 @@
+{
+ "warmup": 8.0,
+ "gap": 2.0,
+ "settle": 7.0,
+ "shots": [
+  { "name": "wat0_goto", "env": { "light_mode": 0, "tier": "medium", "goto": [1200, -2400], "diag": true } },
+  { "name": "wat1_after", "env": { "diag": true } }
+ ]
+}

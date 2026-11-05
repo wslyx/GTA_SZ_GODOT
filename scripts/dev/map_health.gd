@@ -21,6 +21,19 @@ const GROUND_MATS := ["asphalt", "pavement", "land", "park", "concrete", "road",
 const BIN := 64.0
 const THRESHOLD := 1.0
 
+## ---- 屋顶/高架结构剔除（2026-11-05，跑图体检归因）----
+## 地标建筑的混凝土/石材屋面（会展中心 13.2m 顶板、书城 7m 台地）材质名
+## 是 "concrete"/"stone"，命中 GROUND_MATS —— 被当成"地面"烘进修正网格，
+## 楼旁 8m 格带内的路面物理被抬到楼顶（体检 12m/4.5m 浮空的根因）。
+## 判据：三角形平均高度比**原生层叠地面**（lianhua+mountain+relief，不含
+## 修正网格与桥）高出 ROOF_ABOVE 以上、且原生地面本身在低地（< NATIVE_MAX，
+## 山区原生与视觉天生差 10m+，不能用这条规则误杀陡坡）→ 不是可行驶地面。
+const ROOF_ABOVE := 5.0
+const ROOF_NATIVE_MAX := 10.0
+
+## (east, north) -> 原生层叠高度。collect_visual_ground 时从 world 注入。
+var _native_hint: Callable = Callable()
+
 var _tris := PackedFloat32Array()   ## 9 floats/tri：ax,az,ay  bx,bz,by  cx,cz,cy（数据坐标 east/north/up）
 var _bins: Dictionary = {}          ## Vector2i → PackedInt32Array
 var _rows: Array = []
@@ -99,11 +112,27 @@ func run(world: CityWorld, quick: bool) -> Dictionary:
 ##     桥面高度仍由 HeightField 原生 bridge_lift 层负责（onRoad 闸门）；
 ##   · rain_* 雨面覆盖层 —— 不是地面。
 func collect_visual_ground(world: CityWorld, for_height_fix := false) -> void:
-	var roots: Array = [world.terrain_root, world.roads_root, world.landmarks_root,
+	# 注入原生高度提示（屋顶剔除用）。height_field 的原生层是公开方法，
+	# 这里故意**不含**修正网格与 bridge_lift —— 屋顶判据要的是"没有人工
+	# 结构时大地在哪"。
+	if world != null and world.height_field != null:
+		var hf = world.height_field
+		_native_hint = func(e: float, n: float) -> float:
+			return hf.lianhua_height(e, n) + hf.mountain_delta(e, n) + hf.relief_height(e, n)
+	else:
+		_native_hint = Callable()
+	# 地标/楼体：屋顶剔除（ROOF_ABOVE）。会展中心 13.2m 混凝土顶板、书城
+	# 7m 石材台地的材质名（concrete/stone）命中 GROUND_MATS，曾把楼旁路面的
+	# 物理抬到楼顶（体检 12m/4.5m 浮空）。这里的高度判据只用于人工结构根 ——
+	# ⚠️ 山体瓦片不能用：原生山体网格在西部有整片 0 的洞（实测 (-5442,-1846)
+	# 视觉山 81.6m / 原生 0m），按"高出原生即剔除"会把真山删掉。
+	var roots: Array = [world.terrain_root, world.roads_root,
 		world.buildings_root, world.chunks_root]
 	for r in roots:
 		if r != null:
 			_collect(r, false, for_height_fix)
+	if world.landmarks_root != null:
+		_collect(world.landmarks_root, false, for_height_fix, true)
 	# 公园缓坡补面（distant_system 程序化生成的 ground-relief 节点）+
 	# 远山 / 近山（mountain-relief 瓦片）—— 都是 SurfaceTool 网格**无材质**，
 	# 走 all_materials 路径；height_field 的 relief/mountain delta 以它们为视觉对应层
@@ -115,7 +144,8 @@ func collect_visual_ground(world: CityWorld, for_height_fix := false) -> void:
 				_collect(mn, true, false)
 
 
-func _collect(root: Node, all_materials := false, skip_bridge := false) -> void:
+func _collect(root: Node, all_materials := false, skip_bridge := false,
+		roof_filter := false) -> void:
 	var n := 0
 	var stack: Array = [root]
 	while not stack.is_empty():
@@ -150,19 +180,38 @@ func _collect(root: Node, all_materials := false, skip_bridge := false) -> void:
 								break
 					if not ground:
 						continue
-					var faces := mi.mesh.get_faces()
-					var i := 0
-					while i + 2 < faces.size():
-						var a := xform * faces[i]
-						var b := xform * faces[i + 1]
-						var c := xform * faces[i + 2]
-						_add_tri(a.x, -a.z, a.y, b.x, -b.z, b.y, c.x, -c.z, c.y)
-						n += 1
+				var faces := mi.mesh.get_faces()
+				var i := 0
+				while i + 2 < faces.size():
+					var a := xform * faces[i]
+					var b := xform * faces[i + 1]
+					var c := xform * faces[i + 2]
+					if roof_filter and _is_roof_triangle(a, b, c):
 						i += 3
+						continue
+					_add_tri(a.x, -a.z, a.y, b.x, -b.z, b.y, c.x, -c.z, c.y)
+					n += 1
+					i += 3
 		for ch in nd.get_children():
 			stack.append(ch)
 	if n > 0:
 		print("[MapHealth]   %s → %d 地面三角形" % [root.name, n])
+
+
+# ---------------------------------------------------------------------------
+# 屋顶/高架结构剔除
+# ---------------------------------------------------------------------------
+
+## 三角形平均高度比原生地面高出 ROOF_ABOVE 且原生在低地 → 屋顶/高架顶板，
+## 不是可行驶地面（烘焙与体检口径一致）。原生层缺失（无提示）时不剔除。
+func _is_roof_triangle(a: Vector3, b: Vector3, c: Vector3) -> bool:
+	if not _native_hint.is_valid():
+		return false
+	var avg_y := (a.y + b.y + c.y) / 3.0
+	var e := (a.x + b.x + c.x) / 3.0
+	var n := -(a.z + b.z + c.z) / 3.0
+	var native: float = _native_hint.call(e, n)
+	return native < ROOF_NATIVE_MAX and avg_y - native > ROOF_ABOVE
 
 
 # ---------------------------------------------------------------------------

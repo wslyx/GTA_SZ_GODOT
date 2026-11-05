@@ -1,0 +1,13 @@
+{
+ "warmup": 8.0,
+ "gap": 2.0,
+ "settle": 1.0,
+ "shots": [
+  { "name": "p_plate_v04",   "env": { "probe_point": [1754.5, -243.2, 6.0] } },
+  { "name": "p_plate_1848",  "env": { "probe_point": [1848.9, 742.9, 3.0] } },
+  { "name": "p_iso6m",       "env": { "probe_point": [4942.3, 363.0, 3.0] } },
+  { "name": "p_ramp13",      "env": { "probe_point": [1806.7, -98.6, 6.6] } },
+  { "name": "p_west_mtn",    "env": { "probe_point": [-5442.9, -1846.9, 40.0] } },
+  { "name": "p_bridge_south","env": { "probe_point": [1865.1, -1186.6, 1.4] } }
+ ]
+}
