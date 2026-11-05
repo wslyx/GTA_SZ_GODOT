@@ -165,15 +165,35 @@ const STEEL_METALLIC := 0.35
 const STEEL_ROUGHNESS := 0.62
 
 func _apply_road_props() -> void:
-	if world == null or world.roads_root == null:
+	if world == null:
 		return
 	var n := 0
-	for mat in _collect_from(world.roads_root):
-		if str(mat.resource_name) != "steel":
-			continue
-		mat.metallic = STEEL_METALLIC
-		mat.roughness = maxf(STEEL_ROUGHNESS, mat.roughness)
-		n += 1
+	if world.roads_root != null:
+		for mat in _collect_from(world.roads_root):
+			if str(mat.resource_name) != "steel":
+				continue
+			mat.metallic = STEEL_METALLIC
+			mat.roughness = maxf(STEEL_ROUGHNESS, mat.roughness)
+			n += 1
+	# 跨海桥（coastal-bridges.glb）挂在地标根下，钢构件同样近镜面反天空 ——
+	# 白天整排栏杆/吊杆被曝成"白色竖条"（2026-11-05 截图复现）。按节点名前缀
+	# 只标定桥体，不碰地标自己的金属（那套由 architecture_materials 处理）。
+	if world.landmarks_root != null:
+		var stack: Array = [world.landmarks_root]
+		while not stack.is_empty():
+			var nd: Node = stack.pop_back()
+			if nd is MeshInstance3D and String(nd.name).begins_with("coastal_bridge_"):
+				var mi := nd as MeshInstance3D
+				if mi.mesh != null:
+					for s in mi.mesh.get_surface_count():
+						var mat: Material = mi.mesh.surface_get_material(s)
+						if mat is BaseMaterial3D and str(mat.resource_name) == "steel":
+							var b := mat as BaseMaterial3D
+							b.metallic = STEEL_METALLIC
+							b.roughness = maxf(STEEL_ROUGHNESS, b.roughness)
+							n += 1
+			for c in nd.get_children():
+				stack.append(c)
 	if n > 0:
 		print("[RoadSurface] 杆件钢材质标定 %d 个（metallic %.2f / rough %.2f）"
 			% [n, STEEL_METALLIC, STEEL_ROUGHNESS])

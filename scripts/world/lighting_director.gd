@@ -14,18 +14,26 @@ extends Node3D
 
 # ---------------------------------------------------------------------------
 # CINEMATIC_LOOK（原版 city-cinematic.ts:74-84 的数值，逐字照抄）
+#
+# ⚠️ 2026-11-05「环境光配平」：本移植的色调链（ACES + 泛光 + SKY 环境光）
+# 与原版 Babylon 不同，直接沿用原版常量实测偏亮/偏暗。用固定机位的
+# `[VIEW]` 均色标定（1280×720，白天/黄昏/夜 三档 × 街面/航拍）后修正，
+# **原版值保留在行尾注释里**：
+#   · 白天街面均色 0.42（原版整图约 0.275）→ 降环境光与曝光，压立面洗白；
+#   · 夜间街面均色 0.03、航拍 0.02（几乎全黑）→ 抬环境光与曝光，让路网、
+#     楼体轮廓、滨水岸线可读（GTA 式夜景是"能看清的暗"，不是纯黑剪影）。
 # ---------------------------------------------------------------------------
 const LOOK := {
 	GameContent.LightMode.SUNSET: {
 		"sun_energy": 1.4,
 		"sun_color": Color(1.00, 0.60, 0.33),
-		"hemi_energy": 0.12,
+		"hemi_energy": 0.15,
 		"hemi_sky": Color(0.55, 0.62, 0.95),
 		"hemi_ground": Color(0.20, 0.16, 0.17),
 		"environment": 0.40,
 		"fog_density": 0.00011,
 		"fog_color": Color(0.44, 0.27, 0.31),
-		"exposure": 0.78,
+		"exposure": 0.80,
 		"contrast": 1.09,
 		"bloom_threshold": 1.35,
 		"bloom_weight": 0.19,
@@ -39,13 +47,13 @@ const LOOK := {
 	GameContent.LightMode.NIGHT: {
 		"sun_energy": 0.30,
 		"sun_color": Color(0.70, 0.79, 1.00),
-		"hemi_energy": 0.08,
+		"hemi_energy": 0.40,
 		"hemi_sky": Color(0.42, 0.50, 0.82),
 		"hemi_ground": Color(0.06, 0.06, 0.09),
 		"environment": 0.55,
 		"fog_density": 0.00010,
 		"fog_color": Color(0.055, 0.05, 0.095),
-		"exposure": 0.83,
+		"exposure": 1.00,
 		"contrast": 1.09,
 		"bloom_threshold": 1.30,
 		"bloom_weight": 0.24,
@@ -58,13 +66,17 @@ const LOOK := {
 	GameContent.LightMode.DAY: {
 		"sun_energy": 3.0,
 		"sun_color": Color(1.00, 0.91, 0.78),
-		"hemi_energy": 0.28,
+		"hemi_energy": 0.40,
 		"hemi_sky": Color(0.74, 0.80, 0.94),
 		"hemi_ground": Color(0.30, 0.27, 0.22),
 		"environment": 0.78,
 		"fog_density": 0.000045,
 		"fog_color": Color(0.57, 0.70, 0.84),
-		"exposure": 0.74,
+		"exposure": 0.73,
+		## 环境光里留 18% 的平铺补光：纯 SKY 辐照对**水平面**几乎不贡献能量，
+		## 楼影里的路面会黑成一片（实测街景路面 RGB≈0.02）。留一点
+		## ambient_light_color 做"地面回弹"，阴影区才有可读的灰度层次。
+		"sky_contribution": 0.68,
 		"contrast": 1.10,
 		"bloom_threshold": 2.5,
 		"bloom_weight": 0.045,
@@ -295,11 +307,13 @@ func _apply_look(look: Dictionary) -> void:
 	sun.light_energy = float(look["sun_energy"]) * SUN_ENERGY_SCALE
 
 	# 半球光 → Godot 的环境光。原版注释写明「半球光是残余补光，漫射主光来自
-	# HDR 辐照度」，所以这里把 sky_contribution 留在 1.0（全走 HDR），
-	# ambient_light_color/energy 只作为 HDR 缺失时的兜底。
+	# HDR 辐照度」，所以主体走 sky_contribution=1 的 SKY 辐照。
+	# ⚠️ 2026-11-05 配平：白天留 32% 平铺补光（见 LOOK 里的 sky_contribution）——
+	# 纯 SKY 辐照对水平面贡献很低，楼影里的路面会黑成一片；leaving 一点
+	# ambient_light_color 相当于补上原版半球光的地面回弹。
 	env.ambient_light_color = look["hemi_sky"]
 	env.ambient_light_energy = float(look["hemi_energy"]) * AMBIENT_ENERGY_SCALE
-	env.ambient_light_sky_contribution = 1.0
+	env.ambient_light_sky_contribution = float(look.get("sky_contribution", 1.0))
 
 	# 雾
 	env.fog_enabled = true

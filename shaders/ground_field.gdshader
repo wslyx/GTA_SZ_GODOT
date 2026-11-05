@@ -23,6 +23,10 @@ shader_type spatial;
 
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
+// 烘焙 AO 的环境光下限（见 fragment 里 A6 段的说明）：楼影/楼脚不许把
+// 天空回弹压到 0，否则阴影区整片死黑。
+const float AO_MIN = 0.5;
+
 // ---------------------------------------------------------------------------
 // 基础参数（从被替换的 StandardMaterial3D 抄来）
 // ---------------------------------------------------------------------------
@@ -409,7 +413,12 @@ void fragment() {
 	// Godot 会自行把直射光乘上 mix(1, AO, AO_LIGHT_AFFECT)，语义完全一致。
 	float ao_scale = 1.0 / max(env_scale, 0.02);
 	if (use_city_ambient) {
-		AO = city_ambient_at(wpos, wnormal) * ao_scale;
+		// 2026-11-05 环境光配平：烘焙 AO 在楼影/楼脚会压到 0.2~0.3，而阴影区
+		// **没有直射光**，环境光再被 AO 一乘就归零 —— 实测整片草地 RGB≈0.00
+		// （关掉实时阴影同一片区域是亮的，证明是"环境光被 AO 吃掉"而不是阴影过深）。
+		// 这里给 AO 一个下限 AO_MIN：保留原版"楼脚更暗"的遮蔽语义，但不允许
+		// 把天空回弹压没；上限 3.0 防止 env_scale 极小时过曝。
+		AO = clamp(city_ambient_at(wpos, wnormal) * ao_scale, AO_MIN, 3.0);
 		AO_LIGHT_AFFECT = city_ambient_params.z;
 	} else if (abs(env_scale - 1.0) > 0.001) {
 		// 没有烘焙 AO 时，AO 只用来表达环境光强度，不该影响直射

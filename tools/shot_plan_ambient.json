@@ -1,0 +1,12 @@
+{
+ "warmup": 10.0,
+ "gap": 2.2,
+ "settle": 2.5,
+ "shots": [
+  { "name": "a1_day_street",    "env": { "light_mode": 0, "tier": "medium", "observer_at": [-2664, -862, 18, 0, -10] } },
+  { "name": "a2_day_air",       "env": { "light_mode": 0, "tier": "medium", "observer_at": [300, 300, 150, 0, -35] } },
+  { "name": "a3_sunset_street", "env": { "light_mode": 1, "tier": "medium", "observer_at": [-2664, -862, 18, 0, -10] } },
+  { "name": "a4_night_street",  "env": { "light_mode": 2, "tier": "medium", "observer_at": [-2664, -862, 18, 0, -10] } },
+  { "name": "a5_night_air",     "env": { "light_mode": 2, "tier": "medium", "observer_at": [300, 300, 120, 0, -30] } }
+ ]
+}

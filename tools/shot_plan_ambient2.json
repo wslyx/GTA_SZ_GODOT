@@ -1,0 +1,11 @@
+{
+ "warmup": 10.0,
+ "gap": 2.2,
+ "settle": 2.5,
+ "shots": [
+  { "name": "f1_day_canyon", "env": { "light_mode": 0, "tier": "medium", "observer_at": [-2664, -862, 6, 0, 3] } },
+  { "name": "f2_day_park",   "env": { "light_mode": 0, "tier": "medium", "observer_at": [1665, 1730, 20, 0, -12] } },
+  { "name": "f3_night_canyon","env": { "light_mode": 2, "tier": "medium", "observer_at": [-2664, -862, 6, 0, 3] } },
+  { "name": "f4_night_city", "env": { "light_mode": 2, "tier": "medium", "observer_at": [0, 0, 260, 0, -35] } }
+ ]
+}
