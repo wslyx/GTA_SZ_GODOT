@@ -121,18 +121,20 @@ func collect_visual_ground(world: CityWorld, for_height_fix := false) -> void:
 			return hf.lianhua_height(e, n) + hf.mountain_delta(e, n) + hf.relief_height(e, n)
 	else:
 		_native_hint = Callable()
-	# 地标/楼体：屋顶剔除（ROOF_ABOVE）。会展中心 13.2m 混凝土顶板、书城
-	# 7m 石材台地的材质名（concrete/stone）命中 GROUND_MATS，曾把楼旁路面的
-	# 物理抬到楼顶（体检 12m/4.5m 浮空）。这里的高度判据只用于人工结构根 ——
+	# 地标/楼体/区块：屋顶剔除（ROOF_ABOVE）。会展中心 13.2m 混凝土顶板、
+	# 书城 7m 石材台地、普通楼体 block_*_concrete 的楼顶（探测命中
+	# block_-3_-1_concrete 等在 59.6m / 215.6m）材质名都命中 GROUND_MATS，
+	# 曾把楼旁路面/路网的物理抬到楼顶，也让体检把楼顶当"视觉地面"报下陷。
+	# 这里的高度判据只用于人工结构根 ——
 	# ⚠️ 山体瓦片不能用：原生山体网格在西部有整片 0 的洞（实测 (-5442,-1846)
 	# 视觉山 81.6m / 原生 0m），按"高出原生即剔除"会把真山删掉。
-	var roots: Array = [world.terrain_root, world.roads_root,
-		world.buildings_root, world.chunks_root]
+	var roots: Array = [world.terrain_root, world.roads_root]
 	for r in roots:
 		if r != null:
 			_collect(r, false, for_height_fix)
-	if world.landmarks_root != null:
-		_collect(world.landmarks_root, false, for_height_fix, true)
+	for r in [world.buildings_root, world.chunks_root, world.landmarks_root]:
+		if r != null:
+			_collect(r, false, for_height_fix, true)
 	# 公园缓坡补面（distant_system 程序化生成的 ground-relief 节点）+
 	# 远山 / 近山（mountain-relief 瓦片）—— 都是 SurfaceTool 网格**无材质**，
 	# 走 all_materials 路径；height_field 的 relief/mountain delta 以它们为视觉对应层

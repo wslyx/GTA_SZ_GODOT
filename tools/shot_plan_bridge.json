@@ -1,0 +1,16 @@
+{
+ "warmup": 10.0,
+ "gap": 3.0,
+ "settle": 1.0,
+ "shots": [
+  { "name": "b0_start", "env": { "light_mode": 0, "tier": "medium", "goto": [1560, -1205, 90], "diag": true } },
+  { "name": "b1_go",    "env": { "light_mode": 0, "tier": "medium", "autopilot_drive": [1890, -1170] } },
+  { "name": "b2", "env": { "diag": true } },
+  { "name": "b3", "env": { "diag": true } },
+  { "name": "b4", "env": { "diag": true } },
+  { "name": "b5", "env": { "diag": true } },
+  { "name": "b6", "env": { "diag": true } },
+  { "name": "b7", "env": { "diag": true } },
+  { "name": "b8", "env": { "diag": true } }
+ ]
+}

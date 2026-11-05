@@ -2,13 +2,13 @@ Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
 Vulkan 1.4.357 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4060 Laptop GPU
 
 [MemProbe] t=0s static=194MB video=0MB tex=0MB nodes=72
-[BOOT-T] CityWorld 已建 t=2.1s
-[BOOT-T] CityWalk 已建 t=2.1s
+[BOOT-T] CityWorld 已建 t=2.2s
+[BOOT-T] CityWalk 已建 t=2.2s
 [ALS-T] 运行时选项 6 ms
-[ALS-T] 加载编译资源 tres 63 ms
-[ALS-T] LoadDefinition（含摘要链） 146 ms
+[ALS-T] 加载编译资源 tres 65 ms
+[ALS-T] LoadDefinition（含摘要链） 152 ms
 [ALS-T] 运动轮廓编译 9 ms
-[ALS-T] 运行时上下文构造 7492 ms
+[ALS-T] 运行时上下文构造 7204 ms
 [ALS] EnterWorld feet=(0, 0, -0) yaw=0 首次配置=True
 [ALS] slot Configure 开始 pos=(0, 0.9, 0)
 [MemProbe] ⚠ 主线程停滞 8s phase="physics_step" nodes=72
@@ -17,49 +17,49 @@ Vulkan 1.4.357 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4060 La
 ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [ALS] slot Configure 完成（active/spare 角色就绪）
-[ALS-T] slot.Configure 22463 ms
+[ALS-T] slot.Configure 23761 ms
 [ALS] EnterWorld 完成（角色已激活，轨道相机接管）0 ms
 [ALS] ExitWorld（角色停用，相机交还追尾）
-[BOOT-T] ALS 预热完成 t=32.3s
-[BOOT-T] 12 个子系统已建 t=32.3s
+[BOOT-T] ALS 预热完成 t=33.5s
+[BOOT-T] 12 个子系统已建 t=33.5s
 [Audio] 海湾晚风 BGM 已预渲染：1176000 样本（53.3s 循环）
-[BOOT-T] UI/玩法系统已建 t=32.9s
+[BOOT-T] UI/玩法系统已建 t=34.1s
 [VehicleMaterials] 已标定 ["wheel_rubber", "wheel_alloy", "carpaint", "car_glass", "car_chrome"]
 [SportDetails] 运动套件 22 个节点（rearSign=1，车身三角面 62133，后舱盖 y=0.891）
 [Cockpit] 裁掉挡视线的内饰三角形 618 个：car_trim:36, car_leather:582
-[BOOT-T] 车辆模型已载 t=33.3s
-[BOOT-T] world.build() 前 t=33.3s
+[BOOT-T] 车辆模型已载 t=34.4s
+[BOOT-T] world.build() 前 t=34.4s
 [NetSession] 心跳 in_session=false remotes=0 nodes=516
 [CityData] 命中二进制快照（2.1 MB），跳过 city.json 解析
-[MemProbe] 主线程停滞 31.0s 后恢复 phase="loading"
-[CityData] 路名生成 443 ms：未命名 7354 条获得显示名 / 共 12202 条（上下文点 293）
+[MemProbe] 主线程停滞 32.1s 后恢复 phase="loading"
+[CityData] 路名生成 474 ms：未命名 7354 条获得显示名 / 共 12202 条（上下文点 293）
 [CityData] 地标替换：剔除基础楼体 12 个
-[CityData] 核心数据加载完成 560 ms：道路 12202 / 建筑 16089 / 绿地 1703 / 水域 312 / 地标 13
-[BOOT-T] [AlsGround] 全城建筑索引 1695 格 用时 61 ms
+[CityData] 核心数据加载完成 605 ms：道路 12202 / 建筑 16089 / 绿地 1703 / 水域 312 / 地标 13
+[BOOT-T] [AlsGround] 全城建筑索引 1695 格 用时 63 ms
 [HeightField] 修正高度网格 1701x656（8m 步长，覆盖 99%）
-[CityCollision] 构建完成 178 ms：路段格 6516 / 建筑格 4361 / 陆地环 1 / 水域 312
+[CityCollision] 构建完成 183 ms：路段格 6516 / 建筑格 4361 / 陆地环 1 / 水域 312
 [CityData] 导航图：42829 节点 / 47218 边
 [RoadGraph] 使用 navigation.json：42829 节点 / 47218 边 / 主分量 35558 节点（83%）
-[BOOT-T] 装载开始 ["res://data/city/terrain.glb"] t=34.3s
-[BOOT-T] 装载完成 ["res://data/city/terrain.glb"] t=34.4s
-[BOOT-T] 装载开始 ["res://data/city/roads.glb"] t=34.5s
-[BOOT-T] 装载完成 ["res://data/city/roads.glb"] t=34.7s
-[BOOT-T] 装载开始 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=34.7s
-[BOOT-T] 装载完成 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=34.8s
+[BOOT-T] 装载开始 ["res://data/city/terrain.glb"] t=35.5s
+[BOOT-T] 装载完成 ["res://data/city/terrain.glb"] t=35.6s
+[BOOT-T] 装载开始 ["res://data/city/roads.glb"] t=35.6s
+[BOOT-T] 装载完成 ["res://data/city/roads.glb"] t=35.9s
+[BOOT-T] 装载开始 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=35.9s
+[BOOT-T] 装载完成 ["res://data/city/coastal-bridges.glb", "res://data/city/coastal-shoreline.glb", "res://data/city/opposite-shore.glb"] t=36.0s
 [CityWorld] 桥面投影已关闭 ×2（超大 casting 体，阴影贴图解析不动）
 [CityWorld] detail：按前缀移除旧地标网格 17 个
-[TencentWindows] 窗格 6058 块 / 12138 三角形 / 48 ms
-[CityWorld] 腾讯幕墙窗格数据：{ "panes": 6058, "glassTriangles": 12138, "buildMs": 48.0, "hdr": 0.55 }
+[TencentWindows] 窗格 6058 块 / 12138 三角形 / 49 ms
+[CityWorld] 腾讯幕墙窗格数据：{ "panes": 6058, "glassTriangles": 12138, "buildMs": 49.0, "hdr": 0.55 }
 [CityWorld] candidates：按前缀移除旧地标网格 16 个
 [CityWorld] 候选地标：丢弃地面平板 16 个
 [ChunkStreamer] 区块清单 150 块，加载半径 3000m / 卸载 3600m
 [ChunkStreamer] 预加载出生点 1200m 内建筑区块 8 块（3000m 外由运行时流式补齐）
 [ChunkStreamer] 载入 -6_-2 用时 0 ms（累计 载入 1 / 卸载 0 / 失败 0）
 [ChunkStreamer] 载入 -6_-1 用时 0 ms（累计 载入 2 / 卸载 0 / 失败 0）
-[ChunkStreamer] 载入 -5_-2 用时 0 ms（累计 载入 3 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -5_-2 用时 1 ms（累计 载入 3 / 卸载 0 / 失败 0）
 [ChunkStreamer] 载入 -5_-1 用时 0 ms（累计 载入 4 / 卸载 0 / 失败 0）
 [ChunkStreamer] 载入 -4_-2 用时 0 ms（累计 载入 5 / 卸载 0 / 失败 0）
-[ChunkStreamer] 载入 -4_-1 用时 1 ms（累计 载入 6 / 卸载 0 / 失败 0）
+[ChunkStreamer] 载入 -4_-1 用时 0 ms（累计 载入 6 / 卸载 0 / 失败 0）
 [ChunkStreamer] 载入 -3_-2 用时 0 ms（累计 载入 7 / 卸载 0 / 失败 0）
 [ChunkStreamer] 载入 -3_-1 用时 0 ms（累计 载入 8 / 卸载 0 / 失败 0）
 [FacadeStreamer] 瓦片清单 150 块，初始加载 700m 内
@@ -78,8 +78,12 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [ScenerySystem] 林冠 40927 棵 / 树种 6 个 / 节点 36 / 索引单元 256m
 [LandscapeLayer] 种植树 7933 棵 / 细节 64010 / 路面细节 16971 / 原型 15 / open 对账 命中（6261 棵）
 [MeadowLayer] 草地瓦片 3162 个 / safeRadius 2.9 m / 每瓦片 32×32×3 字节
+[HITCH] Scenery 本帧 18 ms
+[RoadSurface] 杆件钢材质标定 150 个（metallic 0.35 / rough 0.62）
 [RoadSurface] asphalt 3 / roadline 1 / canopy 1 / shore 1
 [GroundField] 烘焙 AO occlusion.png 3399×1307 cell=4.0 m
+[DistantSystem] mountain-near：188894 三角形（stride=2）
+[DistantSystem] 公园缓坡 54973 面
 [GroundField] 屋顶查表 3399×1307 cell=4.0 m + 细节瓦片（8 种 finish）
 [GroundField] 公共照明场灯位 20409 个（道路灯 + 公园灯）
 [GroundField] 中湾铺装 kind=1 → terrain_pavement
@@ -89,15 +93,14 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [GroundField] 中湾铺装 kind=2 → coastal_shore_concrete
 [GroundField] 中湾铺装 kind=4 → coastal_shore_coastal-rock
 [GroundField] 接管地面材质 20 个（草地 3）env_scale：沥青 0.55 / 草地 0.75 / 其余 1.00
-[DistantSystem] mountain-near：188894 三角形（stride=2）
-[RooftopLayer] 屋顶实例 76864 个 / 14 类 / 1078 个 200m 格，索引 51 ms
+[DistantSystem] 远景网格后台构建完成并挂载：3 项
+[MemProbe] t=36s static=632MB video=1313MB tex=922MB nodes=1825
+[RooftopLayer] 屋顶实例 76864 个 / 14 类 / 1078 个 200m 格，索引 48 ms
 [RooftopLayer] 屋顶原型 14 类 / 网格 39 个 / 材质 14 个（染色开启）
-[MemProbe] t=35s static=675MB video=1308MB tex=919MB nodes=1861
-[DistantSystem] 公园缓坡 54973 面
 [ArchMaterials] 立面 profile 28 个 / 贴图组 3（齐）
+[ArchMaterials] 未映射地标金属/玻璃标定 3 个材质（silver/landmarkglass/steel）
 [ArchMaterials] 接管网格 surface 86 个 / 共享材质 25 个（预算 31 + 立面多样性 :fv 变体）/ 无 UV 0 / 立面多样性 16
 [ArchMaterials] 逐材质环境光强度 env_scale 取值：[0.85, 0.96, 1.04, 1.05, 1.08]
-[DistantSystem] 远景网格后台构建完成并挂载：3 项
 [ObserverDestination] 陆地块 1 / 水域 312
 [ObserverBeacons] 光柱 3 件 / 收藏 0 个（上限 24）
 [ObserverBeacons] 落点自检：海湾生活驿站 / 有落点=true
@@ -109,26 +112,26 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [PedestrianSystem] 人行道段 36969 条
 [EbikeSystem] 停车排 mesh 21 个 / 骑手 mesh 4 个（染色开启）
 [EbikeSystem] 停车排 21110 辆，配色 11 种，索引单元 128m
-[MainGame] 城市构建完成，启动累计 37518 ms
+[MainGame] 城市构建完成，启动累计 38904 ms
+[DistantCity] 几何后台构建 1463 ms：150 块 / 462367 三角形
 [MapHealth]   terrain → 56597 地面三角形
-[DistantCity] 几何后台构建 1492 ms：150 块 / 462367 三角形
 [MapHealth]   roads → 2018043 地面三角形
-[MapHealth]   chunks → 87261 地面三角形
+[MapHealth]   chunks → 12875 地面三角形
 [MapHealth]   landmarks → 143884 地面三角形
 [MapHealth]   ground-relief → 54973 地面三角形
 [MapHealth]   mountain-far → 140140 地面三角形
 [MapHealth]   mountain-near → 188894 地面三角形
-[MapHealth] 视觉地面三角形 2689792 / 格桶 77870
-[MapHealth] 采样点 47899（路网 42829 + 起伏区 5070）
+[MapHealth] 视觉地面三角形 2615406 / 格桶 77870
+[MapHealth] 采样点 48094（路网 42829 + 起伏区 5265）
 [MemProbe] ⚠ 主线程停滞 8s phase="loading" nodes=2028
 [MemProbe] ⚠ 主线程停滞 16s phase="loading" nodes=2028
 [MemProbe] ⚠ 主线程停滞 24s phase="loading" nodes=2028
-[MapHealth] 20000/47899 …
+[MapHealth] 20000/48094 …
 [MemProbe] ⚠ 主线程停滞 32s phase="loading" nodes=2028
 [MemProbe] ⚠ 主线程停滞 40s phase="loading" nodes=2028
 [MemProbe] ⚠ 主线程停滞 48s phase="loading" nodes=2028
-[MapHealth] 40000/47899 …
-[MapHealth] 完成 54551 ms：ok=47646 浮空=120 下陷=133 空洞=0
+[MapHealth] 40000/48094 …
+[MapHealth] 完成 55457 ms：ok=47754 浮空=185 下陷=155 空洞=0
 [MapHealth] ==== 浮空 Top 30（按发现顺序）====
 [MapHealth] float,1865.1,-1186.6,2.80,0.04,2.76
 [MapHealth] float,407.2,-1192.1,2.80,0.04,2.76
@@ -137,6 +140,7 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [MapHealth] float,4934.9,-618.6,2.80,0.04,2.76
 [MapHealth] float,3620.0,1951.0,1.78,0.12,1.66
 [MapHealth] float,-5452.3,-1859.5,2.11,0.10,2.01
+[MapHealth] float,-2775.2,-573.4,1.81,0.04,1.77
 [MapHealth] float,6529.1,-187.2,2.80,0.04,2.76
 [MapHealth] float,6540.0,-181.3,2.80,0.04,2.76
 [MapHealth] float,6405.2,-254.3,2.80,0.04,2.76
@@ -145,6 +149,11 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [MapHealth] float,3963.2,-509.8,2.80,0.04,2.76
 [MapHealth] float,4409.0,-519.3,1.11,0.04,1.07
 [MapHealth] float,-5451.0,-1838.8,2.81,0.10,2.71
+[MapHealth] float,-1653.6,-351.1,1.11,0.10,1.01
+[MapHealth] float,-1644.6,-373.4,1.51,0.10,1.41
+[MapHealth] float,-1667.3,-369.7,2.06,0.10,1.96
+[MapHealth] float,-2636.7,-644.9,2.50,1.41,1.09
+[MapHealth] float,-3756.9,-93.1,1.52,0.10,1.42
 [MapHealth] float,6344.6,-287.1,2.80,0.04,2.76
 [MapHealth] float,-5416.8,-1864.1,2.22,0.10,2.12
 [MapHealth] float,3188.8,494.5,1.61,0.10,1.51
@@ -152,15 +161,9 @@ ALS_FOOT_SUPPORT_GEOMETRY left=780 right=780 bones=79 bind_error_m=7.365435E-05
 [MapHealth] float,1820.1,742.6,2.16,0.71,1.45
 [MapHealth] float,1848.9,742.9,3.52,0.10,3.42
 [MapHealth] float,3158.7,2024.9,5.42,3.04,2.38
+[MapHealth] float,-1440.2,-239.9,1.69,0.10,1.59
 [MapHealth] float,1754.5,-243.2,3.82,1.19,2.62
-[MapHealth] float,1916.9,-94.2,3.82,1.19,2.62
-[MapHealth] float,2095.3,-1170.0,2.80,0.04,2.76
-[MapHealth] float,2290.1,-1155.9,2.80,0.04,2.76
-[MapHealth] float,2024.7,-1175.1,2.80,0.04,2.76
-[MapHealth] float,2612.8,-1088.5,2.80,-0.11,2.91
-[MapHealth] float,1592.1,-1206.3,2.80,0.04,2.76
-[MapHealth] float,1600.0,-1205.7,2.80,0.04,2.76
-[MapHealth] 汇总 ok=47646 浮空=120 下陷=133 空洞=0 → artifacts/map_health/mismatches.csv
+[MapHealth] 汇总 ok=47754 浮空=185 下陷=155 空洞=0 → artifacts/map_health/mismatches.csv
 WARNING: A Thread object is being destroyed without its completion having been realized.
 Please call wait_to_finish() on it to ensure correct cleanup.
    at: ~Thread (core/os/thread.cpp:116)

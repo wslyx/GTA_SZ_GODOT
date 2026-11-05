@@ -1710,7 +1710,11 @@ func _step_car(dt: float) -> void:
 	# ---- 落水判定（GTA 式，2026-11-05 体检 s07/s08）----
 	# 水面纯视觉无碰撞，车开进深圳湾会悬浮在水上继续开。is_water 与水面
 	# 网格同源；入水即强阻力减速，2 秒后拖回最近主路口。
-	if world.water != null and world.water.is_water(car.x, car.z):
+	# ⚠️ 必须同时满足"脚下地面低于水面"：跨海桥梁的桥面在水面正上方，
+	# 只按 XZ 判定会把桥上正常行驶的车判成落水（桥面 hf=2.8 > 水面）。
+	if world.water != null and world.water.is_water(car.x, car.z) \
+			and world.height_field.height_at(car.x, car.z) \
+				<= world.height_field.water_height + 0.3:
 		_in_water_t += dt
 		# 水阻：每秒速度衰减到 8%（比手刹狠），原地熄火漂在水面
 		car.speed *= pow(0.08, dt)
@@ -1842,7 +1846,10 @@ func _step_walk(dt: float) -> void:
 		walk.moving = walk.speed > 0.1
 		walk_eye_world = motor
 		# ---- 落水（步行）：水面纯视觉，ALS 会走在水面上 —— 1 秒后送回最近路口 ----
-		if world.water != null and world.water.is_water(walk.x, walk.z):
+		# 同车辆：桥面上（hf 高于水面）不算落水。
+		if world.water != null and world.water.is_water(walk.x, walk.z) \
+				and world.height_field.height_at(walk.x, walk.z) \
+					<= world.height_field.water_height + 0.3:
 			_walk_in_water_t += dt
 			if _walk_in_water_t > 1.0:
 				var nid_w := world.graph.nearest_main_node(Vector2(walk.x, walk.z))
