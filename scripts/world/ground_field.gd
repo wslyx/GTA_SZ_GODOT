@@ -159,6 +159,14 @@ func _load_ambient() -> bool:
 			% [img.get_width(), img.get_height(), w, h])
 	if img.get_format() != Image.FORMAT_RGB8:
 		img.convert(Image.FORMAT_RGB8)
+	# 性能优化方案 §2.4：AO 是低频内容（三通道 = 0/12/40m 天空可见度），
+	# shader 按归一化 UV 采样（ground_field.gdshader:166），与分辨率无关。
+	# 原图 3399×1307（非 POT）RGB8 ≈ 13.3MB 显存；长边压到 2048（保持长宽比、
+	# Lanczos + 线性过滤）后 ≈ 4.8MB，观感无差。源 PNG 不动，仅加载期缩。
+	const AMBIENT_MAX_EDGE := 2048
+	if img.get_width() > AMBIENT_MAX_EDGE:
+		var nh := maxi(1, int(round(float(img.get_height()) * float(AMBIENT_MAX_EDGE) / float(img.get_width()))))
+		img.resize(AMBIENT_MAX_EDGE, nh, Image.INTERPOLATE_LANCZOS)
 	_ambient_tex = ImageTexture.create_from_image(img)
 	# 高度与淡出上限在这里就摊成 Vector4 —— 构造器参数必须是静态 float，
 	# 写成 `Vector4(float(hs[0]) if ... else ..., ...)` 在解析期过不了。

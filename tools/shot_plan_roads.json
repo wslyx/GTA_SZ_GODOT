@@ -1,0 +1,9 @@
+{
+ "warmup": 8.0,
+ "gap": 2.0,
+ "settle": 7.0,
+ "shots": [
+  { "name": "road_downtown", "env": { "light_mode": 0, "tier": "medium", "goto": [640, 640], "diag": true } },
+  { "name": "road_downtown2", "env": { "diag": true } }
+ ]
+}

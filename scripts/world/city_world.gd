@@ -267,16 +267,37 @@ func _process(delta: float) -> void:
 	MemProbe.phase = "cw.done"
 
 
+## 子系统更新缓存（性能优化方案 §2.2）：此前每帧构造 14 元素字面量数组 +
+## 每个系统做一次 "cw." + str(name) 字符串拼接。构建完成后子系统列表不变，
+## 首次调用时缓存一次即可。
+var _subsystem_cache: Array = []
+var _subsystem_phases: PackedStringArray = []
+
 func _update_subsystems(delta: float) -> void:
-	for sys in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials, wanted]:
-		if sys != null and sys.has_method("update_system"):
-			MemProbe.phase = "cw." + str(sys.name)
-			var __t0 := Time.get_ticks_msec()
-			sys.update_system(delta, focus)
-			# 慢查日志：哪个子系统单帧超 8ms 一目了然（grep [SLOW]）
-			var __ms := Time.get_ticks_msec() - __t0
-			if __ms > 8:
-				print("[SLOW] cw.%s 本帧 %d ms" % [str(sys.name), __ms])
+	if _subsystem_cache.is_empty():
+		for s in [traffic, pedestrians, ebikes, signals, weather, water, scenery, distant, distant_city, signs, ground_field, rooftop_layer, arch_materials, wanted]:
+			_subsystem_cache.append(s)
+			_subsystem_phases.append(
+				"cw." + str(s.name) if s != null and s.has_method("update_system") else "")
+	var n := _subsystem_cache.size()
+	for i in n:
+		if i >= _subsystem_cache.size():
+			break
+		var sys = _subsystem_cache[i]
+		if sys == null or _subsystem_phases[i].is_empty():
+			# 可选子系统未启用（旧代码的 sys != null 守卫语义），正常跳过
+			continue
+		if not is_instance_valid(sys):
+			# 节点已被释放：清缓存下一帧重建，避免永久跳过
+			_subsystem_cache.clear()
+			break
+		MemProbe.phase = _subsystem_phases[i]
+		var __t0 := Time.get_ticks_msec()
+		sys.update_system(delta, focus)
+		# 慢查日志：哪个子系统单帧超 8ms 一目了然（grep [SLOW]）
+		var __ms := Time.get_ticks_msec() - __t0
+		if __ms > 8:
+			print("[SLOW] %s 本帧 %d ms" % [_subsystem_phases[i], __ms])
 	# 30s 一次节点前缀直方图：节点泄露直接看增量（grep [NODESTAT]）
 	_nodestat_timer -= delta
 	if _nodestat_timer <= 0.0:
@@ -426,8 +447,15 @@ func _plan_terrain() -> bool:
 
 
 # --- 步骤 2：道路 -----------------------------------------------------------
+## 性能优化方案 §2.10：roads.glb 按材质离线合批（tools/merge_roads.py），
+## 765 MeshInstance3D / 765 draw call → 5 / 5（tree 模式实测占全场 draw call 46%）。
+## 合并产物缺失时自动回退原 GLB（烘焙可删，不锁死）。
+const ROADS_MERGED_PATH := "res://data/city/roads_merged.glb"
+
 func _plan_roads() -> bool:
-	return _enqueue_step(["res://data/city/roads.glb"], roads_root, "roads")
+	var p := ROADS_MERGED_PATH if ResourceLoader.exists(ROADS_MERGED_PATH) \
+		else "res://data/city/roads.glb"
+	return _enqueue_step([p], roads_root, "roads")
 
 
 # --- 步骤 2.5：路面 / 车道线 / 林冠材质标定 ---------------------------------

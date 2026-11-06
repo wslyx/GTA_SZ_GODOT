@@ -69,6 +69,8 @@ var _siren_tone := 0.0    ## 警笛音调相位
 var _amb_lfo := 0.0       ## 海浪起伏 LFO
 var _hum_phase := 0.0     ## 工业电力嗡鸣相位
 var _gun_env := 0.0       ## 枪声包络（快衰减）
+## 音频批量合成缓冲（性能优化方案 §2.3）：复用，避免每帧分配
+var _frame_buf := PackedVector2Array()
 
 ## 播放偏好（原版 city-audio.ts 的 AudioPreferences，暂停页可调）：
 ##   effects = 车辆 / 环境音量，music = 海湾晚风 · BGM 音量
@@ -238,13 +240,25 @@ func _process(delta: float) -> void:
 
 	var ev := 0.0 if muted else clampf(effects_volume, 0.0, 1.0)
 	var frames := playback.get_frames_available()
-	for i in frames:
-		# 只算一次采样再同时给左右声道。
-		# 之前写 Vector2(_sample(), _sample())：_sample() 内部会推进 _bgm_sample
-		# 与各个相位，调两次等于每帧推进两个采样点 —— BGM 速度翻倍（72→144 BPM），
-		# 而且左右声道取到的是两条互不相关的噪声，听感是散开的双声道而非同一声源。
-		var s := _sample() * ev
-		playback.push_frame(Vector2(s, s))
+	if frames <= 0:
+		return
+	# 批量合成（性能优化方案 §2.3）：此前逐样本 push_frame，每帧几百次
+	# 跨 GDScript/引擎边界的调用 + 同样多的 Vector2 装箱；改为先填一块
+	# 复用的 PackedVector2Array 再一次性 push_buffer。静音时连 _sample()
+	# 都不跑（相位停走无听感影响），直接推静音帧。
+	if _frame_buf.size() != frames:
+		_frame_buf.resize(frames)
+	if ev <= 0.0005:
+		_frame_buf.fill(Vector2.ZERO)
+	else:
+		for i in frames:
+			# 只算一次采样再同时给左右声道。
+			# 之前写 Vector2(_sample(), _sample())：_sample() 内部会推进 _bgm_sample
+			# 与各个相位，调两次等于每帧推进两个采样点 —— BGM 速度翻倍（72→144 BPM），
+			# 而且左右声道取到的是两条互不相关的噪声，听感是散开的双声道而非同一声源。
+			var s := _sample() * ev
+			_frame_buf[i] = Vector2(s, s)
+	playback.push_buffer(_frame_buf)
 
 
 func _sample() -> float:

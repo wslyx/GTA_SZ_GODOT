@@ -470,9 +470,16 @@ func _build_combat() -> void:
 
 
 ## 任务进度（missions.status() 摘要；空串 = 隐藏）
+var _last_mission_text := ""
+
 func set_mission(text: String) -> void:
 	if _mission_label == null:
 		return
+	# 每帧调用但文案极少变化：text 相同直接返回，避免 Label.text 重写
+	# 触发布局/CJK 重排版（性能优化方案 §2.2）
+	if text == _last_mission_text:
+		return
+	_last_mission_text = text
 	_mission_label.text = text
 	_mission_label.visible = not text.is_empty()
 

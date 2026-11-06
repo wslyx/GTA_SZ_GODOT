@@ -249,13 +249,13 @@ func on_light_mode(mode: int) -> void:
 		Color(0.018, 0.062, 0.070) if night else Color(0.025, 0.095, 0.105))
 
 
-func update_system(_delta: float, focus: Vector3) -> void:
+func update_system(delta: float, focus: Vector3) -> void:
 	# 环形远海跟随焦点，保证视野内永远有海平线
 	if horizon_mesh != null:
 		horizon_mesh.global_position = Vector3(focus.x, HORIZON_Y, focus.z)
-	# 平面镜逐帧跟随主相机（mirror 视角 = 主相机跨水面镜像）
+	# 平面镜跟随主相机（mirror 视角 = 主相机跨水面镜像）；delta 供刷新节流
 	if planar_mirror != null:
-		planar_mirror.update_mirror(get_viewport().get_camera_3d())
+		planar_mirror.update_mirror(get_viewport().get_camera_3d(), delta)
 
 
 func diagnostics() -> Dictionary:

@@ -6,6 +6,7 @@ using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
+using System.Runtime;
 
 namespace GodotAls.Locomotion;
 
@@ -91,6 +92,23 @@ public partial class GtaSzAlsPlayerHost : Node3D
     /// <summary>轨道相机节点 yaw；GTA 数据 yaw = -ViewYaw。</summary>
     public float ViewYaw => _orbitCamera.Yaw;
 
+    /// <summary>内存打点（性能优化方案 §7.7）：强制收一轮 GC 后报托管堆/工作集/提交量，
+    /// 外加 Godot 原生资源记账（static）与显存（video），用于把 ALS 启动期的内存增量
+    /// 拆成「Godot 资源 / 托管堆 / 非记账原生」三份。只允许在启动预热期调用。</summary>
+    private static void PrintMemory(string label)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var managed = GC.GetTotalMemory(false) / 1048576.0;
+        var stat = Godot.Performance.GetMonitor(Godot.Performance.Monitor.MemoryStatic) / 1048576.0;
+        var video = Godot.RenderingServer.GetRenderingInfo(Godot.RenderingServer.RenderingInfo.VideoMemUsed) / 1048576.0;
+        using var p = System.Diagnostics.Process.GetCurrentProcess();
+        var ws = p.WorkingSet64 / 1048576.0;
+        var priv = p.PrivateMemorySize64 / 1048576.0;
+        GD.Print($"[ALS-MEM] {label} 托管={managed:F0}MB static={stat:F0}MB video={video:F0}MB 工作集={ws:F0}MB 提交={priv:F0}MB");
+    }
+
     public override void _Ready()
     {
         // 启动性能归因：ALS 资产链（摘要校验 + 动画集编译）在大仓库里可能吃掉
@@ -98,6 +116,7 @@ public partial class GtaSzAlsPlayerHost : Node3D
         var sw = System.Diagnostics.Stopwatch.StartNew();
         void Mark(string label)
         {
+            PrintMemory(label);
             GD.Print($"[ALS-T] {label} {sw.ElapsedMilliseconds} ms");
             sw.Restart();
         }
@@ -177,6 +196,12 @@ public partial class GtaSzAlsPlayerHost : Node3D
                 _slot.Configure(_context, () => _playerInput, capsuleCenter);
                 _slotConfigured = true;
                 enterSw.Restart();
+                // 预热收尾：编译期 69MB 原始动画解析在 LOH 留下大量碎片，.NET 不会
+                // 主动归还 OS —— 压缩 LOH + 激进回收一次（性能优化方案 §7.7）。
+                PrintMemory("slot.Configure 后（压缩前）");
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                PrintMemory("slot.Configure 后（压缩后）");
                 GD.Print($"[ALS-T] slot.Configure {cfgSw.ElapsedMilliseconds} ms");
             }
             else

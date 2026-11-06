@@ -1166,10 +1166,23 @@ func _try_jack_traffic_car() -> bool:
 	return true
 
 
+## 载具状态缓存字典（性能优化方案 §2.2）：_vehicle_state() 每帧被调 2–3 次，
+## 每次都 new Dictionary 会累积 GC 压力。所有调用方均只读（walk.can_enter /
+## exit_car 现场取值不持有引用），复用同一份安全。
+var _vehicle_state_cache := {"x": 0.0, "z": 0.0, "yaw": 0.0, "speed": 0.0}
+
 func _vehicle_state() -> Dictionary:
 	if mode == Mode.TANK:
-		return {"x": tank.x, "z": tank.z, "yaw": tank.yaw, "speed": tank.speed}
-	return {"x": car.x, "z": car.z, "yaw": car.yaw, "speed": car.speed}
+		_vehicle_state_cache["x"] = tank.x
+		_vehicle_state_cache["z"] = tank.z
+		_vehicle_state_cache["yaw"] = tank.yaw
+		_vehicle_state_cache["speed"] = tank.speed
+	else:
+		_vehicle_state_cache["x"] = car.x
+		_vehicle_state_cache["z"] = car.z
+		_vehicle_state_cache["yaw"] = car.yaw
+		_vehicle_state_cache["speed"] = car.speed
+	return _vehicle_state_cache
 
 func _flush_speed() -> void:
 	car.speed = 0.0
@@ -1485,7 +1498,7 @@ func _process(delta: float) -> void:
 		world.wanted.set_player_state(p, speed)
 		hud.set_wanted(world.wanted.wanted_level, world.wanted.heat)
 	if not paused:
-		rides.step(p, speed, absf(float(_vehicle_state()["speed"])) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
+		rides.step(p, speed, absf(speed) * dt if mode in [Mode.CAR, Mode.TANK] else 0.0)
 		res = career.step(dt, p, speed, false, false)
 		story.note_position(p)
 		# 街头任务（GTA化 §2.4）：事件文案 + 地图光标同步
